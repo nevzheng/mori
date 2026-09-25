@@ -40,6 +40,21 @@ impl Code {
     }
 }
 
+/// What every mori error carries for AIP-193, so the edges (CLI, MCP) render them all the same way.
+pub trait ErrorDetails: std::error::Error {
+    /// The canonical code.
+    fn code(&self) -> Code;
+
+    /// The `ErrorInfo.reason`: stable, `UPPER_SNAKE_CASE`.
+    fn reason(&self) -> &'static str;
+
+    /// The `ErrorInfo.domain`, e.g. `config.mori`.
+    fn domain(&self) -> &'static str;
+
+    /// The `ErrorInfo.metadata`, with lowerCamelCase keys.
+    fn metadata(&self) -> Vec<(&'static str, String)>;
+}
+
 /// Where a root was recorded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RootSource {
@@ -110,10 +125,10 @@ pub enum ConfigError {
 impl ConfigError {
     /// The AIP-193 `ErrorInfo.domain`.
     pub const DOMAIN: &'static str = "config.mori";
+}
 
-    /// The canonical code.
-    #[must_use]
-    pub fn code(&self) -> Code {
+impl ErrorDetails for ConfigError {
+    fn code(&self) -> Code {
         match self {
             Self::NotAbsolute { .. } | Self::NotUtf8 { .. } | Self::ConfigInvalid { .. } => {
                 Code::InvalidArgument
@@ -122,9 +137,7 @@ impl ConfigError {
         }
     }
 
-    /// The AIP-193 `ErrorInfo.reason`: stable, `UPPER_SNAKE_CASE`.
-    #[must_use]
-    pub fn reason(&self) -> &'static str {
+    fn reason(&self) -> &'static str {
         match self {
             Self::HomeNotSet => "HOME_NOT_SET",
             Self::NotAbsolute { .. } => "PATH_NOT_ABSOLUTE",
@@ -134,9 +147,11 @@ impl ConfigError {
         }
     }
 
-    /// The AIP-193 `ErrorInfo.metadata`, with lowerCamelCase keys.
-    #[must_use]
-    pub fn metadata(&self) -> Vec<(&'static str, String)> {
+    fn domain(&self) -> &'static str {
+        Self::DOMAIN
+    }
+
+    fn metadata(&self) -> Vec<(&'static str, String)> {
         let path = |p: &PathBuf| p.display().to_string();
         match self {
             Self::HomeNotSet => vec![],

@@ -12,6 +12,7 @@ publish = false
 
 # Shared third-party versions. prost, pbjson and protox must agree on prost 0.14.
 [workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
 pbjson = "0.9"
 pbjson-build = "0.9"
 prost = "0.14"

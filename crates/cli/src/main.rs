@@ -1,31 +1,48 @@
 //! The `mori` command.
+//!
+//! Every failure is a `google.rpc.Status`, and the exit code is its canonical code's number: 0 for
+//! success, 3 for bad arguments, 9 for a failed precondition, and so on.
 
-use std::io::Write;
+mod init;
+mod output;
+
 use std::process::ExitCode;
 
-/// Exit code for bad arguments (`INVALID_ARGUMENT`).
-const EXIT_USAGE: u8 = 2;
+use clap::{Parser, Subcommand};
+
+/// mori looks after a forest of repos and worktrees, for you and your agents.
+#[derive(Debug, Parser)]
+#[command(name = "mori", version)]
+struct Cli {
+    /// Print one JSON object on stdout instead of text, for errors too.
+    #[arg(long, global = true)]
+    json: bool,
+
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Set up mori's root, config and database. Only adds things; safe to run again.
+    Init {
+        /// Show what would be created, and create nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
 
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match args.as_slice() {
-        [flag] if flag == "--version" || flag == "-V" => {
-            match writeln!(
-                std::io::stdout().lock(),
-                "mori {}",
-                env!("CARGO_PKG_VERSION")
-            ) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(_) => ExitCode::FAILURE,
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => return output::usage_error(&error),
+    };
+    match cli.command {
+        Command::Init { dry_run } => match init::run(dry_run) {
+            Ok(response) => {
+                output::success(cli.json, &response, output::init_text(&response).as_str())
             }
-        }
-        _ => {
-            // Best effort: if stderr is gone there is nowhere left to report to.
-            let _ = writeln!(
-                std::io::stderr().lock(),
-                "usage: mori --version\n\nmori is pre-alpha: nothing else exists yet."
-            );
-            ExitCode::from(EXIT_USAGE)
-        }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
     }
 }

@@ -171,7 +171,7 @@ impl Database {
 mod tests {
     use std::os::unix::fs::PermissionsExt;
 
-    use mori_core::error::Code;
+    use mori_core::error::{Code, ErrorDetails};
 
     use super::*;
 

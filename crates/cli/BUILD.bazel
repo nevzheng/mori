@@ -1,3 +1,4 @@
+load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
 
@@ -9,9 +10,15 @@ extract_cargo_lints(
 
 rust_binary(
     name = "mori",
-    srcs = ["src/main.rs"],
+    srcs = glob(["src/**/*.rs"]),
     lint_config = ":lints",
-    visibility = ["//visibility:public"],  # the Python e2e tests will depend on it
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],  # the Python e2e tests depend on it
+    deps = all_crate_deps(normal = True) + [
+        "//crates/api:mori_api",
+        "//crates/core:mori_core",
+        "//crates/store:mori_store",
+    ],
 )
 
 rust_test(
@@ -21,4 +28,8 @@ rust_test(
     data = [":mori"],
     lint_config = ":lints",
     rustc_env = {"CARGO_BIN_EXE_mori": "$(rootpath :mori)"},
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ),
 )
