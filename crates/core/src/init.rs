@@ -231,6 +231,7 @@ fn unmanaged(paths: &Paths, clones: &[PathBuf]) -> Vec<UnmanagedRepo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorDetails;
     use crate::paths::Env;
 
     fn paths() -> Paths {

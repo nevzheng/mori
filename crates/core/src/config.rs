@@ -66,6 +66,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorDetails;
 
     const PATH: &str = "/home/acme/.config/mori/config.toml";
 

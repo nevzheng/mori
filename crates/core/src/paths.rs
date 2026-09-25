@@ -174,6 +174,7 @@ pub fn utf8(path: &Path) -> Result<&str, ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorDetails;
 
     fn env(vars: &[(&str, &str)]) -> Env {
         Env::from_vars(|name| {

@@ -12,4 +12,4 @@ Feature: Harness smoke test
 
   Scenario: Unknown arguments are a usage error
     When I run "mori plant a-tree"
-    Then it fails with exit code 2
+    Then it fails with exit code 3

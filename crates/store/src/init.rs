@@ -183,7 +183,7 @@ fn io(path: &Path, source: std::io::Error) -> StoreError {
 mod tests {
     use std::os::unix::fs::PermissionsExt;
 
-    use mori_core::error::ConfigError;
+    use mori_core::error::{ConfigError, ErrorDetails};
     use mori_core::init::plan;
     use mori_core::paths::Env;
 
