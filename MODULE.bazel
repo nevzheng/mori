@@ -19,16 +19,7 @@ crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.from_cargo(
     name = "crates",
     cargo_lockfile = "//:Cargo.lock",
-    manifests = [
-        "//:Cargo.toml",
-        "//crates/cli:Cargo.toml",
-        "//crates/core:Cargo.toml",
-        "//crates/git:Cargo.toml",
-        "//crates/github:Cargo.toml",
-        "//crates/jj:Cargo.toml",
-        "//crates/mcp:Cargo.toml",
-        "//crates/store:Cargo.toml",
-    ],
+    manifests = ["//:Cargo.toml"],  # member crates are found from the workspace
 )
 use_repo(crate, "crates")
 

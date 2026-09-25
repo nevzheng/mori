@@ -1,0 +1,49 @@
+load("@crates//:defs.bzl", "all_crate_deps")
+load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+
+# The toolchain's rustfmt: generated code is formatted so `bazel run @rules_rust//:rustfmt`
+# never changes it.
+RUSTFMT = "@rules_rust//tools/upstream_wrapper:rustfmt"
+
+extract_cargo_lints(
+    name = "lints",
+    manifest = "Cargo.toml",
+    workspace = "//:Cargo.toml",
+)
+
+rust_library(
+    name = "mori_protogen",
+    srcs = ["src/lib.rs"],
+    lint_config = ":lints",
+    deps = all_crate_deps(normal = True),
+)
+
+# bazel run //tools/protogen
+rust_binary(
+    name = "protogen",
+    srcs = ["src/main.rs"],
+    data = [RUSTFMT],
+    env = {"RUSTFMT": "$(rootpath %s)" % RUSTFMT},
+    lint_config = ":lints",
+    deps = [":mori_protogen"],
+)
+
+rust_test(
+    name = "up_to_date_test",
+    size = "small",
+    srcs = ["tests/up_to_date.rs"],
+    data = [
+        "//crates/api:src/gen/mori.v1alpha1.rs",
+        "//crates/api:src/gen/mori.v1alpha1.serde.rs",
+        "//proto:mori/v1alpha1/mori.proto",
+        RUSTFMT,
+    ],
+    env = {
+        "RUSTFMT": "$(rootpath %s)" % RUSTFMT,
+        "GEN_FILE": "$(rootpath //crates/api:src/gen/mori.v1alpha1.rs)",
+        "PROTO_FILE": "$(rootpath //proto:mori/v1alpha1/mori.proto)",
+    },
+    lint_config = ":lints",
+    deps = [":mori_protogen"],
+)

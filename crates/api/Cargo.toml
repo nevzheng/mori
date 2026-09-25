@@ -1,0 +1,20 @@
+[package]
+name = "mori-api"
+description = "mori's API types, generated from proto/mori/v1alpha1."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+pbjson.workspace = true
+prost.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

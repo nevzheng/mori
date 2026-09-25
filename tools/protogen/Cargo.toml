@@ -1,0 +1,18 @@
+[package]
+name = "mori-protogen"
+description = "Generates crates/api/src/gen from proto/ (protox, prost, pbjson; no protoc)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+pbjson-build.workspace = true
+prost.workspace = true
+prost-build.workspace = true
+protox.workspace = true
+
+[lints]
+workspace = true

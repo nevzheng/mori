@@ -43,4 +43,7 @@ bazel test //...    # builds everything; clippy and rustfmt run on every target;
 ```
 
 Lints live in `Cargo.toml` (`[workspace.lints]`) and Bazel applies them through
-`extract_cargo_lints`. Adding a crate means adding it to the `manifests` list in `MODULE.bazel`.
+`extract_cargo_lints`. New crates under `crates/*` or `tools/*` are picked up automatically.
+
+The API is proto-first: edit `proto/`, then run `bazel run //tools/protogen` and commit
+`crates/api/src/gen/`. Never edit generated code by hand; a test fails if it's stale.

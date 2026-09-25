@@ -1,6 +1,64 @@
 syntax = "proto3";
 
 // mori's API. Alpha: no stability guarantees; anything may change in any release (AIP-185).
-// Resources, methods and error details are defined here first, and everything else is generated
-// from this package.
+// Everything else (Rust types, JSON output, MCP tool schemas) is generated from this package.
 package mori.v1alpha1;
+
+// mori's operations.
+service MoriService {
+  // Sets up mori once per machine: the root layout, the config and the state store.
+  // Only ever adds things; running it again changes nothing.
+  rpc Init(InitRequest) returns (InitResponse);
+}
+
+// Request for `Init`.
+message InitRequest {
+  // Report what would be created without creating anything (AIP-163; the CLI's --dry-run).
+  bool validate_only = 1;
+}
+
+// Response for `Init`.
+message InitResponse {
+  // Absolute path of the root.
+  string root = 1;
+
+  // True if mori was already set up and nothing changed.
+  bool already_initialized = 2;
+
+  // Echoes the request: true if nothing was actually created.
+  bool validate_only = 3;
+
+  // What was created, or would be created when `validate_only` is set.
+  repeated CreatedPath created = 4;
+
+  // Clones found under the root that mori didn't make. mori never touches them.
+  repeated UnmanagedRepo unmanaged_repos = 5;
+}
+
+// A path `Init` created.
+message CreatedPath {
+  // What kind of path it is.
+  enum Kind {
+    // Not set.
+    KIND_UNSPECIFIED = 0;
+    // A directory.
+    KIND_DIRECTORY = 1;
+    // A regular file.
+    KIND_FILE = 2;
+  }
+
+  // Absolute path.
+  string path = 1;
+
+  // Directory or file.
+  Kind kind = 2;
+}
+
+// A clone under the root that mori didn't make.
+message UnmanagedRepo {
+  // The repo's identity, e.g. "github.com/acme/widget".
+  string repo = 1;
+
+  // Absolute path of the clone.
+  string path = 2;
+}

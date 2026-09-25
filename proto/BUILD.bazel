@@ -1,0 +1,4 @@
+exports_files(
+    ["mori/v1alpha1/mori.proto"],
+    visibility = ["//tools/protogen:__pkg__"],
+)
