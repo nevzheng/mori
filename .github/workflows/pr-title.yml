@@ -8,7 +8,7 @@ on:
 permissions: {}
 
 jobs:
-  check:
+  pr-title: # the job id is the check name that branch protection requires
     runs-on: ubuntu-latest
     steps:
       - name: Conventional Commit title, no attribution
