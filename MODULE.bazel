@@ -2,6 +2,7 @@ module(name = "mori", version = "0.0.0")
 
 bazel_dep(name = "rules_rust", version = "0.74.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "rules_python", version = "2.3.4")
 
 # The Rust toolchain comes from Bazel, pinned to the same version as rust-toolchain.toml.
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -30,3 +31,23 @@ crate.from_cargo(
     ],
 )
 use_repo(crate, "crates")
+
+# Python for the end-to-end tests, which run the real binary: a hermetic interpreter and locked
+# test dependencies.
+# No implicit __init__.py files (deprecated in rules_python; they turn test dirs into packages).
+rules_python_config = use_extension("@rules_python//python/extensions:config.bzl", "config")
+rules_python_config.explicit_init_py(default = True)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.13",
+)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pypi",
+    python_version = "3.13",
+    requirements_lock = "//e2e:requirements_lock.txt",
+)
+use_repo(pip, "pypi")

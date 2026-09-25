@@ -1,0 +1,27 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+
+exports_files(["requirements_lock.txt"])
+
+# Runs every CUJ feature (spec/cuj) and the harness smoke feature against the real `mori` binary.
+py_test(
+    name = "e2e_test",
+    size = "small",
+    srcs = [
+        "conftest.py",
+        "matchers.py",
+        "pytest_main.py",
+        "test_features.py",
+    ],
+    data = [
+        "features/smoke.feature",
+        "//crates/cli:mori",
+        "//spec/cuj:features",
+    ],
+    env = {"MORI_BIN": "$(rootpath //crates/cli:mori)"},
+    main = "pytest_main.py",
+    deps = [
+        "@pypi//precisely",
+        "@pypi//pytest",
+        "@pypi//pytest_bdd",
+    ],
+)

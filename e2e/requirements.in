@@ -1,0 +1,5 @@
+# End-to-end test dependencies. Lock with:
+#   uv pip compile e2e/requirements.in --universal --python-version 3.13 --generate-hashes -o e2e/requirements_lock.txt
+pytest
+pytest-bdd
+precisely
