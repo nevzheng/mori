@@ -18,7 +18,8 @@ anything may change in any release.
 - **Fix something small** (typos, docs, an obvious bug): open a PR directly.
 - **Build something bigger:** see *Spec- and design-driven development* below. Unsure whether it
   fits? Open an issue and ask first.
-- **Security issues:** never in a public issue. See [SECURITY.md](SECURITY.md).
+- **Security issues:** never in a public issue. See
+  [SECURITY.md](https://github.com/nevzheng/mori/blob/main/SECURITY.md).
 
 ## The bar
 
@@ -76,7 +77,8 @@ an issue and ask.
   every target, and runs the tests, including the end-to-end CUJ scenarios.
 - `cargo` works too, but Bazel is the supported path.
 - The API is proto-first: edit `proto/`, run `bazel run //tools/protogen`, commit the result.
-- [AGENTS.md](AGENTS.md) has the full working rules; they apply to humans and agents alike.
+- [AGENTS.md](https://github.com/nevzheng/mori/blob/main/AGENTS.md) has the full working rules; they
+  apply to humans and agents alike.
 
 ## Pull requests
 
@@ -94,9 +96,11 @@ Reviews use [Conventional Comments](https://conventionalcomments.org/) (`issue:`
 
 ## Code of conduct
 
-Everyone taking part in mori follows the [code of conduct](CODE_OF_CONDUCT.md).
+Everyone taking part in mori follows the
+[code of conduct](https://github.com/nevzheng/mori/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 
 Unless you say otherwise, anything you submit is licensed under
-[Apache-2.0](LICENSE), like the rest of mori (section 5 of the license). No CLA.
+[Apache-2.0](https://github.com/nevzheng/mori/blob/main/LICENSE), like the rest of mori (section 5
+of the license). No CLA.

@@ -1,0 +1,43 @@
+/* mori colours: Everforest (MIT), darkened where needed so text passes WCAG AA. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #4f6b2a;
+  --md-primary-fg-color--light: #6e8a3e;
+  --md-primary-fg-color--dark: #3b5220;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: #5c6f00;
+  --md-default-bg-color: #fdf6e3;
+  --md-typeset-color: #5c6a72;
+  --md-typeset-a-color: #2f6f8f;
+  --md-code-bg-color: #f4f0d9;
+  --md-footer-bg-color: #3b5220;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #a7c080;
+  --md-primary-fg-color--light: #bcd09a;
+  --md-primary-fg-color--dark: #8da866;
+  --md-primary-bg-color: #2d353b;
+  --md-primary-bg-color--light: #343f44;
+  --md-accent-fg-color: #83c092;
+  --md-default-bg-color: #2d353b;
+  --md-typeset-color: #d3c6aa;
+  --md-typeset-a-color: #7fbbb3;
+  --md-code-bg-color: #343f44;
+  --md-footer-bg-color: #232a2e;
+}
+
+/* Brand page: show the logo on the dark background too. */
+.mori-logo-on-dark {
+  background: #2d353b;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+
+/* Brand page: a small colour chip before each hex code. */
+.md-typeset .swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+  border-radius: 0.2em;
+  border: 1px solid rgb(128 128 128 / 40%);
+}
