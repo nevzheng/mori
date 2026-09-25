@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="mori">
+  <g fill="#8DA101">
+    <path d="M32 4 L44 26 H20 Z"/><rect x="30" y="26" width="4" height="6" fill="#6E7F02"/>
+  </g>
+  <g fill="#35A77C">
+    <path d="M17 28 L29 52 H5 Z"/><rect x="15" y="52" width="4" height="7" fill="#2A8563"/>
+  </g>
+  <g fill="#35A77C">
+    <path d="M47 28 L59 52 H35 Z"/><rect x="45" y="52" width="4" height="7" fill="#2A8563"/>
+  </g>
+</svg>
