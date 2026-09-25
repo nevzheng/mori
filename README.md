@@ -11,9 +11,11 @@ guarantees, and anything may change in any release. Nothing useful works yet.
 
 ## Build
 
+Bazel is the build system. `cargo` works too, but Bazel is the supported path.
+
 ```sh
-cargo build --release   # the binary is target/release/mori
-just check              # or: cargo fmt --check, cargo clippy -- -D warnings, cargo test
+bazel test //...            # build everything, run clippy and rustfmt, run the tests
+bazel run //crates/cli:mori -- --version
 ```
 
 ## License

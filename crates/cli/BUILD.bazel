@@ -1,0 +1,24 @@
+load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+
+extract_cargo_lints(
+    name = "lints",
+    manifest = "Cargo.toml",
+    workspace = "//:Cargo.toml",
+)
+
+rust_binary(
+    name = "mori",
+    srcs = ["src/main.rs"],
+    lint_config = ":lints",
+    visibility = ["//visibility:public"],  # the Python e2e tests will depend on it
+)
+
+rust_test(
+    name = "cli_test",
+    size = "small",
+    srcs = ["tests/cli.rs"],
+    data = [":mori"],
+    lint_config = ":lints",
+    rustc_env = {"CARGO_BIN_EXE_mori": "$(rootpath :mori)"},
+)

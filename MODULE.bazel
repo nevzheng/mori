@@ -1,0 +1,32 @@
+module(name = "mori", version = "0.0.0")
+
+bazel_dep(name = "rules_rust", version = "0.74.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
+
+# The Rust toolchain comes from Bazel, pinned to the same version as rust-toolchain.toml.
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.94.1"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+# Third-party crates: Cargo.toml and Cargo.lock are only the dependency manifest; Bazel builds.
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//:Cargo.lock",
+    manifests = [
+        "//:Cargo.toml",
+        "//crates/cli:Cargo.toml",
+        "//crates/core:Cargo.toml",
+        "//crates/git:Cargo.toml",
+        "//crates/github:Cargo.toml",
+        "//crates/jj:Cargo.toml",
+        "//crates/mcp:Cargo.toml",
+        "//crates/store:Cargo.toml",
+    ],
+)
+use_repo(crate, "crates")

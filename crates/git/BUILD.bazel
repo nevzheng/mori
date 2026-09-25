@@ -1,0 +1,15 @@
+load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+extract_cargo_lints(
+    name = "lints",
+    manifest = "Cargo.toml",
+    workspace = "//:Cargo.toml",
+)
+
+rust_library(
+    name = "mori_git",
+    srcs = glob(["src/**/*.rs"]),
+    lint_config = ":lints",
+    visibility = ["//visibility:public"],
+)

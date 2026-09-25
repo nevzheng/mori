@@ -1,0 +1,15 @@
+# Lints on every build: clippy with warnings as errors, and a rustfmt check.
+build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build --output_groups=+clippy_checks
+build --@rules_rust//rust/settings:clippy_flags=-Dwarnings
+build --@rules_rust//rust/settings:clippy.toml=//:clippy.toml
+build --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
+build --output_groups=+rustfmt_checks
+build --@rules_rust//rust/settings:rustfmt.toml=//:rustfmt.toml
+
+# Hermetic-ish actions; show failing test output.
+build --incompatible_strict_action_env
+test --test_output=errors
+
+# Shared caches are per-user: set --disk_cache in your ~/.bazelrc so every agent tree
+# (jj workspace) reuses one cache instead of rebuilding cold. See CONTRIBUTING.md.
