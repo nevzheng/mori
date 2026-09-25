@@ -19,3 +19,8 @@ style = "aligned"
 # A PR template starts with instructions for the author, not a heading.
 [per-file-ignores]
 ".github/pull_request_template.md" = ["MD041"]
+# The home page includes README.md (a snippet), so it has no heading of its own.
+"docs/index.md" = ["MD041"]
+"docs/brand.md" = ["MD033"]
+# The site's contributing page only includes CONTRIBUTING.md (a snippet), so it has no heading.
+"docs/contributing.md" = ["MD041"]
