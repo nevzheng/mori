@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest something mori should do. Start with the problem.
+title: "feat: "
+labels: ["kind/feature", "status/triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem before the solution. mori is a pre-alpha hobby project: there's no
+        roadmap promise, and not every good idea fits.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today? No jargon.
+      placeholder: When an agent finishes a task, I can't tell which trees still hold unpushed work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Optional. What you'd like mori to do, from the user's side (commands, output).
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Optional. Other ways to solve it, including workarounds you use today.
+
+  - type: textarea
+    id: who
+    attributes:
+      label: Who benefits
+      description: Optional. Who runs into this problem, and how often?
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      description: Optional. Bigger changes come with a design doc ([template](https://github.com/nevzheng/mori/blob/main/docs/design/TEMPLATE.md)).
+      options:
+        - label: I'm willing to write the design doc.
+          required: false
+        - label: I'm willing to send the PR.
+          required: false
