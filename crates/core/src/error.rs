@@ -8,8 +8,12 @@ use std::path::PathBuf;
 pub enum Code {
     /// The caller passed something invalid.
     InvalidArgument,
+    /// Something the operation would create already exists.
+    AlreadyExists,
     /// The system isn't in a state where the operation can run.
     FailedPrecondition,
+    /// Something broke that the caller can't fix, e.g. an I/O error.
+    Internal,
 }
 
 impl Code {
@@ -18,7 +22,9 @@ impl Code {
     pub fn name(self) -> &'static str {
         match self {
             Self::InvalidArgument => "INVALID_ARGUMENT",
+            Self::AlreadyExists => "ALREADY_EXISTS",
             Self::FailedPrecondition => "FAILED_PRECONDITION",
+            Self::Internal => "INTERNAL",
         }
     }
 
@@ -27,7 +33,9 @@ impl Code {
     pub fn number(self) -> i32 {
         match self {
             Self::InvalidArgument => 3,
+            Self::AlreadyExists => 6,
             Self::FailedPrecondition => 9,
+            Self::Internal => 13,
         }
     }
 }
