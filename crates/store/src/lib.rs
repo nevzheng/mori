@@ -3,5 +3,6 @@
 
 pub mod database;
 mod error;
+pub mod init;
 
 pub use error::StoreError;

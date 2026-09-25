@@ -15,6 +15,13 @@ pub enum StoreError {
         path: PathBuf,
     },
 
+    /// Something other than a directory is where mori needs a directory.
+    #[error("{} is not a directory", path.display())]
+    NotADirectory {
+        /// The path.
+        path: PathBuf,
+    },
+
     /// The file isn't a mori database, or is missing what every mori database has.
     #[error("{} is not a mori database", path.display())]
     NotMori {
@@ -64,7 +71,9 @@ impl StoreError {
     pub fn code(&self) -> Code {
         match self {
             Self::AlreadyExists { .. } => Code::AlreadyExists,
-            Self::NotMori { .. } | Self::SchemaTooNew { .. } => Code::FailedPrecondition,
+            Self::NotADirectory { .. } | Self::NotMori { .. } | Self::SchemaTooNew { .. } => {
+                Code::FailedPrecondition
+            }
             Self::Io { .. } | Self::Sqlite { .. } => Code::Internal,
         }
     }
@@ -74,6 +83,7 @@ impl StoreError {
     pub fn reason(&self) -> &'static str {
         match self {
             Self::AlreadyExists { .. } => "FILE_EXISTS",
+            Self::NotADirectory { .. } => "NOT_A_DIRECTORY",
             Self::NotMori { .. } => "DATABASE_NOT_MORI",
             Self::SchemaTooNew { .. } => "DATABASE_SCHEMA_TOO_NEW",
             Self::Io { .. } => "IO_ERROR",
@@ -100,6 +110,7 @@ impl StoreError {
     pub fn path(&self) -> &Path {
         match self {
             Self::AlreadyExists { path }
+            | Self::NotADirectory { path }
             | Self::NotMori { path }
             | Self::SchemaTooNew { path, .. }
             | Self::Io { path, .. }
