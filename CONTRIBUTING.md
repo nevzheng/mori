@@ -11,9 +11,10 @@ anything may change in any release.
 
 ## Ways to help
 
-- **Report a bug:** open an issue. Include your version (`mori --version`), OS, the command,
+- **Report a bug:** use the bug form. Include your version (`mori --version`), OS, the command,
   what you expected and what happened.
-- **Suggest a feature:** open an issue and start with the problem, not the solution.
+- **Suggest a feature:** use the feature form and start with the problem, not the solution.
+- **Ask a question:** use the question form.
 - **Fix something small** (typos, docs, an obvious bug): open a PR directly.
 - **Build something bigger:** see *Spec- and design-driven development* below. Unsure whether it
   fits? Open an issue and ask first.

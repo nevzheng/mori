@@ -1,0 +1,88 @@
+name: Bug report
+description: mori did something wrong or unexpected.
+title: "bug: "
+labels: ["kind/bug", "status/triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. mori is a pre-alpha hobby project, so replies come when they can.
+        **Security issues go through [SECURITY.md](https://github.com/nevzheng/mori/security/policy), never a public issue.**
+
+  - type: input
+    id: version
+    attributes:
+      label: mori version
+      description: Output of `mori --version`.
+      placeholder: mori 0.1.0 (abc1234)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: Name, version and architecture.
+      placeholder: macOS 15.4 (arm64)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Built with Bazel
+        - Built with cargo
+    validations:
+      required: true
+
+  - type: input
+    id: tools
+    attributes:
+      label: git and jj versions
+      description: Optional. Output of `git --version` and `jj --version`, if the bug involves them.
+      placeholder: git 2.51.0, jj 0.33.0
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      placeholder: mori tree create --agent claude --task fix-typo
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: The full output of the command. Remove anything private (paths, repo names, tokens).
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: duplicates
+    attributes:
+      label: Duplicates
+      options:
+        - label: I searched the existing issues and this isn't one of them.
+          required: false

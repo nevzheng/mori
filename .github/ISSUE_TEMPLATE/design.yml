@@ -1,0 +1,68 @@
+name: Design proposal
+description: Propose or discuss a design before (or while) you write the doc.
+title: "design: "
+labels: ["kind/design", "status/triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New commands, new concepts, changes to the model or the API, and anything hard to undo
+        come with a design doc in `docs/design/<area>/`, using the
+        [template](https://github.com/nevzheng/mori/blob/main/docs/design/TEMPLATE.md)
+        (Apache Spark's SPIP format). See [how design docs work](https://github.com/nevzheng/mori/blob/main/docs/design/README.md).
+
+        Use this issue to test the direction early, or to track a doc you've already sent.
+        The doc is part of the change, not a gate: a PR with the doc is fine without an issue.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where the doc would live (`docs/design/<area>/`).
+      options:
+        - cli
+        - core
+        - api
+        - store
+        - git
+        - jj
+        - github
+        - mcp
+        - other (say which below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Q1 of the template, in a few sentences. No jargon.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: Who cares, and what changes for them if this works (Q5).
+    validations:
+      required: true
+
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Rough approach
+      description: Optional. What's new in your approach, and the main risks (Q4, Q6).
+
+  - type: textarea
+    id: questions
+    attributes:
+      label: Open questions
+      description: Optional. What you'd like feedback on first.
+
+  - type: input
+    id: doc
+    attributes:
+      label: Design doc
+      description: Optional. Link to the doc or its PR, if it exists yet.
+      placeholder: https://github.com/nevzheng/mori/pull/123
