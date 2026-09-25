@@ -1,5 +1,6 @@
+load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 
 extract_cargo_lints(
     name = "lints",
@@ -12,4 +13,12 @@ rust_library(
     srcs = glob(["src/**/*.rs"]),
     lint_config = ":lints",
     visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "mori_core_test",
+    size = "small",
+    crate = ":mori_core",
+    lint_config = ":lints",
 )
