@@ -15,7 +15,8 @@ Instructions for coding agents (and humans). `CLAUDE.md` is a symlink to this fi
   the PR title and description become the commit. The title is a Conventional Commit:
   `<type>(<scope>)!: <subject>`, with types `feat fix docs refactor perf test build ci chore style
   revert` and crate names as scopes. The description says what changed and why.
-- **Reviews** use Conventional Comments (`issue:`, `suggestion:`, `nitpick:`, …), recommended not required.
+- **Reviews** use Conventional Comments (`issue:`, `suggestion:`, `nitpick:`, …), recommended not
+  required.
 
 ## Version control
 
@@ -44,6 +45,9 @@ bazel test //...    # builds everything; clippy and rustfmt run on every target;
 
 Lints live in `Cargo.toml` (`[workspace.lints]`) and Bazel applies them through
 `extract_cargo_lints`. New crates under `crates/*` or `tools/*` are picked up automatically.
+
+Markdown wraps at 100 columns with aligned tables (`.rumdl.toml`). Format with
+`uvx rumdl fmt .`; CI runs `rumdl check` and `rumdl fmt --check`.
 
 The API is proto-first: edit `proto/`, then run `bazel run //tools/protogen` and commit
 `crates/api/src/gen/`. Never edit generated code by hand; a test fails if it's stale.

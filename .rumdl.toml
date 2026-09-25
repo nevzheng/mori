@@ -1,0 +1,21 @@
+# Markdown lint and format rules (https://github.com/rvben/rumdl).
+# Format: `uvx rumdl fmt .`  Check: `uvx rumdl check . && uvx rumdl fmt --check .`
+
+[global]
+exclude = ["target", "bazel-*", "crates/api/src/gen"]
+
+# Wrap prose at 100 columns; leave code blocks and tables alone.
+[MD013]
+line-length = 100
+reflow = true
+code-blocks = false
+tables = false
+
+# Align table columns (opt-in).
+[MD060]
+enabled = true
+style = "aligned"
+
+# A PR template starts with instructions for the author, not a heading.
+[per-file-ignores]
+".github/pull_request_template.md" = ["MD041"]
