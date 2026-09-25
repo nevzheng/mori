@@ -5,9 +5,9 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "zensical.toml", "CONTRIBUTING.md", ".github/workflows/pages.yml"]
+    paths: ["docs/**", "zensical.toml", "README.md", "CONTRIBUTING.md", ".github/workflows/pages.yml"]
   pull_request:
-    paths: ["docs/**", "zensical.toml", "CONTRIBUTING.md", ".github/workflows/pages.yml"]
+    paths: ["docs/**", "zensical.toml", "README.md", "CONTRIBUTING.md", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
