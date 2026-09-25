@@ -57,8 +57,8 @@ pub enum Step {
     CreateDatabase {
         /// The database file.
         path: PathBuf,
-        /// The root to record.
-        root: PathBuf,
+        /// The root to record, as text: every path in [`Paths`] is valid UTF-8.
+        root: String,
         /// Its permission bits.
         mode: u32,
     },
@@ -164,7 +164,7 @@ pub fn plan(paths: &Paths, observed: &Observed) -> Result<InitPlan, ConfigError>
     if observed.database_root.is_none() {
         steps.push(Step::CreateDatabase {
             path: paths.database.clone(),
-            root: paths.root.clone(),
+            root: crate::paths::utf8(&paths.root)?.to_owned(),
             mode: DATABASE_MODE,
         });
     }
