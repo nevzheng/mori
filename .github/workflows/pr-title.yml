@@ -1,0 +1,28 @@
+name: pr-title
+
+# The PR title and body become the squashed commit, so they are what gets checked.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conventional Commit title, no attribution
+        env: # passed through env, never interpolated into the script
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          re='^(feat|fix|docs|refactor|perf|test|build|ci|chore|style|revert)(\([a-z0-9-]+\))?!?: .+'
+          if ! [[ "$TITLE" =~ $re ]]; then
+            echo "::error::PR title must be a Conventional Commit: <type>(<scope>)!: <subject>"
+            exit 1
+          fi
+          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -Eiq '^[[:space:]]*co-authored-by:|generated with'; then
+            echo "::error::No attribution lines (Co-Authored-By, Generated with) in the PR title or body"
+            exit 1
+          fi

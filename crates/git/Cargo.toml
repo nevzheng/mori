@@ -1,0 +1,12 @@
+[package]
+name = "mori-git"
+description = "mori's git backend: gix for reads, the git CLI for writes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

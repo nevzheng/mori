@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+// mori's API. Alpha: no stability guarantees; anything may change in any release (AIP-185).
+// Resources, methods and error details are defined here first, and everything else is generated
+// from this package.
+package mori.v1alpha1;
