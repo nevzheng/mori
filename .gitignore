@@ -1,3 +1,5 @@
-/target
+.bazelbsp
+.idea
 /bazel-*
 /site
+/target
