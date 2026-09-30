@@ -138,6 +138,14 @@ class and a reason:
 Removing the trees a report lists is the person's decision: don't run `mori gc apply` unless they
 asked you to.
 
+### `mori gc apply <report> --yes`
+
+Removes the trees a report lists to remove, at most 10 per run (`--max`, `--only <name>`). Each
+tree is snapshotted and judged again first; one that changed since the report is kept and the
+output says why. Each removal pins the tree's commit and goes into the journal, and the output
+gives the `mori restore <entry>` command that undoes it. Without `--yes` nothing is removed
+(`CONFIRMATION_NEEDED`); `--dry-run` shows what would go.
+
 ### `mori skills sync`
 
 Updates mori's skills in the root (`skills/`, and the `skills/llms.txt` and `llms.txt` indexes) to

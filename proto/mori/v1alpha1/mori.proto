@@ -37,6 +37,11 @@ service MoriService {
   // Reports which trees may be removed and whether each is safe to remove, and saves the report
   // for `GcApply`. Changes no tree; fetches remote bookmarks unless offline.
   rpc Gc(GcRequest) returns (GcResponse);
+
+  // Removes a confirmed batch of the trees a saved report lists to remove. Each is snapshotted and
+  // judged again first, and skipped if anything changed; each removal pins the tree's commit and
+  // goes into the journal, so `Restore` can bring it back.
+  rpc GcApply(GcApplyRequest) returns (GcApplyResponse);
 }
 
 // Request for `Init`.
@@ -372,4 +377,69 @@ message GcItem {
 
   // The facts it was judged on, for people to read.
   string facts = 6;
+}
+
+// Request for `GcApply`.
+message GcApplyRequest {
+  // The report to act on.
+  string report_id = 1;
+
+  // Only these trees, by name. Empty for every tree the report lists to remove.
+  repeated string names = 2;
+
+  // The most trees to remove in this batch. 0 means the default, 10.
+  uint32 max = 3;
+
+  // The person confirmed the batch. Without it, nothing is removed.
+  bool confirmed = 4;
+
+  // Check everything and remove nothing (AIP-163; the CLI's --dry-run).
+  bool validate_only = 5;
+
+  // Don't fetch or ask GitHub while checking again.
+  bool offline = 6;
+}
+
+// Response for `GcApply`.
+message GcApplyResponse {
+  // The report acted on.
+  string report_id = 1;
+
+  // Each tree in the batch, in order, and what happened.
+  repeated GcApplyItem items = 2;
+
+  // Echoes the request: true if nothing was actually removed.
+  bool validate_only = 3;
+}
+
+// One tree in a `GcApply` batch.
+message GcApplyItem {
+  // What happened to the tree.
+  enum Outcome {
+    // Not set.
+    OUTCOME_UNSPECIFIED = 0;
+    // It was removed and journalled.
+    OUTCOME_REMOVED = 1;
+    // It would be removed (a dry run, or not confirmed).
+    OUTCOME_WOULD_REMOVE = 2;
+    // Checked again, it may no longer go (its facts changed); kept.
+    OUTCOME_SKIPPED_CHANGED = 3;
+    // Checked again, it has work only this machine has; kept.
+    OUTCOME_SKIPPED_UNSAVED = 4;
+  }
+
+  // The repo.
+  string repo = 1;
+
+  // The tree's name.
+  string name = 2;
+
+  // What happened.
+  Outcome outcome = 3;
+
+  // The reason the tree was judged by, now.
+  string reason = 4;
+
+  // The journal entry for a removal, for `Restore`.
+  string entry_id = 5;
 }

@@ -290,6 +290,22 @@ impl JjCli {
         parse_state(&head, &unpushed)
     }
 
+    /// The full ID of the commit the tree's working copy is on.
+    ///
+    /// # Errors
+    ///
+    /// When jj can't be run or has no such workspace.
+    pub fn working_copy_commit(&self, clone: &Path, name: &str) -> Result<String, JjError> {
+        let working_copy = format!("{}@", revset_string(name));
+        Ok(self
+            .read(
+                clone,
+                &["log", "--no-graph", "-r", &working_copy, "-T", "commit_id"],
+            )?
+            .trim()
+            .to_owned())
+    }
+
     /// The remote bookmarks pointing into the tree's own history (its changes not in trunk).
     /// The colocated `git` pseudo-remote is left out.
     ///
