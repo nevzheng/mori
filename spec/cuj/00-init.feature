@@ -1,4 +1,3 @@
-@wip
 Feature: CUJ 0 - set up mori
   Once per machine, `mori init` creates the root layout, the config and the state store.
   It only ever adds things, and running it twice is safe.

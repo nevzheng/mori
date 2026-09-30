@@ -8,6 +8,8 @@ py_test(
     size = "small",
     srcs = [
         "conftest.py",
+        "harness.py",
+        "init_steps.py",
         "matchers.py",
         "pytest_main.py",
         "test_features.py",

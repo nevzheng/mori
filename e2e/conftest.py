@@ -1,22 +1,21 @@
-"""Shared steps for mori's end-to-end features.
+"""Fixtures and the steps every feature shares.
 
 Every scenario runs the real `mori` binary (built by Bazel; its path is in MORI_BIN) with a
-temporary HOME and XDG directories, so nothing touches the machine running the tests.
-Scenarios tagged @wip describe features that aren't built yet and are skipped.
+temporary HOME, so nothing touches the machine running the tests. Steps get what they need from
+the fixtures below. Scenarios tagged @wip describe features that aren't built yet and are skipped.
 """
 
 import os
-import shlex
-import subprocess
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from harness import CANONICAL_CODES, DiskWatch, Mori, Placeholders
 from matchers import matches_regex
-from precisely import assert_that, equal_to
+from precisely import all_of, assert_that, contains_string, equal_to
 from pytest_bdd import given, parsers, then, when
 
-MORI_BIN = Path(os.environ["MORI_BIN"]).resolve()
+# Steps for one journey each.
+pytest_plugins = ["init_steps"]
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -29,69 +28,103 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             item.add_marker(pytest.mark.skip(reason="@wip: the feature isn't built yet"))
 
 
-@dataclass
-class World:
-    """What one scenario has set up and observed."""
+# Fixtures
 
-    home: Path
-    env: dict[str, str] = field(default_factory=dict)
-    result: subprocess.CompletedProcess[str] | None = None
 
-    def last(self) -> subprocess.CompletedProcess[str]:
-        assert self.result is not None, "no command has been run yet"
-        return self.result
+@pytest.fixture(scope="session")
+def mori_binary() -> Path:
+    return Path(os.environ["MORI_BIN"]).resolve()
 
 
 @pytest.fixture
-def world(tmp_path: Path) -> World:
+def home(tmp_path: Path) -> Path:
     home = tmp_path / "home"
     home.mkdir()
-    return World(home=home)
+    return home
+
+
+@pytest.fixture
+def env() -> dict[str, str]:
+    """The scenario's environment. Starts with only PATH; steps add the rest."""
+    return {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+
+
+@pytest.fixture
+def mori(mori_binary: Path, home: Path, env: dict[str, str]) -> Mori:
+    return Mori(binary=mori_binary, home=home, env=env)
+
+
+@pytest.fixture
+def placeholders(home: Path, env: dict[str, str]) -> Placeholders:
+    return Placeholders(home=home, env=env)
+
+
+@pytest.fixture
+def disk(home: Path) -> DiskWatch:
+    return DiskWatch(root=home)
+
+
+# The environment
 
 
 @given("a temporary HOME with XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME inside it")
-def temporary_home(world: World) -> None:
-    world.env = {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "HOME": str(world.home),
-        "XDG_CONFIG_HOME": str(world.home / ".config"),
-        "XDG_STATE_HOME": str(world.home / ".local" / "state"),
-        "XDG_CACHE_HOME": str(world.home / ".cache"),
-    }
+def temporary_home(home: Path, env: dict[str, str]) -> None:
+    env["HOME"] = str(home)
+    env["XDG_CONFIG_HOME"] = str(home / ".config")
+    env["XDG_STATE_HOME"] = str(home / ".local" / "state")
+    env["XDG_CACHE_HOME"] = str(home / ".cache")
 
 
 @given("MORI_ROOT is not set")
-def mori_root_unset(world: World) -> None:
-    world.env.pop("MORI_ROOT", None)
+def mori_root_unset(env: dict[str, str]) -> None:
+    env.pop("MORI_ROOT", None)
+
+
+@given(parsers.parse('MORI_ROOT is "{root}"'))
+def mori_root_is(env: dict[str, str], placeholders: Placeholders, root: str) -> None:
+    env["MORI_ROOT"] = str(placeholders.path(root))
+
+
+# Running mori
+
+
+@given(parsers.parse('I have run "{command}"'))
+def have_run(mori: Mori, disk: DiskWatch, command: str) -> None:
+    result = mori.run(command)
+    if result.returncode != 0:
+        pytest.fail(f"setup: {command!r} exited {result.returncode}\nstderr:\n{result.stderr}")
+    disk.remember()
 
 
 @when(parsers.parse('I run "{command}"'))
-def run(world: World, command: str) -> None:
-    program, *args = shlex.split(command)
-    assert program == "mori", f"steps only run mori, not {program!r}"
-    world.result = subprocess.run(
-        [str(MORI_BIN), *args],
-        env=world.env,
-        cwd=world.home,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+def run(mori: Mori, command: str) -> None:
+    mori.run(command)
+
+
+# Outcomes
 
 
 @then("it succeeds")
-def succeeds(world: World) -> None:
-    result = world.last()
+def succeeds(mori: Mori) -> None:
+    result = mori.last
     if result.returncode != 0:
         pytest.fail(f"mori exited {result.returncode}\nstderr:\n{result.stderr}")
 
 
 @then(parsers.parse("it fails with exit code {code:d}"))
-def fails_with_exit_code(world: World, code: int) -> None:
-    assert_that(world.last().returncode, equal_to(code))
+def fails_with_exit_code(mori: Mori, code: int) -> None:
+    assert_that(mori.last.returncode, equal_to(code))
+
+
+@then(parsers.parse('it fails with status {status} and reason "{reason}"'))
+def fails_with_status(mori: Mori, status: str, reason: str) -> None:
+    assert_that(mori.last.returncode, equal_to(CANONICAL_CODES[status]))
+    assert_that(
+        mori.last.stderr,
+        all_of(contains_string(f"status: {status}"), contains_string(f"reason: {reason} (")),
+    )
 
 
 @then(parsers.parse('stdout matches "{pattern}"'))
-def stdout_matches(world: World, pattern: str) -> None:
-    assert_that(world.last().stdout.strip(), matches_regex(pattern))
+def stdout_matches(mori: Mori, pattern: str) -> None:
+    assert_that(mori.last.stdout.strip(), matches_regex(pattern))
