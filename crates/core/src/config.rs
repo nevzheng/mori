@@ -134,6 +134,9 @@ mod tests {
 
             [trees.landed]
             when = ["pr-merged"]
+
+            [trees.lru]
+            max = 5
         "#;
 
         let trees = Config::parse(text, Path::new(PATH)).unwrap().trees;
@@ -144,5 +147,6 @@ mod tests {
         );
         assert_eq!(trees.lifetime.task.to_string(), "ttl:14d");
         assert_eq!(trees.landed.when, [Landed::PrMerged]);
+        assert_eq!(trees.lru.max, Some(5));
     }
 }
