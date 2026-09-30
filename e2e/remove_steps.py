@@ -20,7 +20,8 @@ def jj(env: dict[str, str], *args: str) -> None:
 
 @given(parsers.parse('someone edits "{name}" without running jj'))
 def edit_without_jj(placeholders: Placeholders, name: str) -> None:
-    (placeholders.path(f"{TREES}/{name}") / "login.rs").write_text("fn login() {}\n")
+    # Different from anything committed in the scenarios, so it is always a real edit.
+    (placeholders.path(f"{TREES}/{name}") / "login.rs").write_text("fn login() { todo() }\n")
 
 
 @given(parsers.parse('someone commits work in "{name}"'))

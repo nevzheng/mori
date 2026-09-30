@@ -472,3 +472,101 @@ pub mod gc_item {
         }
     }
 }
+/// Request for `GcApply`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GcApplyRequest {
+    /// The report to act on.
+    #[prost(string, tag = "1")]
+    pub report_id: ::prost::alloc::string::String,
+    /// Only these trees, by name. Empty for every tree the report lists to remove.
+    #[prost(string, repeated, tag = "2")]
+    pub names: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// The most trees to remove in this batch. 0 means the default, 10.
+    #[prost(uint32, tag = "3")]
+    pub max: u32,
+    /// The person confirmed the batch. Without it, nothing is removed.
+    #[prost(bool, tag = "4")]
+    pub confirmed: bool,
+    /// Check everything and remove nothing (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "5")]
+    pub validate_only: bool,
+    /// Don't fetch or ask GitHub while checking again.
+    #[prost(bool, tag = "6")]
+    pub offline: bool,
+}
+/// Response for `GcApply`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GcApplyResponse {
+    /// The report acted on.
+    #[prost(string, tag = "1")]
+    pub report_id: ::prost::alloc::string::String,
+    /// Each tree in the batch, in order, and what happened.
+    #[prost(message, repeated, tag = "2")]
+    pub items: ::prost::alloc::vec::Vec<GcApplyItem>,
+    /// Echoes the request: true if nothing was actually removed.
+    #[prost(bool, tag = "3")]
+    pub validate_only: bool,
+}
+/// One tree in a `GcApply` batch.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GcApplyItem {
+    /// The repo.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree's name.
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// What happened.
+    #[prost(enumeration = "gc_apply_item::Outcome", tag = "3")]
+    pub outcome: i32,
+    /// The reason the tree was judged by, now.
+    #[prost(string, tag = "4")]
+    pub reason: ::prost::alloc::string::String,
+    /// The journal entry for a removal, for `Restore`.
+    #[prost(string, tag = "5")]
+    pub entry_id: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `GcApplyItem`.
+pub mod gc_apply_item {
+    /// What happened to the tree.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Outcome {
+        /// Not set.
+        Unspecified = 0,
+        /// It was removed and journalled.
+        Removed = 1,
+        /// It would be removed (a dry run, or not confirmed).
+        WouldRemove = 2,
+        /// Checked again, it may no longer go (its facts changed); kept.
+        SkippedChanged = 3,
+        /// Checked again, it has work only this machine has; kept.
+        SkippedUnsaved = 4,
+    }
+    impl Outcome {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "OUTCOME_UNSPECIFIED",
+                Self::Removed => "OUTCOME_REMOVED",
+                Self::WouldRemove => "OUTCOME_WOULD_REMOVE",
+                Self::SkippedChanged => "OUTCOME_SKIPPED_CHANGED",
+                Self::SkippedUnsaved => "OUTCOME_SKIPPED_UNSAVED",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "OUTCOME_UNSPECIFIED" => Some(Self::Unspecified),
+                "OUTCOME_REMOVED" => Some(Self::Removed),
+                "OUTCOME_WOULD_REMOVE" => Some(Self::WouldRemove),
+                "OUTCOME_SKIPPED_CHANGED" => Some(Self::SkippedChanged),
+                "OUTCOME_SKIPPED_UNSAVED" => Some(Self::SkippedUnsaved),
+                _ => None,
+            }
+        }
+    }
+}

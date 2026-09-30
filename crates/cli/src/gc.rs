@@ -76,12 +76,13 @@ pub fn run(repo: Option<&str>, offline: bool) -> Result<GcResponse, Box<dyn Erro
     })
 }
 
-struct Context<'a> {
-    paths: &'a Paths,
-    jj: &'a JjCli,
-    gh: Option<&'a GhCli>,
-    policy: &'a TreePolicy,
-    now: u64,
+/// What judging a repo's trees needs.
+pub struct Context<'a> {
+    pub paths: &'a Paths,
+    pub jj: &'a JjCli,
+    pub gh: Option<&'a GhCli>,
+    pub policy: &'a TreePolicy,
+    pub now: u64,
 }
 
 /// What one tree looks like before it is classified.
@@ -92,7 +93,9 @@ struct Row {
     landed_count: usize,
 }
 
-fn report_repo(
+/// Judges every tree of `repo`, fetching first unless `offline`. Reads only, apart from the
+/// fetch and recording the bookmarks it sees.
+pub fn report_repo(
     context: &Context,
     db: &mut Database,
     repo: &RepoRecord,
@@ -237,7 +240,7 @@ fn tree_ref<'a>(id: &'a RepoId, clone: &'a std::path::Path, record: &'a TreeReco
     }
 }
 
-fn is_task(record: &TreeRecord) -> bool {
+pub fn is_task(record: &TreeRecord) -> bool {
     record.role == Role::Task.as_str()
 }
 
@@ -250,7 +253,7 @@ fn role(record: &TreeRecord) -> Role {
 }
 
 /// An unreadable stored lifetime counts as pinned: the choice that never removes.
-fn lifetime(record: &TreeRecord) -> Lifetime {
+pub fn lifetime(record: &TreeRecord) -> Lifetime {
     record.lifetime.parse().unwrap_or(Lifetime::Pinned)
 }
 

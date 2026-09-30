@@ -5,6 +5,7 @@
 
 mod clone;
 mod gc;
+mod gc_apply;
 mod init;
 mod landing;
 mod ls;
@@ -17,6 +18,7 @@ mod tree_remove;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
 
 /// mori looks after a forest of repos and worktrees, for you and your agents.
@@ -57,7 +59,11 @@ enum Command {
 
     /// Report which trees may be removed and whether each is safe to remove, and save the report
     /// for `mori gc apply`. Changes no tree.
+    #[command(args_conflicts_with_subcommands = true)]
     Gc {
+        #[command(subcommand)]
+        apply: Option<GcCommand>,
+
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
 
@@ -83,6 +89,36 @@ enum Command {
     Tree {
         #[command(subcommand)]
         command: TreeCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum GcCommand {
+    /// Remove a batch of the trees a saved report lists to remove. Each is checked again first
+    /// and skipped if anything changed; each removal is journalled, so `mori restore` can undo it.
+    Apply {
+        /// The report, from `mori gc`.
+        report: String,
+
+        /// Only these trees (repeat for more).
+        #[arg(long = "only")]
+        names: Vec<String>,
+
+        /// The most trees to remove in this batch (default 10).
+        #[arg(long)]
+        max: Option<u32>,
+
+        /// Confirm the batch. Without it, nothing is removed.
+        #[arg(long)]
+        yes: bool,
+
+        /// Check everything and remove nothing.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Don't fetch or ask GitHub while checking again.
+        #[arg(long)]
+        offline: bool,
     },
 }
 
@@ -159,43 +195,50 @@ fn main() -> ExitCode {
     if matches!(cli.command, Command::Init { .. } | Command::Ls { .. }) {
         skills::stale_hint();
     }
+    let json = cli.json;
     match cli.command {
-        Command::Init { dry_run } => match init::run(dry_run) {
-            Ok(response) => {
-                output::success(cli.json, &response, output::init_text(&response).as_str())
-            }
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
+        Command::Init { dry_run } => respond(json, init::run(dry_run), output::init_text),
         Command::Clone {
             url,
             dry_run,
             no_colocate,
-        } => match clone::run(&url, dry_run, no_colocate) {
-            Ok(response) => {
-                output::success(cli.json, &response, output::clone_text(&response).as_str())
-            }
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
+        } => respond(
+            json,
+            clone::run(&url, dry_run, no_colocate),
+            output::clone_text,
+        ),
         Command::Skills {
             command: SkillsCommand::Sync { dry_run },
-        } => match skills::sync(dry_run) {
-            Ok(response) => {
-                output::success(cli.json, &response, output::skills_text(&response).as_str())
-            }
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
-        Command::Gc { repo, offline } => match gc::run(repo.as_deref(), offline) {
-            Ok(response) => {
-                output::success(cli.json, &response, output::gc_text(&response).as_str())
-            }
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
-        Command::Ls { repo } => match ls::run(repo.as_deref()) {
-            Ok(response) => {
-                output::success(cli.json, &response, output::ls_text(&response).as_str())
-            }
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
+        } => respond(json, skills::sync(dry_run), output::skills_text),
+        Command::Gc {
+            apply:
+                Some(GcCommand::Apply {
+                    report,
+                    names,
+                    max,
+                    yes,
+                    dry_run,
+                    offline,
+                }),
+            ..
+        } => respond(
+            json,
+            gc_apply::run(&gc_apply::ApplyArgs {
+                report_id: report,
+                names,
+                max,
+                yes,
+                dry_run,
+                offline,
+            }),
+            output::gc_apply_text,
+        ),
+        Command::Gc {
+            apply: None,
+            repo,
+            offline,
+        } => respond(json, gc::run(repo.as_deref(), offline), output::gc_text),
+        Command::Ls { repo } => respond(json, ls::run(repo.as_deref()), output::ls_text),
         Command::Tree {
             command:
                 TreeCommand::Create {
@@ -206,21 +249,18 @@ fn main() -> ExitCode {
                     from,
                     dry_run,
                 },
-        } => match tree::create(tree::CreateArgs {
-            repo,
-            task,
-            agent,
-            lifetime,
-            from,
-            dry_run,
-        }) {
-            Ok(response) => output::success(
-                cli.json,
-                &response,
-                output::tree_create_text(&response).as_str(),
-            ),
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
+        } => respond(
+            json,
+            tree::create(tree::CreateArgs {
+                repo,
+                task,
+                agent,
+                lifetime,
+                from,
+                dry_run,
+            }),
+            output::tree_create_text,
+        ),
         Command::Tree {
             command:
                 TreeCommand::Remove {
@@ -230,19 +270,28 @@ fn main() -> ExitCode {
                     pinned,
                     dry_run,
                 },
-        } => match tree_remove::run(tree_remove::RemoveArgs {
-            repo,
-            name,
-            agent,
-            pinned,
-            dry_run,
-        }) {
-            Ok(response) => output::success(
-                cli.json,
-                &response,
-                output::tree_remove_text(&response).as_str(),
-            ),
-            Err(error) => output::failure(cli.json, error.as_ref()),
-        },
+        } => respond(
+            json,
+            tree_remove::run(tree_remove::RemoveArgs {
+                repo,
+                name,
+                agent,
+                pinned,
+                dry_run,
+            }),
+            output::tree_remove_text,
+        ),
+    }
+}
+
+/// Prints a command's result: its response as JSON or text, or its error.
+fn respond<T: serde::Serialize>(
+    json: bool,
+    result: Result<T, Box<dyn ErrorDetails>>,
+    text: fn(&T) -> String,
+) -> ExitCode {
+    match result {
+        Ok(response) => output::success(json, &response, &text(&response)),
+        Err(error) => output::failure(json, error.as_ref()),
     }
 }
