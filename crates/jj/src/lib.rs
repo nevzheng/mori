@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use mori_core::error::{Code, ErrorDetails};
-use mori_core::forest::{Workspace, Workspaces};
+use mori_core::forest::{TreeState, Workspace, Workspaces};
 
 /// Prints each workspace as two JSON strings, name then root, so any path parses exactly.
 const WORKSPACE_TEMPLATE: &str = r#"json(name) ++ " " ++ json(root) ++ "\n""#;
@@ -187,6 +187,64 @@ impl Workspaces for JjCli {
         let stdout = self.read(clone, &["workspace", "list", "-T", WORKSPACE_TEMPLATE])?;
         parse_workspace_list(&stdout)
     }
+
+    fn state(&self, clone: &Path, name: &str) -> Result<TreeState, JjError> {
+        let working_copy = format!("{}@", revset_string(name));
+        let head = self.read(
+            clone,
+            &[
+                "log",
+                "--no-graph",
+                "-r",
+                &working_copy,
+                "-T",
+                STATE_TEMPLATE,
+            ],
+        )?;
+        let unpushed = self.read(
+            clone,
+            &[
+                "log",
+                "--no-graph",
+                "-r",
+                &format!("(::{working_copy} ~ ::(remote_bookmarks() | trunk())) ~ empty()"),
+                "-T",
+                r#"change_id.short() ++ "\n""#,
+            ],
+        )?;
+        parse_state(&head, &unpushed)
+    }
+}
+
+/// Prints the working-copy change's ID and whether it has edits.
+const STATE_TEMPLATE: &str =
+    r#"change_id.short(12) ++ " " ++ if(empty, "clean", "changed") ++ "\n""#;
+
+/// Quotes `name` as a revset string, so any workspace name, even a foreign one, is taken
+/// literally.
+fn revset_string(name: &str) -> String {
+    let escaped = name.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{escaped}\"")
+}
+
+/// Parses [`STATE_TEMPLATE`] output and the list of unpushed changes.
+fn parse_state(head: &str, unpushed: &str) -> Result<TreeState, JjError> {
+    let invalid = || JjError::OutputInvalid {
+        output: head.to_owned(),
+    };
+    let (change, edits) = head.trim().split_once(' ').ok_or_else(invalid)?;
+    let changed = match edits {
+        "changed" => true,
+        "clean" => false,
+        _ => return Err(invalid()),
+    };
+    let unpushed = u32::try_from(unpushed.lines().filter(|line| !line.is_empty()).count())
+        .map_err(|_| invalid())?;
+    Ok(TreeState {
+        change: change.to_owned(),
+        changed,
+        unpushed,
+    })
 }
 
 /// Parses the output of `jj workspace list` with [`WORKSPACE_TEMPLATE`].
@@ -582,5 +640,65 @@ mod tests {
             std::fs::read_to_string(tree.join("notes.txt")).unwrap(),
             "someone's work"
         );
+    }
+
+    #[test]
+    fn state_lines_parse() {
+        let state = parse_state("vmvywosutlnw changed\n", "abc\ndef\n").unwrap();
+
+        assert_eq!(
+            state,
+            TreeState {
+                change: "vmvywosutlnw".to_owned(),
+                changed: true,
+                unpushed: 2,
+            }
+        );
+        assert!(!parse_state("vmvywosutlnw clean\n", "").unwrap().changed);
+        assert!(parse_state("vmvywosutlnw dirty\n", "").is_err());
+        assert!(parse_state("", "").is_err());
+    }
+
+    #[test]
+    fn revset_strings_are_quoted() {
+        assert_eq!(revset_string("claude-fix-login"), r#""claude-fix-login""#);
+        assert_eq!(revset_string(r#"odd "one""#), r#""odd \"one\"""#);
+    }
+
+    #[test]
+    fn reads_a_trees_state() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("claude-fix-login");
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+
+        let fresh = jj.state(&clone, "claude-fix-login")?;
+        assert!(!fresh.changed);
+        assert_eq!(fresh.unpushed, 0);
+
+        // Edit, then let jj snapshot the edit (as it does whenever someone runs jj in the tree).
+        std::fs::write(tree.join("login.rs"), "fn login() {}\n")?;
+        run(
+            &jj,
+            &["--repository", &tree.display().to_string(), "status"],
+        )?;
+        let edited = jj.state(&clone, "claude-fix-login")?;
+        assert!(edited.changed);
+        assert_eq!(edited.unpushed, 1);
+        assert_ne!(edited.change, "");
+
+        // Commit it: the working copy is clean again, but the work is still only local.
+        let tree_arg = tree.display().to_string();
+        run(
+            &jj,
+            &["--repository", &tree_arg, "commit", "--message", "login"],
+        )?;
+        let committed = jj.state(&clone, "claude-fix-login")?;
+        assert!(!committed.changed);
+        assert_eq!(committed.unpushed, 1);
+        Ok(())
     }
 }
