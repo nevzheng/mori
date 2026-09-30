@@ -68,6 +68,19 @@ pub struct TreeRecord {
     pub last_used_at: String,
 }
 
+/// A remote bookmark mori saw pointing into a tree's own history.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeBookmark {
+    /// The remote, e.g. `origin`.
+    pub remote: String,
+    /// The bookmark, e.g. `claude/fix-login`.
+    pub bookmark: String,
+    /// Where it pointed when last seen.
+    pub commit_id: String,
+    /// When mori last saw it (RFC 3339, UTC).
+    pub seen_at: String,
+}
+
 // Opaque, random, never reused: a prefix and 128 random bits.
 const NEW_ID: &str = "lower(hex(randomblob(16)))";
 const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
@@ -193,13 +206,80 @@ impl Database {
     ///
     /// A SQLite error.
     pub fn delete_tree(&mut self, repo_id: &str, name: &str) -> Result<bool, StoreError> {
-        self.conn
+        let path = self.path.clone();
+        let sqlite = |source| StoreError::Sqlite {
+            path: path.clone(),
+            source,
+        };
+        let tx = self.conn.transaction().map_err(sqlite)?;
+        tx.execute(
+            "DELETE FROM tree_bookmarks WHERE tree_id IN
+                 (SELECT id FROM trees WHERE repo_id = ?1 AND name = ?2)",
+            params![repo_id, name],
+        )
+        .map_err(sqlite)?;
+        let deleted = tx
             .execute(
                 "DELETE FROM trees WHERE repo_id = ?1 AND name = ?2",
                 params![repo_id, name],
             )
-            .map(|deleted| deleted > 0)
+            .map_err(sqlite)?;
+        tx.commit().map_err(sqlite)?;
+        Ok(deleted > 0)
+    }
+
+    /// Notes that `bookmark` on `remote` points into the tree with ID `tree_id`, at `commit_id`.
+    /// A new sighting adds a row; a moved bookmark updates it.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error, including when no tree has that ID.
+    pub fn record_tree_bookmark(
+        &mut self,
+        tree_id: &str,
+        remote: &str,
+        bookmark: &str,
+        commit_id: &str,
+    ) -> Result<(), StoreError> {
+        self.conn
+            .execute(
+                &format!(
+                    "INSERT INTO tree_bookmarks (tree_id, remote, bookmark, commit_id, seen_at)
+                     VALUES (?1, ?2, ?3, ?4, {NOW})
+                     ON CONFLICT (tree_id, remote, bookmark)
+                     DO UPDATE SET commit_id = excluded.commit_id, seen_at = excluded.seen_at"
+                ),
+                params![tree_id, remote, bookmark, commit_id],
+            )
+            .map(|_| ())
             .map_err(|source| self.sqlite(source))
+    }
+
+    /// Every bookmark mori has seen pushed from the tree with ID `tree_id`, sorted.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error.
+    pub fn tree_bookmarks(&self, tree_id: &str) -> Result<Vec<TreeBookmark>, StoreError> {
+        let sqlite = |source| self.sqlite(source);
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT remote, bookmark, commit_id, seen_at FROM tree_bookmarks
+                 WHERE tree_id = ?1 ORDER BY remote, bookmark",
+            )
+            .map_err(sqlite)?;
+        let rows = statement
+            .query_map([tree_id], |row| {
+                Ok(TreeBookmark {
+                    remote: row.get(0)?,
+                    bookmark: row.get(1)?,
+                    commit_id: row.get(2)?,
+                    seen_at: row.get(3)?,
+                })
+            })
+            .map_err(sqlite)?;
+        rows.collect::<Result<_, _>>().map_err(sqlite)
     }
 
     /// The recorded repo with identity `remote`, if any.
@@ -484,5 +564,27 @@ mod tests {
             .map(|tree| tree.name)
             .collect();
         assert_eq!(names, ["default"]);
+    }
+
+    #[test]
+    fn pushed_bookmarks_are_recorded_updated_and_dropped_with_the_tree() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        let tree = db
+            .record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        db.record_tree_bookmark(&tree.id, "origin", "claude/fix-login", "aaaa")
+            .unwrap();
+        db.record_tree_bookmark(&tree.id, "origin", "claude/fix-login", "bbbb")
+            .unwrap();
+
+        let seen = db.tree_bookmarks(&tree.id).unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].bookmark, "claude/fix-login");
+        assert_eq!(seen[0].commit_id, "bbbb");
+
+        assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
+        assert_eq!(db.tree_bookmarks(&tree.id).unwrap(), []);
     }
 }
