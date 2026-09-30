@@ -16,7 +16,20 @@ pub struct Workspace {
     pub root: PathBuf,
 }
 
-/// Lists the workspaces of a clone. Implemented by the VCS backends; read-only.
+/// What the VCS says about one workspace, as of its last snapshot. Read without snapshotting, so
+/// someone working in the tree is never disturbed; edits since jj last ran there don't show yet.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeState {
+    /// The working-copy change's short ID.
+    pub change: String,
+    /// True if the working-copy change has edits.
+    pub changed: bool,
+    /// How many non-empty changes in the tree's history are on no remote bookmark and not in
+    /// trunk: work that exists only on this machine.
+    pub unpushed: u32,
+}
+
+/// Reads the workspaces of a clone. Implemented by the VCS backends; read-only.
 pub trait Workspaces {
     /// The backend's error.
     type Error;
@@ -27,6 +40,13 @@ pub trait Workspaces {
     ///
     /// When the VCS can't be run or its answer can't be read.
     fn list(&self, clone: &Path) -> Result<Vec<Workspace>, Self::Error>;
+
+    /// The state of the workspace named `name` in the clone at `clone`.
+    ///
+    /// # Errors
+    ///
+    /// When the VCS can't be run, has no such workspace, or its answer can't be read.
+    fn state(&self, clone: &Path, name: &str) -> Result<TreeState, Self::Error>;
 }
 
 /// One line of the forest: a recorded tree, its workspace, or both.
