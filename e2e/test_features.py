@@ -8,5 +8,6 @@ scenarios(
     "../spec/cuj/02-ls.feature",
     "../spec/cuj/03-tree-create.feature",
     "../spec/cuj/04-tree-remove.feature",
+    "../spec/cuj/skills.feature",
     "features/smoke.feature",
 )

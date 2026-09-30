@@ -1704,6 +1704,405 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
         deserializer.deserialize_struct("mori.v1alpha1.RepoTrees", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for SkillFile {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.path.is_empty() {
+            len += 1;
+        }
+        if self.action != 0 {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.SkillFile", len)?;
+        if !self.path.is_empty() {
+            struct_ser.serialize_field("path", &self.path)?;
+        }
+        if self.action != 0 {
+            let v = skill_file::Action::try_from(self.action).map_err(|_| {
+                serde::ser::Error::custom(format!("Invalid variant {}", self.action))
+            })?;
+            struct_ser.serialize_field("action", &v)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for SkillFile {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["path", "action"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Path,
+            Action,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "path" => Ok(GeneratedField::Path),
+                            "action" => Ok(GeneratedField::Action),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SkillFile;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.SkillFile")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<SkillFile, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut path__ = None;
+                let mut action__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Path => {
+                            if path__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("path"));
+                            }
+                            path__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Action => {
+                            if action__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("action"));
+                            }
+                            action__ = Some(map_.next_value::<skill_file::Action>()? as i32);
+                        }
+                    }
+                }
+                Ok(SkillFile {
+                    path: path__.unwrap_or_default(),
+                    action: action__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.SkillFile", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for skill_file::Action {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "ACTION_UNSPECIFIED",
+            Self::Installed => "ACTION_INSTALLED",
+            Self::Unchanged => "ACTION_UNCHANGED",
+            Self::Updated => "ACTION_UPDATED",
+            Self::KeptEdited => "ACTION_KEPT_EDITED",
+            Self::SkippedNotOurs => "ACTION_SKIPPED_NOT_OURS",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for skill_file::Action {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "ACTION_UNSPECIFIED",
+            "ACTION_INSTALLED",
+            "ACTION_UNCHANGED",
+            "ACTION_UPDATED",
+            "ACTION_KEPT_EDITED",
+            "ACTION_SKIPPED_NOT_OURS",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl serde::de::Visitor<'_> for GeneratedVisitor {
+            type Value = skill_file::Action;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "ACTION_UNSPECIFIED" => Ok(skill_file::Action::Unspecified),
+                    "ACTION_INSTALLED" => Ok(skill_file::Action::Installed),
+                    "ACTION_UNCHANGED" => Ok(skill_file::Action::Unchanged),
+                    "ACTION_UPDATED" => Ok(skill_file::Action::Updated),
+                    "ACTION_KEPT_EDITED" => Ok(skill_file::Action::KeptEdited),
+                    "ACTION_SKIPPED_NOT_OURS" => Ok(skill_file::Action::SkippedNotOurs),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SyncSkillsRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.SyncSkillsRequest", len)?;
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for SyncSkillsRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["validate_only", "validateOnly"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SyncSkillsRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.SyncSkillsRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<SyncSkillsRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(SyncSkillsRequest {
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.SyncSkillsRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SyncSkillsResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.files.is_empty() {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("mori.v1alpha1.SyncSkillsResponse", len)?;
+        if !self.files.is_empty() {
+            struct_ser.serialize_field("files", &self.files)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for SyncSkillsResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["files", "validate_only", "validateOnly"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Files,
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "files" => Ok(GeneratedField::Files),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SyncSkillsResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.SyncSkillsResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<SyncSkillsResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut files__ = None;
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Files => {
+                            if files__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("files"));
+                            }
+                            files__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(SyncSkillsResponse {
+                    files: files__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "mori.v1alpha1.SyncSkillsResponse",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
 impl serde::Serialize for Tree {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

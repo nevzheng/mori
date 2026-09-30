@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, InitResponse, ListTreesResponse, RemoveTreeResponse,
-    TreeRow, tree_row::Status,
+    SyncSkillsResponse, TreeRow, skill_file::Action, tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -258,6 +258,33 @@ pub fn tree_remove_text(response: &RemoveTreeResponse) -> String {
             );
         }
         let _ = writeln!(text, "  dropped its record");
+    }
+    text
+}
+
+/// The text `skills sync` prints: one line per file mori ships, saying what happened to it.
+pub fn skills_text(response: &SyncSkillsResponse) -> String {
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "{}",
+        if response.validate_only {
+            "Skills (dry run):"
+        } else {
+            "Skills:"
+        }
+    );
+    for file in &response.files {
+        let what = match (file.action(), response.validate_only) {
+            (Action::Installed, false) => "installed",
+            (Action::Installed, true) => "would install",
+            (Action::Updated, false) => "updated",
+            (Action::Updated, true) => "would update",
+            (Action::KeptEdited, _) => "kept (edited since mori wrote it)",
+            (Action::SkippedNotOurs, _) => "left alone (mori didn't write it)",
+            (Action::Unchanged | Action::Unspecified, _) => "up to date",
+        };
+        let _ = writeln!(text, "  {what}: {}", file.path);
     }
     text
 }

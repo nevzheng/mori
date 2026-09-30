@@ -311,3 +311,78 @@ pub struct RemoveTreeResponse {
     #[prost(bool, tag = "4")]
     pub validate_only: bool,
 }
+/// Request for `SyncSkills`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SyncSkillsRequest {
+    /// Report what would change without writing anything (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "1")]
+    pub validate_only: bool,
+}
+/// Response for `SyncSkills`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SyncSkillsResponse {
+    /// Every file mori ships into the root: its skills and the two indexes.
+    #[prost(message, repeated, tag = "1")]
+    pub files: ::prost::alloc::vec::Vec<SkillFile>,
+    /// Echoes the request: true if nothing was actually written.
+    #[prost(bool, tag = "2")]
+    pub validate_only: bool,
+}
+/// One file mori ships into the root, and what a sync did with it.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SkillFile {
+    /// Absolute path of the file.
+    #[prost(string, tag = "1")]
+    pub path: ::prost::alloc::string::String,
+    /// What happened to it.
+    #[prost(enumeration = "skill_file::Action", tag = "2")]
+    pub action: i32,
+}
+/// Nested message and enum types in `SkillFile`.
+pub mod skill_file {
+    /// What happened to the file.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Action {
+        /// Not set.
+        Unspecified = 0,
+        /// It wasn't there, so mori wrote it.
+        Installed = 1,
+        /// It already matched this mori's version.
+        Unchanged = 2,
+        /// mori wrote it before and nobody changed it, so mori updated it.
+        Updated = 3,
+        /// mori wrote it before, but someone edited it, so mori kept their version.
+        KeptEdited = 4,
+        /// It is there, but mori never wrote it, so mori left it alone.
+        SkippedNotOurs = 5,
+    }
+    impl Action {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "ACTION_UNSPECIFIED",
+                Self::Installed => "ACTION_INSTALLED",
+                Self::Unchanged => "ACTION_UNCHANGED",
+                Self::Updated => "ACTION_UPDATED",
+                Self::KeptEdited => "ACTION_KEPT_EDITED",
+                Self::SkippedNotOurs => "ACTION_SKIPPED_NOT_OURS",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "ACTION_UNSPECIFIED" => Some(Self::Unspecified),
+                "ACTION_INSTALLED" => Some(Self::Installed),
+                "ACTION_UNCHANGED" => Some(Self::Unchanged),
+                "ACTION_UPDATED" => Some(Self::Updated),
+                "ACTION_KEPT_EDITED" => Some(Self::KeptEdited),
+                "ACTION_SKIPPED_NOT_OURS" => Some(Self::SkippedNotOurs),
+                _ => None,
+            }
+        }
+    }
+}

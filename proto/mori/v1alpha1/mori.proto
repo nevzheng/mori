@@ -28,6 +28,11 @@ service MoriService {
   // no change missing from the remote). Snapshots the tree first. Never removes the clone itself
   // or a workspace mori didn't make.
   rpc RemoveTree(RemoveTreeRequest) returns (RemoveTreeResponse);
+
+  // Brings mori's agent skills in the root up to date with this mori, and regenerates the
+  // skills/llms.txt and llms.txt indexes. Changes only files mori wrote and nobody edited since;
+  // never touches anyone else's skills.
+  rpc SyncSkills(SyncSkillsRequest) returns (SyncSkillsResponse);
 }
 
 // Request for `Init`.
@@ -270,4 +275,44 @@ message RemoveTreeResponse {
 
   // Echoes the request: true if nothing was actually removed.
   bool validate_only = 4;
+}
+
+// Request for `SyncSkills`.
+message SyncSkillsRequest {
+  // Report what would change without writing anything (AIP-163; the CLI's --dry-run).
+  bool validate_only = 1;
+}
+
+// Response for `SyncSkills`.
+message SyncSkillsResponse {
+  // Every file mori ships into the root: its skills and the two indexes.
+  repeated SkillFile files = 1;
+
+  // Echoes the request: true if nothing was actually written.
+  bool validate_only = 2;
+}
+
+// One file mori ships into the root, and what a sync did with it.
+message SkillFile {
+  // What happened to the file.
+  enum Action {
+    // Not set.
+    ACTION_UNSPECIFIED = 0;
+    // It wasn't there, so mori wrote it.
+    ACTION_INSTALLED = 1;
+    // It already matched this mori's version.
+    ACTION_UNCHANGED = 2;
+    // mori wrote it before and nobody changed it, so mori updated it.
+    ACTION_UPDATED = 3;
+    // mori wrote it before, but someone edited it, so mori kept their version.
+    ACTION_KEPT_EDITED = 4;
+    // It is there, but mori never wrote it, so mori left it alone.
+    ACTION_SKIPPED_NOT_OURS = 5;
+  }
+
+  // Absolute path of the file.
+  string path = 1;
+
+  // What happened to it.
+  Action action = 2;
 }

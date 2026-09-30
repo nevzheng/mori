@@ -1,9 +1,14 @@
 //! `mori init`: observe the disk, plan, and (unless it's a dry run) apply.
 
+use std::path::PathBuf;
+
 use mori_api::v1alpha1::{CreatedPath, InitResponse, UnmanagedRepo, created_path::Kind};
 use mori_core::error::ErrorDetails;
 use mori_core::init::{InitPlan, Step, plan};
 use mori_core::paths::{Env, Paths};
+use mori_core::skills::Mode;
+
+use crate::skills;
 
 /// Runs `init` against the real environment and disk.
 pub fn run(dry_run: bool) -> Result<InitResponse, Box<dyn ErrorDetails>> {
@@ -13,24 +18,30 @@ pub fn run(dry_run: bool) -> Result<InitResponse, Box<dyn ErrorDetails>> {
     if !dry_run {
         mori_store::init::apply(&plan).map_err(boxed)?;
     }
-    Ok(response(&plan, dry_run))
+    // Skills are only added, never changed: updating them is `mori skills sync`.
+    let skills = skills::run(&paths, Mode::AddOnly, dry_run)?;
+    Ok(response(&plan, &skills.created, dry_run))
 }
 
-fn response(plan: &InitPlan, dry_run: bool) -> InitResponse {
+fn response(plan: &InitPlan, skills: &[(PathBuf, bool)], dry_run: bool) -> InitResponse {
+    let kind = |is_dir: bool| if is_dir { Kind::Directory } else { Kind::File };
     InitResponse {
         root: plan.root.display().to_string(),
-        already_initialized: plan.already_initialized(),
+        already_initialized: plan.already_initialized() && skills.is_empty(),
         validate_only: dry_run,
         created: plan
             .steps
             .iter()
-            .map(|step| CreatedPath {
-                path: step.path().display().to_string(),
-                kind: match step {
-                    Step::CreateDir { .. } => Kind::Directory,
-                    Step::WriteConfig { .. } | Step::CreateDatabase { .. } => Kind::File,
-                }
-                .into(),
+            .map(|step| {
+                (
+                    step.path().to_path_buf(),
+                    matches!(step, Step::CreateDir { .. }),
+                )
+            })
+            .chain(skills.iter().cloned())
+            .map(|(path, is_dir)| CreatedPath {
+                path: path.display().to_string(),
+                kind: kind(is_dir).into(),
             })
             .collect(),
         unmanaged_repos: plan
