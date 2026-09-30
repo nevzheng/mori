@@ -275,3 +275,39 @@ pub struct TreeState {
     #[prost(uint32, tag = "3")]
     pub unpushed: u32,
 }
+/// Request for `RemoveTree`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct RemoveTreeRequest {
+    /// The repo, in any form `Clone` accepts.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree's name, e.g. "claude-fix-login".
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// Who is asking; must be the tree's owner. Defaults to the login name.
+    #[prost(string, tag = "3")]
+    pub agent: ::prost::alloc::string::String,
+    /// Allow removing a pinned tree.
+    #[prost(bool, tag = "4")]
+    pub pinned: bool,
+    /// Check everything and remove nothing (AIP-163; the CLI's --dry-run). The tree is still
+    /// snapshotted, which changes only jj's record of it.
+    #[prost(bool, tag = "5")]
+    pub validate_only: bool,
+}
+/// Response for `RemoveTree`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct RemoveTreeResponse {
+    /// The tree removed, or that would be removed.
+    #[prost(message, optional, tag = "1")]
+    pub tree: ::core::option::Option<Tree>,
+    /// True if its workspace was forgotten (false for a missing tree).
+    #[prost(bool, tag = "2")]
+    pub workspace_forgotten: bool,
+    /// True if its directory was deleted. A missing tree's directory is left in place.
+    #[prost(bool, tag = "3")]
+    pub directory_removed: bool,
+    /// Echoes the request: true if nothing was actually removed.
+    #[prost(bool, tag = "4")]
+    pub validate_only: bool,
+}

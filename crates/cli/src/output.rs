@@ -8,7 +8,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
-    CloneResponse, CreateTreeResponse, InitResponse, ListTreesResponse, TreeRow, tree_row::Status,
+    CloneResponse, CreateTreeResponse, InitResponse, ListTreesResponse, RemoveTreeResponse,
+    TreeRow, tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -228,6 +229,37 @@ fn ls_row(row: &TreeRow) -> [String; 6] {
         or_dash(tree.lifetime),
         work,
     ]
+}
+
+/// The text `tree remove` prints.
+pub fn tree_remove_text(response: &RemoveTreeResponse) -> String {
+    let mut text = String::new();
+    let Some(tree) = &response.tree else {
+        return text;
+    };
+    // Writing to a String can't fail.
+    let _ = if response.validate_only {
+        writeln!(
+            text,
+            "Would remove tree {} (dry run): it is safe to remove.",
+            tree.name
+        )
+    } else {
+        writeln!(text, "Removed tree {}:", tree.name)
+    };
+    if !response.validate_only {
+        if response.directory_removed {
+            let _ = writeln!(text, "  deleted {}", tree.path);
+        } else {
+            let _ = writeln!(
+                text,
+                "  its workspace was already gone; left {} in place",
+                tree.path
+            );
+        }
+        let _ = writeln!(text, "  dropped its record");
+    }
+    text
 }
 
 fn report(

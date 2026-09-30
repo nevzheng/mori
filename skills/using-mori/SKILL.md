@@ -103,6 +103,22 @@ The output (and `tree.path` with `--json`) is the directory to work in. One tree
 name is taken, pick another task slug rather than reusing someone else's tree. For a long-lived
 coordinating tree, see the `lead-tree` skill.
 
+### `mori tree remove <repo> <name>`
+
+Removes a task tree when its work is done and safe elsewhere. mori first lets jj snapshot the
+tree, then removes it only if nothing in it exists only on this machine: no edits, and every
+change is on the remote (in a pushed bookmark or trunk). Then it forgets the workspace, deletes
+the directory and drops the record.
+
+- **`--agent <name>`**: you can only remove your own trees; pass the same name you created it
+  with.
+- **`--pinned`**: needed for a pinned tree, such as a lead tree. Only with the person's say-so.
+- **`--dry-run`**: checks everything and removes nothing.
+- If it refuses with `TREE_HAS_UNSAVED_WORK`, push your work (or ask the person whether to
+  abandon it). Never delete the directory yourself to get around it.
+- It never removes the clone itself or a workspace mori didn't make. If mori's record has no
+  workspace any more (`missing` in `mori ls`), it drops the record and leaves the directory.
+
 ## Errors
 
 Errors follow Google AIP-193. The exit code is the `google.rpc.Code` number. With `--json`, the
@@ -114,23 +130,28 @@ error is a `google.rpc.Status`:
               "domain": "repo.mori", "metadata": {"repo": "github.com/acme/widget"}}]}
 ```
 
-| Exit | Reason               | What it means, and what to do                                                  |
-| ---- | -------------------- | ------------------------------------------------------------------------------ |
-| 3    | `INVALID_USAGE`      | Bad flags or arguments. Check `mori <command> --help`.                         |
-| 3    | `CLONE_URL_INVALID`  | The URL isn't a form mori accepts. Use one of the forms above.                 |
-| 3    | `TREE_NAME_INVALID`  | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
-| 5    | `REPO_NOT_MANAGED`   | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
-| 6    | `REPO_EXISTS`        | mori already has this repo. Use the existing clone; don't clone again.         |
-| 6    | `PATH_EXISTS`        | Something mori didn't make is at the path. Leave it; tell the person.          |
-| 6    | `TREE_EXISTS`        | A tree of that name exists. Use a different task slug; don't take it over.     |
-| 6    | `WORKSPACE_EXISTS`   | A workspace mori didn't make has that name. Leave it; pick another slug.       |
-| 9    | `NOT_INITIALIZED`    | mori isn't set up. Run `mori init` if the task allows, else ask.               |
-| 9    | `ROOT_MISMATCH`      | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |
-| 9    | `JJ_NOT_FOUND`       | jj isn't installed or on `PATH`. Ask the person to install it.                 |
-| 9    | `OWNER_UNKNOWN`      | No owner: pass `--agent <name>`.                                               |
-| 13   | `JJ_FAILED`          | jj failed (network, auth, missing repo). Nothing was left behind; see message. |
-| 13   | `CLONE_NOT_RECORDED` | The clone worked but wasn't recorded. It is kept; don't delete it. Report it.  |
-| 13   | `TREE_NOT_RECORDED`  | The tree was made but not recorded. It is kept; don't delete it. Report it.    |
+| Exit | Reason                  | What it means, and what to do                                                  |
+| ---- | ----------------------- | ------------------------------------------------------------------------------ |
+| 3    | `INVALID_USAGE`         | Bad flags or arguments. Check `mori <command> --help`.                         |
+| 3    | `CLONE_URL_INVALID`     | The URL isn't a form mori accepts. Use one of the forms above.                 |
+| 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
+| 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
+| 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                         |
+| 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.         |
+| 6    | `PATH_EXISTS`           | Something mori didn't make is at the path. Leave it; tell the person.          |
+| 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.     |
+| 6    | `WORKSPACE_EXISTS`      | A workspace mori didn't make has that name. Leave it; pick another slug.       |
+| 9    | `TREE_HAS_UNSAVED_WORK` | The tree has edits or unpushed changes. Push them, or ask the person.          |
+| 9    | `NOT_TREE_OWNER`        | Someone else's tree. Leave it; tell the person if it looks abandoned.          |
+| 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.       |
+| 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                |
+| 9    | `NOT_INITIALIZED`       | mori isn't set up. Run `mori init` if the task allows, else ask.               |
+| 9    | `ROOT_MISMATCH`         | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |
+| 9    | `JJ_NOT_FOUND`          | jj isn't installed or on `PATH`. Ask the person to install it.                 |
+| 9    | `OWNER_UNKNOWN`         | No owner: pass `--agent <name>`.                                               |
+| 13   | `JJ_FAILED`             | jj failed (network, auth, missing repo). Nothing was left behind; see message. |
+| 13   | `CLONE_NOT_RECORDED`    | The clone worked but wasn't recorded. It is kept; don't delete it. Report it.  |
+| 13   | `TREE_NOT_RECORDED`     | The tree was made but not recorded. It is kept; don't delete it. Report it.    |
 
 Other reasons (`CONFIG_INVALID`, `DATABASE_NOT_MORI`, `DATABASE_SCHEMA_TOO_NEW`, `IO_ERROR`,
 `DATABASE_ERROR`, …) mean something outside the task is wrong: stop and report the message and
@@ -138,7 +159,7 @@ reason.
 
 ## Not yet
 
-These are designed but not built, so don't look for them: `mori tree remove`, cleanup and
-restore. Until `mori tree remove` exists, leave finished trees in place and say which ones are
-done; don't delete them yourself. Use `mori tree create` rather than making jj workspaces or git
-worktrees in a mori clone by hand: mori would list those as foreign.
+These are designed but not built, so don't look for them: automatic cleanup (a report of trees
+that may go, confirmed in batches, with a journal) and restore. Until then, remove your own trees
+with `mori tree remove` when your work is pushed. Use `mori tree create` rather than making jj
+workspaces or git worktrees in a mori clone by hand: mori would list those as foreign.
