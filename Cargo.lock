@@ -577,6 +577,8 @@ version = "0.0.0"
 dependencies = [
  "mori-core",
  "rusqlite",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
 ]

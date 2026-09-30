@@ -11,6 +11,7 @@ extract_cargo_lints(
 rust_library(
     name = "mori_store",
     srcs = glob(["src/**/*.rs"]),
+    compile_data = ["//skills:files"],
     lint_config = ":lints",
     visibility = ["//visibility:public"],
     deps = all_crate_deps(normal = True) + ["//crates/core:mori_core"],
@@ -19,6 +20,7 @@ rust_library(
 rust_test(
     name = "mori_store_test",
     size = "small",
+    compile_data = ["//skills:files"],
     crate = ":mori_store",
     lint_config = ":lints",
     deps = all_crate_deps(normal_dev = True),
