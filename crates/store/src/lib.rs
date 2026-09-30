@@ -3,6 +3,7 @@
 
 pub mod database;
 mod error;
+pub mod gc;
 pub mod init;
 pub mod records;
 pub mod skills;
