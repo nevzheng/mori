@@ -6,10 +6,13 @@
 mod clone;
 mod init;
 mod output;
+mod state;
+mod tree;
 
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use mori_core::tree::Lifetime;
 
 /// mori looks after a forest of repos and worktrees, for you and your agents.
 #[derive(Debug, Parser)]
@@ -46,6 +49,43 @@ enum Command {
         #[arg(long)]
         no_colocate: bool,
     },
+
+    /// Work with trees: the jj workspaces mori creates for tasks.
+    Tree {
+        #[command(subcommand)]
+        command: TreeCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum TreeCommand {
+    /// Give one task its own tree: a jj workspace under trees/<repo>/, on a new change on top of
+    /// trunk, recorded with its owner, task and lifetime.
+    Create {
+        /// The repo, in any form `mori clone` accepts, e.g. github.com/acme/widget.
+        repo: String,
+
+        /// A short slug for the work: lowercase letters, digits and hyphens.
+        #[arg(long)]
+        task: String,
+
+        /// Who the tree is for, e.g. claude. Defaults to your login name.
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// When the tree may go: pinned, task-done, lru, or ttl:<n>d. Defaults to the
+        /// [trees.lifetime] task setting (task-done).
+        #[arg(long)]
+        lifetime: Option<Lifetime>,
+
+        /// The jj revision to start from. Defaults to `trunk()`.
+        #[arg(long)]
+        from: Option<String>,
+
+        /// Show what would happen, and create nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -68,6 +108,31 @@ fn main() -> ExitCode {
             Ok(response) => {
                 output::success(cli.json, &response, output::clone_text(&response).as_str())
             }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Tree {
+            command:
+                TreeCommand::Create {
+                    repo,
+                    task,
+                    agent,
+                    lifetime,
+                    from,
+                    dry_run,
+                },
+        } => match tree::create(tree::CreateArgs {
+            repo,
+            task,
+            agent,
+            lifetime,
+            from,
+            dry_run,
+        }) {
+            Ok(response) => output::success(
+                cli.json,
+                &response,
+                output::tree_create_text(&response).as_str(),
+            ),
             Err(error) => output::failure(cli.json, error.as_ref()),
         },
     }

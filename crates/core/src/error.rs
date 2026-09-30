@@ -228,6 +228,21 @@ pub enum TreeError {
         /// The path.
         path: PathBuf,
     },
+
+    /// The workspace was made, but mori couldn't record it. It is kept: mori never deletes work.
+    #[error(
+        "made the tree {name:?} at {}, but couldn't record it ({why}). The tree is kept; \
+         mori doesn't manage it, so it shows as foreign",
+        path.display()
+    )]
+    NotRecorded {
+        /// The tree's name.
+        name: String,
+        /// The tree, which is kept.
+        path: PathBuf,
+        /// Why recording failed.
+        why: String,
+    },
 }
 
 impl TreeError {
@@ -243,6 +258,7 @@ impl ErrorDetails for TreeError {
             Self::TreeExists { .. } | Self::WorkspaceExists { .. } | Self::PathExists { .. } => {
                 Code::AlreadyExists
             }
+            Self::NotRecorded { .. } => Code::Internal,
         }
     }
 
@@ -253,6 +269,7 @@ impl ErrorDetails for TreeError {
             Self::TreeExists { .. } => "TREE_EXISTS",
             Self::WorkspaceExists { .. } => "WORKSPACE_EXISTS",
             Self::PathExists { .. } => "PATH_EXISTS",
+            Self::NotRecorded { .. } => "TREE_NOT_RECORDED",
         }
     }
 
@@ -267,6 +284,9 @@ impl ErrorDetails for TreeError {
             | Self::WorkspaceExists { name } => vec![("name", name.clone())],
             Self::OwnerUnknown => vec![],
             Self::PathExists { path } => vec![("path", path.display().to_string())],
+            Self::NotRecorded { name, path, .. } => {
+                vec![("name", name.clone()), ("path", path.display().to_string())]
+            }
         }
     }
 }

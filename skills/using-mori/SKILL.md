@@ -38,7 +38,7 @@ find the skill for a task. The same layout suits skills of your own.
 ```text
 $MORI_ROOT/                        default ~/mori
   repos/<host>/<owner>/<repo>/     one clone per repo; also its base tree (yours, pinned)
-  trees/<repo>/<name>/             task trees (not created by any command yet)
+  trees/<repo>/<name>/             task trees, one per piece of work
   skills/  projects/  llms.txt     reserved for people and LLMs; no stability guarantee
 ```
 
@@ -70,6 +70,24 @@ Clones a repo into `repos/<host>/<owner>/<repo>` and records it with a pinned ba
 
 Run `mori init` first. mori needs `jj` on `PATH`.
 
+### `mori tree create <repo> --task <slug>`
+
+Gives one piece of work its own tree: a jj workspace at `trees/<repo>/<name>`, on a new change on
+top of trunk, recorded with its owner, task and lifetime. Work in that directory; it is yours.
+
+- **`--agent <name>`**: who the tree is for, e.g. `claude`. Always pass it when you are an agent;
+  without it the owner is the person's login name.
+- **`--task <slug>`**: lowercase letters, digits and hyphens, e.g. `fix-login`. The tree's name is
+  `<owner>-<task>` by default (the `[trees] name` template in `config.toml` can change it).
+- **`--lifetime`**: `pinned`, `task-done` (the default), `lru`, or `ttl:<n>d`. A tree only becomes
+  a cleanup candidate by its lifetime; nothing is removed without the safety checks.
+- **`--from <revset>`**: where the new change starts; `trunk()` by default.
+- **`--dry-run`** shows the name, path and lifetime, and creates nothing.
+
+The output (and `tree.path` with `--json`) is the directory to work in. One tree per task: if the
+name is taken, pick another task slug rather than reusing someone else's tree. For a long-lived
+coordinating tree, see the `lead-tree` skill.
+
 ## Errors
 
 Errors follow Google AIP-193. The exit code is the `google.rpc.Code` number. With `--json`, the
@@ -85,13 +103,19 @@ error is a `google.rpc.Status`:
 | ---- | -------------------- | ------------------------------------------------------------------------------ |
 | 3    | `INVALID_USAGE`      | Bad flags or arguments. Check `mori <command> --help`.                         |
 | 3    | `CLONE_URL_INVALID`  | The URL isn't a form mori accepts. Use one of the forms above.                 |
+| 3    | `TREE_NAME_INVALID`  | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
+| 5    | `REPO_NOT_MANAGED`   | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
 | 6    | `REPO_EXISTS`        | mori already has this repo. Use the existing clone; don't clone again.         |
 | 6    | `PATH_EXISTS`        | Something mori didn't make is at the path. Leave it; tell the person.          |
+| 6    | `TREE_EXISTS`        | A tree of that name exists. Use a different task slug; don't take it over.     |
+| 6    | `WORKSPACE_EXISTS`   | A workspace mori didn't make has that name. Leave it; pick another slug.       |
 | 9    | `NOT_INITIALIZED`    | mori isn't set up. Run `mori init` if the task allows, else ask.               |
 | 9    | `ROOT_MISMATCH`      | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |
 | 9    | `JJ_NOT_FOUND`       | jj isn't installed or on `PATH`. Ask the person to install it.                 |
+| 9    | `OWNER_UNKNOWN`      | No owner: pass `--agent <name>`.                                               |
 | 13   | `JJ_FAILED`          | jj failed (network, auth, missing repo). Nothing was left behind; see message. |
 | 13   | `CLONE_NOT_RECORDED` | The clone worked but wasn't recorded. It is kept; don't delete it. Report it.  |
+| 13   | `TREE_NOT_RECORDED`  | The tree was made but not recorded. It is kept; don't delete it. Report it.    |
 
 Other reasons (`CONFIG_INVALID`, `DATABASE_NOT_MORI`, `DATABASE_SCHEMA_TOO_NEW`, `IO_ERROR`,
 `DATABASE_ERROR`, …) mean something outside the task is wrong: stop and report the message and
@@ -99,7 +123,7 @@ reason.
 
 ## Not yet
 
-These are designed but not built, so don't look for them: `mori ls`, `mori tree create`,
-`mori tree remove`, cleanup and restore. Until `mori tree create` exists, don't make your own jj
-workspaces or git worktrees in a mori clone unless the person asks; mori would list them as
-foreign.
+These are designed but not built, so don't look for them: `mori ls`, `mori tree remove`, cleanup
+and restore. Until `mori tree remove` exists, leave finished trees in place and say which ones are
+done; don't delete them yourself. Use `mori tree create` rather than making jj workspaces or git
+worktrees in a mori clone by hand: mori would list those as foreign.

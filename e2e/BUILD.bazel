@@ -14,6 +14,7 @@ py_test(
         "matchers.py",
         "pytest_main.py",
         "test_features.py",
+        "tree_steps.py",
     ],
     data = [
         "features/smoke.feature",

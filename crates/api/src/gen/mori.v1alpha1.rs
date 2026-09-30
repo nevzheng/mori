@@ -116,3 +116,66 @@ pub struct CloneResponse {
     #[prost(bool, tag = "6")]
     pub validate_only: bool,
 }
+/// A tree mori created.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Tree {
+    /// Opaque and stable; never reused. Empty when nothing was created (a dry run).
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    /// The repo's identity, e.g. "github.com/acme/widget".
+    #[prost(string, tag = "2")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree's name, which is also its workspace name, e.g. "claude-fix-login".
+    #[prost(string, tag = "3")]
+    pub name: ::prost::alloc::string::String,
+    /// Absolute path of the tree.
+    #[prost(string, tag = "4")]
+    pub path: ::prost::alloc::string::String,
+    /// "base" (the clone itself) or "task".
+    #[prost(string, tag = "5")]
+    pub role: ::prost::alloc::string::String,
+    /// Who the tree is for: an agent such as "claude", or a person's login name.
+    #[prost(string, tag = "6")]
+    pub owner: ::prost::alloc::string::String,
+    /// The task, e.g. "fix-login". Empty for the base tree.
+    #[prost(string, tag = "7")]
+    pub task: ::prost::alloc::string::String,
+    /// When the tree may go: "pinned", "task-done", "lru", or "ttl:<n>d" / "ttl:<n>h".
+    #[prost(string, tag = "8")]
+    pub lifetime: ::prost::alloc::string::String,
+}
+/// Request for `CreateTree`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct CreateTreeRequest {
+    /// The repo, in any form `Clone` accepts.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// A short slug for the work: lowercase letters, digits and hyphens.
+    #[prost(string, tag = "2")]
+    pub task: ::prost::alloc::string::String,
+    /// Who the tree is for. Defaults to the login name.
+    #[prost(string, tag = "3")]
+    pub agent: ::prost::alloc::string::String,
+    /// A lifetime instead of the configured default for task trees.
+    #[prost(string, tag = "4")]
+    pub lifetime: ::prost::alloc::string::String,
+    /// The jj revision the tree starts from. Defaults to "trunk()".
+    #[prost(string, tag = "5")]
+    pub from: ::prost::alloc::string::String,
+    /// Report what would happen without creating anything (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "6")]
+    pub validate_only: bool,
+}
+/// Response for `CreateTree`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct CreateTreeResponse {
+    /// The tree created, or that would be created.
+    #[prost(message, optional, tag = "1")]
+    pub tree: ::core::option::Option<Tree>,
+    /// The revision it starts from.
+    #[prost(string, tag = "2")]
+    pub from: ::prost::alloc::string::String,
+    /// Echoes the request: true if nothing was actually created.
+    #[prost(bool, tag = "3")]
+    pub validate_only: bool,
+}
