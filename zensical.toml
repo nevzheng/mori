@@ -16,6 +16,7 @@ nav = [
   { "Design docs" = [
     { "How design docs work" = "design/README.md" },
     { "Template" = "design/TEMPLATE.md" },
+    { "The forest layout and tree model" = "design/core/forest-layout-and-tree-model.md" },
   ] },
 ]
 
