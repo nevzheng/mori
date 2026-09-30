@@ -7,6 +7,7 @@ py_test(
     name = "e2e_test",
     size = "small",
     srcs = [
+        "clone_steps.py",
         "conftest.py",
         "harness.py",
         "init_steps.py",
@@ -18,8 +19,12 @@ py_test(
         "features/smoke.feature",
         "//crates/cli:mori",
         "//spec/cuj:features",
+        "//third_party/jj",
     ],
-    env = {"MORI_BIN": "$(rootpath //crates/cli:mori)"},
+    env = {
+        "MORI_BIN": "$(rootpath //crates/cli:mori)",
+        "MORI_TEST_JJ": "$(rootpath //third_party/jj)",
+    },
     main = "pytest_main.py",
     deps = [
         "@pypi//precisely",

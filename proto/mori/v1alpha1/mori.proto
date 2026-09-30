@@ -9,6 +9,11 @@ service MoriService {
   // Sets up mori once per machine: the root layout, the config and the state store.
   // Only ever adds things; running it again changes nothing.
   rpc Init(InitRequest) returns (InitResponse);
+
+  // Clones a repo to repos/<host>/<owner>/<repo> and records it with a pinned base tree.
+  // Refuses a repo mori already has and any path it didn't make. If the clone succeeds but
+  // recording it fails, the clone is kept and the error says so.
+  rpc Clone(CloneRequest) returns (CloneResponse);
 }
 
 // Request for `Init`.
@@ -61,4 +66,37 @@ message UnmanagedRepo {
 
   // Absolute path of the clone.
   string path = 2;
+}
+
+// Request for `Clone`.
+message CloneRequest {
+  // What to clone: https://, ssh://, user@host:owner/repo, or host/owner/repo.
+  string url = 1;
+
+  // Report what would happen without cloning anything (AIP-163; the CLI's --dry-run).
+  bool validate_only = 2;
+
+  // Make a jj-only clone. By default the clone is colocated: a jj repo and a git repo at once.
+  bool jj_only = 3;
+}
+
+// Response for `Clone`.
+message CloneResponse {
+  // The repo's identity, all lowercase, e.g. "github.com/acme/widget".
+  string repo = 1;
+
+  // Absolute path of the clone.
+  string path = 2;
+
+  // The URL fetched from.
+  string fetch_url = 3;
+
+  // True if the clone is also a git repo.
+  bool colocated = 4;
+
+  // The repo's directory under trees/, where its task trees will go.
+  string tree_dir = 5;
+
+  // Echoes the request: true if nothing was actually cloned.
+  bool validate_only = 6;
 }
