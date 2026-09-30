@@ -1,27 +1,65 @@
 //! The state database: one SQLite file that only its owner can read.
 //!
 //! Its schema version is SQLite's `user_version`, and its `application_id` marks it as mori's, so
-//! mori never writes to another program's database by mistake.
+//! mori never writes to another program's database by mistake. Opening a database an older mori
+//! wrote upgrades it in place, all or nothing.
+//!
+//! It holds only what the VCS can't tell mori: who made a tree, for what, and how long it may live.
+//! Branches, HEAD and dirty or pushed state are always read from the VCS, never stored here.
 
 use std::fs::OpenOptions;
 use std::io::ErrorKind;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension};
+use rusqlite::{
+    Connection, ErrorCode, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
+};
 
 use crate::StoreError;
 
 /// The `application_id` of a mori database: "mori" in ASCII.
 const APPLICATION_ID: i32 = 0x6d6f_7269;
 
-/// The schema version this mori writes and reads. Later versions add migrations from this one.
-pub const SCHEMA_VERSION: i32 = 1;
+/// How long to wait for another mori process to finish writing before giving up.
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The schema version this mori writes, and the newest it reads.
+pub const SCHEMA_VERSION: i32 = 2;
+
+/// The steps from an empty file to each version: `MIGRATIONS[n]` takes version `n` to `n + 1`.
+/// Append only: a released step never changes.
+const MIGRATIONS: [&str; 2] = [SCHEMA_V1, SCHEMA_V2];
 
 const SCHEMA_V1: &str = "
     CREATE TABLE meta (
         key   TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL
+    ) STRICT;
+";
+
+// IDs are opaque and never reused. A tree's name is also its workspace name in the VCS, which is
+// how a row is matched to a workspace.
+const SCHEMA_V2: &str = "
+    CREATE TABLE repos (
+        id         TEXT PRIMARY KEY NOT NULL,
+        remote     TEXT NOT NULL UNIQUE,
+        dir_name   TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL
+    ) STRICT;
+
+    CREATE TABLE trees (
+        id           TEXT PRIMARY KEY NOT NULL,
+        repo_id      TEXT NOT NULL REFERENCES repos (id),
+        name         TEXT NOT NULL,
+        role         TEXT NOT NULL CHECK (role IN ('base', 'task')),
+        owner        TEXT NOT NULL,
+        task         TEXT,
+        lifetime     TEXT NOT NULL
+            CHECK (lifetime IN ('pinned', 'task-done', 'lru') OR lifetime GLOB 'ttl:*'),
+        created_at   TEXT NOT NULL,
+        last_used_at TEXT NOT NULL,
+        UNIQUE (repo_id, name)
     ) STRICT;
 ";
 
@@ -73,9 +111,9 @@ impl Database {
     /// # Errors
     ///
     /// [`StoreError::NotMori`] if the file isn't a mori database, [`StoreError::SchemaTooNew`] if a
-    /// newer mori wrote it, otherwise an I/O or SQLite error.
+    /// newer mori wrote it, otherwise an I/O or SQLite error. A failed upgrade changes nothing.
     pub fn open(path: &Path) -> Result<Self, StoreError> {
-        let db = Self::connect(path)?;
+        let mut db = Self::connect(path)?;
         let not_mori = || StoreError::NotMori {
             path: path.to_path_buf(),
         };
@@ -97,6 +135,11 @@ impl Database {
                 found,
                 supported: SCHEMA_VERSION,
             }),
+            // Version 0 is a file mori never finished setting up, not an old schema.
+            found if found >= 1 => {
+                db.upgrade(usize::try_from(found).map_err(|_| not_mori())?)?;
+                Ok(db)
+            }
             _ => Err(not_mori()),
         }
     }
@@ -121,21 +164,25 @@ impl Database {
 
     /// Opens `path` without creating it: a missing file is an error, never a new database.
     fn connect(path: &Path) -> Result<Self, StoreError> {
+        let sqlite = |source| StoreError::Sqlite {
+            path: path.to_path_buf(),
+            source,
+        };
         let conn = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
-        .map_err(|source| StoreError::Sqlite {
-            path: path.to_path_buf(),
-            source,
-        })?;
+        .map_err(sqlite)?;
+        conn.pragma_update(None, "foreign_keys", true)
+            .map_err(sqlite)?;
+        conn.busy_timeout(BUSY_TIMEOUT).map_err(sqlite)?;
         Ok(Self {
             path: path.to_path_buf(),
             conn,
         })
     }
 
-    /// Writes schema version 1 and the root, all or nothing.
+    /// Writes the whole schema and the root, all or nothing.
     fn initialize(&mut self, root: &str) -> Result<(), StoreError> {
         let path = self.path.clone();
         let sqlite = |source| StoreError::Sqlite {
@@ -145,11 +192,30 @@ impl Database {
         let tx = self.conn.transaction().map_err(sqlite)?;
         tx.pragma_update(None, "application_id", APPLICATION_ID)
             .map_err(sqlite)?;
-        tx.execute_batch(SCHEMA_V1).map_err(sqlite)?;
+        apply_migrations(&tx, 0).map_err(sqlite)?;
         tx.execute("INSERT INTO meta (key, value) VALUES ('root', ?1)", [root])
             .map_err(sqlite)?;
-        tx.pragma_update(None, "user_version", SCHEMA_VERSION)
+        tx.commit().map_err(sqlite)
+    }
+
+    /// Upgrades a database from schema version `from` to [`SCHEMA_VERSION`], all or nothing.
+    fn upgrade(&mut self, from: usize) -> Result<(), StoreError> {
+        let path = self.path.clone();
+        let sqlite = |source| StoreError::Sqlite {
+            path: path.clone(),
+            source,
+        };
+        // Take the write lock first, then look again: another mori may have upgraded meanwhile.
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite)?;
+        let current: i32 = tx
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .map_err(sqlite)?;
+        if usize::try_from(current).ok() == Some(from) {
+            apply_migrations(&tx, from).map_err(sqlite)?;
+        }
         tx.commit().map_err(sqlite)
     }
 
@@ -167,6 +233,14 @@ impl Database {
     }
 }
 
+/// Runs the migrations from schema version `from` on, then records the new version.
+fn apply_migrations(tx: &Transaction, from: usize) -> rusqlite::Result<()> {
+    for step in MIGRATIONS.iter().skip(from) {
+        tx.execute_batch(step)?;
+    }
+    tx.pragma_update(None, "user_version", SCHEMA_VERSION)
+}
+
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
@@ -176,6 +250,46 @@ mod tests {
     use super::*;
 
     const ROOT: &str = "/home/acme/mori";
+
+    /// Writes a database the way the first mori release did: schema version 1.
+    fn create_v1(path: &Path) -> rusqlite::Result<()> {
+        let conn = Connection::open(path)?;
+        conn.pragma_update(None, "application_id", APPLICATION_ID)?;
+        conn.execute_batch(SCHEMA_V1)?;
+        conn.execute("INSERT INTO meta (key, value) VALUES ('root', ?1)", [ROOT])?;
+        conn.pragma_update(None, "user_version", 1)
+    }
+
+    fn tables(db: &Database) -> rusqlite::Result<Vec<String>> {
+        let mut statement = db
+            .conn
+            .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")?;
+        let names = statement.query_map([], |row| row.get(0))?;
+        names.collect()
+    }
+
+    fn insert_repo(db: &Database, id: &str) -> rusqlite::Result<usize> {
+        db.conn.execute(
+            "INSERT INTO repos (id, remote, dir_name, created_at)
+             VALUES (?1, 'github.com/acme/' || ?1, ?1, '2026-01-01T00:00:00Z')",
+            [id],
+        )
+    }
+
+    fn insert_tree(
+        db: &Database,
+        repo: &str,
+        name: &str,
+        role: &str,
+        lifetime: &str,
+    ) -> rusqlite::Result<usize> {
+        db.conn.execute(
+            "INSERT INTO trees (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
+             VALUES (lower(hex(randomblob(8))), ?1, ?2, ?3, 'claude', 'fix-login', ?4,
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [repo, name, role, lifetime],
+        )
+    }
 
     fn database_path() -> std::io::Result<(tempfile::TempDir, PathBuf)> {
         let dir = tempfile::tempdir()?;
@@ -261,8 +375,8 @@ mod tests {
         assert!(matches!(
             error,
             StoreError::SchemaTooNew {
-                found: 2,
-                supported: 1,
+                found: 3,
+                supported: 2,
                 ..
             }
         ));
@@ -271,9 +385,97 @@ mod tests {
             error.metadata(),
             vec![
                 ("path", path.display().to_string()),
-                ("foundVersion", "2".to_owned()),
-                ("supportedVersion", "1".to_owned()),
+                ("foundVersion", "3".to_owned()),
+                ("supportedVersion", "2".to_owned()),
             ]
         );
+    }
+
+    #[test]
+    fn create_writes_the_latest_schema() {
+        let (_dir, path) = database_path().unwrap();
+        let db = Database::create(&path, ROOT, 0o600).unwrap();
+
+        assert_eq!(tables(&db).unwrap(), ["meta", "repos", "trees"]);
+    }
+
+    #[test]
+    fn open_upgrades_a_version_1_database() {
+        let (_dir, path) = database_path().unwrap();
+        create_v1(&path).unwrap();
+
+        let db = Database::open(&path).unwrap();
+        assert_eq!(db.pragma("user_version").unwrap(), SCHEMA_VERSION);
+        assert_eq!(db.root().unwrap(), PathBuf::from(ROOT));
+        assert_eq!(tables(&db).unwrap(), ["meta", "repos", "trees"]);
+    }
+
+    #[test]
+    fn an_upgrade_another_mori_already_did_is_skipped() {
+        let (_dir, path) = database_path().unwrap();
+        create_v1(&path).unwrap();
+        // Both saw version 1; this one upgrades first.
+        let mut late = Database::connect(&path).unwrap();
+        Database::open(&path).unwrap();
+
+        late.upgrade(1).unwrap();
+        assert_eq!(late.pragma("user_version").unwrap(), SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn a_failed_upgrade_changes_nothing() {
+        let (_dir, path) = database_path().unwrap();
+        create_v1(&path).unwrap();
+        // Version 2 creates `trees` after `repos`; this makes that second step fail.
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch("CREATE TABLE trees (x TEXT);")
+            .unwrap();
+
+        let error = Database::open(&path).unwrap_err();
+        assert!(matches!(error, StoreError::Sqlite { .. }));
+        let conn = Connection::open(&path).unwrap();
+        let version: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+        let repos: i32 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE name = 'repos'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(repos, 0);
+    }
+
+    #[test]
+    fn trees_accept_the_known_roles_and_lifetimes() {
+        let (_dir, path) = database_path().unwrap();
+        let db = Database::create(&path, ROOT, 0o600).unwrap();
+        insert_repo(&db, "widget").unwrap();
+
+        for (name, role, lifetime) in [
+            ("base", "base", "pinned"),
+            ("a", "task", "task-done"),
+            ("b", "task", "ttl:14d"),
+            ("c", "task", "lru"),
+        ] {
+            insert_tree(&db, "widget", name, role, lifetime).unwrap();
+        }
+    }
+
+    #[test]
+    fn trees_refuse_bad_rows() {
+        let (_dir, path) = database_path().unwrap();
+        let db = Database::create(&path, ROOT, 0o600).unwrap();
+        insert_repo(&db, "widget").unwrap();
+        insert_tree(&db, "widget", "claude-fix-login", "task", "pinned").unwrap();
+
+        // An unknown role or lifetime, a second tree with the same name, a repo that isn't there.
+        assert!(insert_tree(&db, "widget", "x", "lead", "pinned").is_err());
+        assert!(insert_tree(&db, "widget", "x", "task", "forever").is_err());
+        assert!(insert_tree(&db, "widget", "claude-fix-login", "task", "pinned").is_err());
+        assert!(insert_tree(&db, "gadget", "x", "task", "pinned").is_err());
     }
 }
