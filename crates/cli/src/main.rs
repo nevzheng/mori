@@ -3,6 +3,7 @@
 //! Every failure is a `google.rpc.Status`, and the exit code is its canonical code's number: 0 for
 //! success, 3 for bad arguments, 9 for a failed precondition, and so on.
 
+mod clone;
 mod init;
 mod output;
 
@@ -30,6 +31,21 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Clone a repo into repos/<host>/<owner>/<repo> and record it. Refuses a repo mori already
+    /// has, and any directory it didn't make.
+    Clone {
+        /// What to clone: https://…, ssh://…, git@host:owner/repo, or host/owner/repo.
+        url: String,
+
+        /// Show what would happen, and clone nothing.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Make a jj-only clone. By default the clone is a git repo too (colocated).
+        #[arg(long)]
+        no_colocate: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -41,6 +57,16 @@ fn main() -> ExitCode {
         Command::Init { dry_run } => match init::run(dry_run) {
             Ok(response) => {
                 output::success(cli.json, &response, output::init_text(&response).as_str())
+            }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Clone {
+            url,
+            dry_run,
+            no_colocate,
+        } => match clone::run(&url, dry_run, no_colocate) {
+            Ok(response) => {
+                output::success(cli.json, &response, output::clone_text(&response).as_str())
             }
             Err(error) => output::failure(cli.json, error.as_ref()),
         },

@@ -469,7 +469,9 @@ dependencies = [
  "clap",
  "mori-api",
  "mori-core",
+ "mori-jj",
  "mori-store",
+ "serde",
  "serde_json",
  "tempfile",
 ]

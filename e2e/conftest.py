@@ -15,7 +15,7 @@ from precisely import all_of, assert_that, contains_string, equal_to
 from pytest_bdd import given, parsers, then, when
 
 # Steps for one journey each.
-pytest_plugins = ["init_steps"]
+pytest_plugins = ["init_steps", "clone_steps"]
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -44,9 +44,16 @@ def home(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def env() -> dict[str, str]:
-    """The scenario's environment. Starts with only PATH; steps add the rest."""
-    return {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+def env(tmp_path: Path) -> dict[str, str]:
+    """The scenario's environment: PATH with the pinned jj first, and a throwaway jj config.
+    Steps add the rest."""
+    jj_dir = Path(os.environ["MORI_TEST_JJ"]).resolve().parent
+    jj_config = tmp_path / "jj.toml"
+    jj_config.write_text('user.name = "Test"\nuser.email = "test@example.com"\n')
+    return {
+        "PATH": f"{jj_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
+        "JJ_CONFIG": str(jj_config),
+    }
 
 
 @pytest.fixture

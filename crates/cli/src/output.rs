@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use std::io::Write;
 use std::process::ExitCode;
 
-use mori_api::v1alpha1::InitResponse;
+use mori_api::v1alpha1::{CloneResponse, InitResponse};
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
 
@@ -15,7 +15,7 @@ use serde_json::{Map, Value, json};
 const CLI_DOMAIN: &str = "cli.mori";
 
 /// Prints a successful response and exits 0.
-pub fn success(json: bool, response: &InitResponse, text: &str) -> ExitCode {
+pub fn success(json: bool, response: &impl serde::Serialize, text: &str) -> ExitCode {
     let printed = if json {
         match serde_json::to_string(response) {
             Ok(line) => line + "\n",
@@ -101,6 +101,27 @@ pub fn init_text(response: &InitResponse) -> String {
             let _ = writeln!(text, "  {}  {}", repo.repo, repo.path);
         }
     }
+    text
+}
+
+/// The text `clone` prints.
+pub fn clone_text(response: &CloneResponse) -> String {
+    let mut text = String::new();
+    let (repo, path) = (&response.repo, &response.path);
+    let kind = if response.colocated {
+        "jj, colocated with git"
+    } else {
+        "jj only"
+    };
+    // Writing to a String can't fail.
+    let _ = if response.validate_only {
+        writeln!(text, "Would clone {repo} into {path} (dry run):")
+    } else {
+        writeln!(text, "Cloned {repo} into {path}:")
+    };
+    let _ = writeln!(text, "  from {} ({kind})", response.fetch_url);
+    let _ = writeln!(text, "  base tree: default (pinned; the clone itself)");
+    let _ = writeln!(text, "  task trees: trees/{}/", response.tree_dir);
     text
 }
 

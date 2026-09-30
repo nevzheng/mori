@@ -12,6 +12,12 @@ use std::path::PathBuf;
 use crate::error::RepoError;
 use crate::paths::Paths;
 
+/// The base tree's name: jj's name for a clone's own workspace, so the record matches it.
+pub const BASE_TREE_NAME: &str = "default";
+
+/// Who the base tree belongs to: the person, never an agent.
+pub const BASE_TREE_OWNER: &str = "you";
+
 /// A repo's identity: its remote without the scheme, user, port or `.git`, all lowercase, such as
 /// `github.com/acme/widget`. Two URLs for the same repo give the same identity, whatever their case.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

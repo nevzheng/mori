@@ -81,3 +81,38 @@ pub struct UnmanagedRepo {
     #[prost(string, tag = "2")]
     pub path: ::prost::alloc::string::String,
 }
+/// Request for `Clone`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct CloneRequest {
+    /// What to clone: <https://,> ssh://, user@host:owner/repo, or host/owner/repo.
+    #[prost(string, tag = "1")]
+    pub url: ::prost::alloc::string::String,
+    /// Report what would happen without cloning anything (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "2")]
+    pub validate_only: bool,
+    /// Make a jj-only clone. By default the clone is colocated: a jj repo and a git repo at once.
+    #[prost(bool, tag = "3")]
+    pub jj_only: bool,
+}
+/// Response for `Clone`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct CloneResponse {
+    /// The repo's identity, all lowercase, e.g. "github.com/acme/widget".
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// Absolute path of the clone.
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+    /// The URL fetched from.
+    #[prost(string, tag = "3")]
+    pub fetch_url: ::prost::alloc::string::String,
+    /// True if the clone is also a git repo.
+    #[prost(bool, tag = "4")]
+    pub colocated: bool,
+    /// The repo's directory under trees/, where its task trees will go.
+    #[prost(string, tag = "5")]
+    pub tree_dir: ::prost::alloc::string::String,
+    /// Echoes the request: true if nothing was actually cloned.
+    #[prost(bool, tag = "6")]
+    pub validate_only: bool,
+}

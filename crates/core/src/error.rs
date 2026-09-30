@@ -106,6 +106,13 @@ pub enum ConfigError {
         message: String,
     },
 
+    /// mori isn't set up on this machine yet.
+    #[error("mori isn't set up yet: run `mori init` first")]
+    NotInitialized {
+        /// The database mori looked for.
+        database: PathBuf,
+    },
+
     /// The root on record differs from the effective root: a misconfiguration.
     #[error(
         "misconfiguration: mori's root is recorded as {recorded:?} in the {} but is now {effective:?}. \
@@ -133,7 +140,9 @@ impl ErrorDetails for ConfigError {
             Self::NotAbsolute { .. } | Self::NotUtf8 { .. } | Self::ConfigInvalid { .. } => {
                 Code::InvalidArgument
             }
-            Self::HomeNotSet | Self::RootMismatch { .. } => Code::FailedPrecondition,
+            Self::HomeNotSet | Self::NotInitialized { .. } | Self::RootMismatch { .. } => {
+                Code::FailedPrecondition
+            }
         }
     }
 
@@ -143,6 +152,7 @@ impl ErrorDetails for ConfigError {
             Self::NotAbsolute { .. } => "PATH_NOT_ABSOLUTE",
             Self::NotUtf8 { .. } => "PATH_NOT_UTF8",
             Self::ConfigInvalid { .. } => "CONFIG_INVALID",
+            Self::NotInitialized { .. } => "NOT_INITIALIZED",
             Self::RootMismatch { .. } => "ROOT_MISMATCH",
         }
     }
@@ -161,6 +171,7 @@ impl ErrorDetails for ConfigError {
             Self::NotUtf8 { path: p } | Self::ConfigInvalid { path: p, .. } => {
                 vec![("path", path(p))]
             }
+            Self::NotInitialized { database } => vec![("database", path(database))],
             Self::RootMismatch {
                 recorded,
                 effective,
@@ -249,6 +260,21 @@ pub enum RepoError {
         path: PathBuf,
     },
 
+    /// The clone succeeded, but mori couldn't record it. The clone is kept: mori never deletes work.
+    #[error(
+        "cloned {repo} into {}, but couldn't record it ({why}). The clone is kept; \
+         mori doesn't manage it, so move it aside before cloning again",
+        path.display()
+    )]
+    NotRecorded {
+        /// The repo.
+        repo: String,
+        /// The clone, which is kept.
+        path: PathBuf,
+        /// Why recording failed.
+        why: String,
+    },
+
     /// Both directory names mori would give the repo under `trees/` are taken.
     #[error("no free directory under trees/ for {repo}")]
     TreeDirTaken {
@@ -268,6 +294,7 @@ impl ErrorDetails for RepoError {
             Self::UrlInvalid { .. } => Code::InvalidArgument,
             Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
             Self::TreeDirTaken { .. } => Code::FailedPrecondition,
+            Self::NotRecorded { .. } => Code::Internal,
         }
     }
 
@@ -277,6 +304,7 @@ impl ErrorDetails for RepoError {
             Self::RepoExists { .. } => "REPO_EXISTS",
             Self::PathExists { .. } => "PATH_EXISTS",
             Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
+            Self::NotRecorded { .. } => "CLONE_NOT_RECORDED",
         }
     }
 
@@ -288,7 +316,7 @@ impl ErrorDetails for RepoError {
         match self {
             Self::UrlInvalid { url, .. } => vec![("url", url.clone())],
             Self::RepoExists { repo } | Self::TreeDirTaken { repo } => vec![("repo", repo.clone())],
-            Self::PathExists { repo, path } => {
+            Self::PathExists { repo, path } | Self::NotRecorded { repo, path, .. } => {
                 vec![("repo", repo.clone()), ("path", path.display().to_string())]
             }
         }
