@@ -108,9 +108,12 @@ coordinating tree, see the `lead-tree` skill.
 
 Removes a task tree when its work is done and safe elsewhere. mori first lets jj snapshot the
 tree, then removes it only if nothing in it exists only on this machine: no edits, and every
-change is on the remote (in a pushed bookmark or trunk). Then it forgets the workspace, deletes
-the directory and drops the record.
+change is either on the remote (in a pushed bookmark or trunk) or part of work that landed (a
+bookmark mori saw pushed from the tree that was since merged and deleted, as after a squash
+merge). Then it forgets the workspace, deletes the directory and drops the record.
 
+- After you push, let mori see the bookmark (`mori ls` does) before the pull request merges;
+  that is how it knows the work landed once the remote deletes the bookmark.
 - **`--agent <name>`**: you can only remove your own trees; pass the same name you created it
   with.
 - **`--pinned`**: needed for a pinned tree, such as a lead tree. Only with the person's say-so.

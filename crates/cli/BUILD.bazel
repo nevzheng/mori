@@ -17,6 +17,7 @@ rust_binary(
     deps = all_crate_deps(normal = True) + [
         "//crates/api:mori_api",
         "//crates/core:mori_core",
+        "//crates/github:mori_github",
         "//crates/jj:mori_jj",
         "//crates/store:mori_store",
     ],

@@ -5,6 +5,7 @@
 
 mod clone;
 mod init;
+mod landing;
 mod ls;
 mod output;
 mod skills;

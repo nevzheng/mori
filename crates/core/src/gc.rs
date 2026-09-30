@@ -8,7 +8,7 @@
 use std::collections::BTreeSet;
 
 use crate::forest::TreeState;
-use crate::tree::{Lifetime, Role};
+use crate::tree::{Landed, Lifetime, Role};
 
 /// What happens to a tree in a cleanup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -116,6 +116,59 @@ pub fn classify(facts: &Facts) -> (Class, Reason) {
         (Class::Blocked, Reason::Unsaved)
     } else {
         (Class::Remove, candidate)
+    }
+}
+
+/// A bookmark mori recorded as pushed from a tree, and what is known about it now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SeenBookmark {
+    /// Where it pointed when mori last saw it.
+    pub commit_id: String,
+    /// Whether the remote still has it, as far as the clone knows.
+    pub on_remote: bool,
+    /// Whether its pull request merged; none when unknown or not asked.
+    pub pr_merged: Option<bool>,
+}
+
+/// Whether a tree's work landed, and which commits hold the work that did.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Landing {
+    /// Some(true) if any recorded bookmark landed; Some(false) if none did and every fact the
+    /// policy asks for is known; none otherwise.
+    pub landed: Option<bool>,
+    /// The recorded commits of the bookmarks that landed. The tree's changes that are their
+    /// ancestors count as saved.
+    pub commits: Vec<String>,
+}
+
+/// Decides which of a tree's recorded bookmarks landed, under the `[trees.landed]` policy.
+#[must_use]
+pub fn landing(seen: &[SeenBookmark], policy: &[Landed]) -> Landing {
+    let deleted_counts = policy.contains(&Landed::PushedBookmarkDeleted);
+    let merged_counts = policy.contains(&Landed::PrMerged);
+    let landed: Vec<&SeenBookmark> = seen
+        .iter()
+        .filter(|bookmark| {
+            (deleted_counts && !bookmark.on_remote)
+                || (merged_counts && bookmark.pr_merged == Some(true))
+        })
+        .collect();
+    let unknown = merged_counts
+        && seen
+            .iter()
+            .any(|bookmark| bookmark.on_remote && bookmark.pr_merged.is_none());
+    Landing {
+        landed: if !landed.is_empty() {
+            Some(true)
+        } else if unknown {
+            None
+        } else {
+            Some(false)
+        },
+        commits: landed
+            .into_iter()
+            .map(|bookmark| bookmark.commit_id.clone())
+            .collect(),
     }
 }
 
@@ -278,5 +331,54 @@ mod tests {
     fn reason_codes_are_stable() {
         assert_eq!(Reason::OverCap.code(), "OVER_CAP");
         assert_eq!(Reason::Unsaved.code(), "UNSAVED");
+    }
+
+    fn seen(commit: &str, on_remote: bool, pr_merged: Option<bool>) -> SeenBookmark {
+        SeenBookmark {
+            commit_id: commit.to_owned(),
+            on_remote,
+            pr_merged,
+        }
+    }
+
+    const BOTH: [Landed; 2] = [Landed::PrMerged, Landed::PushedBookmarkDeleted];
+
+    #[test]
+    fn a_bookmark_gone_from_the_remote_landed() {
+        let landing = landing(&[seen("aaaa", false, None)], &BOTH);
+
+        assert_eq!(landing.landed, Some(true));
+        assert_eq!(landing.commits, ["aaaa"]);
+    }
+
+    #[test]
+    fn a_merged_pull_request_landed() {
+        let landing = landing(&[seen("aaaa", true, Some(true))], &BOTH);
+
+        assert_eq!(landing.landed, Some(true));
+    }
+
+    #[test]
+    fn nothing_pushed_is_not_landed() {
+        assert_eq!(landing(&[], &BOTH).landed, Some(false));
+        assert_eq!(
+            landing(&[seen("aaaa", true, Some(false))], &BOTH).landed,
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn an_open_bookmark_with_no_answer_is_unknown() {
+        assert_eq!(landing(&[seen("aaaa", true, None)], &BOTH).landed, None);
+    }
+
+    #[test]
+    fn the_policy_decides_which_facts_count() {
+        let only_merged = [Landed::PrMerged];
+
+        let deleted = landing(&[seen("aaaa", false, Some(false))], &only_merged);
+
+        assert_eq!(deleted.landed, Some(false));
+        assert!(deleted.commits.is_empty());
     }
 }

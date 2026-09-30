@@ -522,6 +522,7 @@ dependencies = [
  "clap",
  "mori-api",
  "mori-core",
+ "mori-github",
  "mori-jj",
  "mori-store",
  "serde",
