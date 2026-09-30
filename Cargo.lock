@@ -494,6 +494,12 @@ version = "0.0.0"
 [[package]]
 name = "mori-jj"
 version = "0.0.0"
+dependencies = [
+ "mori-core",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
 
 [[package]]
 name = "mori-mcp"
