@@ -216,3 +216,81 @@ impl ErrorDetails for TreeError {
         }
     }
 }
+
+/// Errors about repos and their clones (domain `repo.mori`).
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RepoError {
+    /// A clone URL mori can't use.
+    #[error("can't clone {url:?}: {why}")]
+    UrlInvalid {
+        /// The URL as given.
+        url: String,
+        /// What's wrong with it.
+        why: String,
+    },
+
+    /// mori already manages the repo.
+    #[error("mori already manages {repo}")]
+    RepoExists {
+        /// The repo, e.g. `github.com/acme/widget`.
+        repo: String,
+    },
+
+    /// Something is already at the clone's path. mori never touches what it didn't make.
+    #[error(
+        "{} already exists and mori didn't make it; move it aside to clone {repo} there",
+        path.display()
+    )]
+    PathExists {
+        /// The repo.
+        repo: String,
+        /// The path.
+        path: PathBuf,
+    },
+
+    /// Both directory names mori would give the repo under `trees/` are taken.
+    #[error("no free directory under trees/ for {repo}")]
+    TreeDirTaken {
+        /// The repo.
+        repo: String,
+    },
+}
+
+impl RepoError {
+    /// The AIP-193 `ErrorInfo.domain`.
+    pub const DOMAIN: &'static str = "repo.mori";
+}
+
+impl ErrorDetails for RepoError {
+    fn code(&self) -> Code {
+        match self {
+            Self::UrlInvalid { .. } => Code::InvalidArgument,
+            Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
+            Self::TreeDirTaken { .. } => Code::FailedPrecondition,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
+        match self {
+            Self::UrlInvalid { .. } => "CLONE_URL_INVALID",
+            Self::RepoExists { .. } => "REPO_EXISTS",
+            Self::PathExists { .. } => "PATH_EXISTS",
+            Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
+        }
+    }
+
+    fn domain(&self) -> &'static str {
+        Self::DOMAIN
+    }
+
+    fn metadata(&self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::UrlInvalid { url, .. } => vec![("url", url.clone())],
+            Self::RepoExists { repo } | Self::TreeDirTaken { repo } => vec![("repo", repo.clone())],
+            Self::PathExists { repo, path } => {
+                vec![("repo", repo.clone()), ("path", path.display().to_string())]
+            }
+        }
+    }
+}
