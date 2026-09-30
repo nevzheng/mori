@@ -43,6 +43,15 @@ pub enum StoreError {
         supported: i32,
     },
 
+    /// mori already has a record with this key.
+    #[error("{what} is already recorded in {}", path.display())]
+    AlreadyRecorded {
+        /// The database.
+        path: PathBuf,
+        /// What clashed, e.g. `repo github.com/acme/widget`.
+        what: String,
+    },
+
     /// The operating system refused or failed.
     #[error("{}: {source}", path.display())]
     Io {
@@ -74,6 +83,7 @@ impl StoreError {
             | Self::NotADirectory { path }
             | Self::NotMori { path }
             | Self::SchemaTooNew { path, .. }
+            | Self::AlreadyRecorded { path, .. }
             | Self::Io { path, .. }
             | Self::Sqlite { path, .. } => path,
         }
@@ -83,7 +93,7 @@ impl StoreError {
 impl ErrorDetails for StoreError {
     fn code(&self) -> Code {
         match self {
-            Self::AlreadyExists { .. } => Code::AlreadyExists,
+            Self::AlreadyExists { .. } | Self::AlreadyRecorded { .. } => Code::AlreadyExists,
             Self::NotADirectory { .. } | Self::NotMori { .. } | Self::SchemaTooNew { .. } => {
                 Code::FailedPrecondition
             }
@@ -94,6 +104,7 @@ impl ErrorDetails for StoreError {
     fn reason(&self) -> &'static str {
         match self {
             Self::AlreadyExists { .. } => "FILE_EXISTS",
+            Self::AlreadyRecorded { .. } => "ALREADY_RECORDED",
             Self::NotADirectory { .. } => "NOT_A_DIRECTORY",
             Self::NotMori { .. } => "DATABASE_NOT_MORI",
             Self::SchemaTooNew { .. } => "DATABASE_SCHEMA_TOO_NEW",
@@ -108,6 +119,9 @@ impl ErrorDetails for StoreError {
 
     fn metadata(&self) -> Vec<(&'static str, String)> {
         let mut metadata = vec![("path", self.path().display().to_string())];
+        if let Self::AlreadyRecorded { what, .. } = self {
+            metadata.push(("what", what.clone()));
+        }
         if let Self::SchemaTooNew {
             found, supported, ..
         } = self
