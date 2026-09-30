@@ -186,6 +186,22 @@ impl Database {
             .map_err(sqlite)
     }
 
+    /// Drops the record of the tree named `name` in the repo with ID `repo_id`. Returns whether
+    /// there was one. Only records change: the tree's files are the caller's to remove first.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error.
+    pub fn delete_tree(&mut self, repo_id: &str, name: &str) -> Result<bool, StoreError> {
+        self.conn
+            .execute(
+                "DELETE FROM trees WHERE repo_id = ?1 AND name = ?2",
+                params![repo_id, name],
+            )
+            .map(|deleted| deleted > 0)
+            .map_err(|source| self.sqlite(source))
+    }
+
     /// The recorded repo with identity `remote`, if any.
     ///
     /// # Errors
@@ -449,5 +465,24 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error.reason(), "DATABASE_ERROR");
+    }
+
+    #[test]
+    fn a_tree_record_is_dropped_once() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        db.record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
+        assert!(!db.delete_tree(&repo.id, "claude-fix-login").unwrap());
+
+        let names: Vec<_> = db
+            .trees(&repo.id)
+            .unwrap()
+            .into_iter()
+            .map(|tree| tree.name)
+            .collect();
+        assert_eq!(names, ["default"]);
     }
 }
