@@ -70,6 +70,21 @@ Clones a repo into `repos/<host>/<owner>/<repo>` and records it with a pinned ba
 
 Run `mori init` first. mori needs `jj` on `PATH`.
 
+### `mori ls [repo]`
+
+Lists every repo mori manages (or just one) and every tree in it: name, status, owner, task,
+lifetime, and the work in it. It only reads; it never snapshots a working copy, so it is always
+safe to run, even while others work.
+
+- **Status:** `tree` (mori made it and jj has it), `missing` (mori recorded it but jj has no such
+  workspace), or `foreign` (jj has it but mori didn't make it: leave it alone).
+- **Work:** `edited` (the working-copy change has edits) and `N unpushed` (changes that exist only
+  on this machine). It is as of jj's last snapshot in that tree, so run `jj status` in your own
+  tree first if you need it current.
+- Clones under `repos/` that mori didn't make are listed apart, and left alone.
+- With `--json`, rows are in `repos[].trees[]`, with `status` (`STATUS_TREE`, `STATUS_MISSING`,
+  `STATUS_FOREIGN`), `tree` and `state`. Fields at their default (`false`, `0`) are left out.
+
 ### `mori tree create <repo> --task <slug>`
 
 Gives one piece of work its own tree: a jj workspace at `trees/<repo>/<name>`, on a new change on
@@ -123,7 +138,7 @@ reason.
 
 ## Not yet
 
-These are designed but not built, so don't look for them: `mori ls`, `mori tree remove`, cleanup
-and restore. Until `mori tree remove` exists, leave finished trees in place and say which ones are
+These are designed but not built, so don't look for them: `mori tree remove`, cleanup and
+restore. Until `mori tree remove` exists, leave finished trees in place and say which ones are
 done; don't delete them yourself. Use `mori tree create` rather than making jj workspaces or git
 worktrees in a mori clone by hand: mori would list those as foreign.

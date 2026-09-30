@@ -7,7 +7,9 @@ use std::fmt::Write as _;
 use std::io::Write;
 use std::process::ExitCode;
 
-use mori_api::v1alpha1::{CloneResponse, CreateTreeResponse, InitResponse};
+use mori_api::v1alpha1::{
+    CloneResponse, CreateTreeResponse, InitResponse, ListTreesResponse, TreeRow, tree_row::Status,
+};
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
 
@@ -143,6 +145,89 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
     let _ = writeln!(text, "  starts from: {}", response.from);
     text
+}
+
+/// The text `ls` prints: a table of trees per repo, then the clones mori didn't make.
+pub fn ls_text(response: &ListTreesResponse) -> String {
+    let mut text = String::new();
+    if response.repos.is_empty() {
+        let _ = writeln!(
+            text,
+            "mori manages no repos yet; add one with `mori clone`."
+        );
+    }
+    for repo in &response.repos {
+        let _ = writeln!(text, "{}  {}", repo.repo, repo.path);
+        let rows: Vec<[String; 6]> = repo.trees.iter().map(ls_row).collect();
+        let header = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"].map(str::to_owned);
+        let mut widths = header.clone().map(|cell| cell.len());
+        for row in &rows {
+            for (width, cell) in widths.iter_mut().zip(row) {
+                *width = (*width).max(cell.len());
+            }
+        }
+        for row in std::iter::once(&header).chain(&rows) {
+            let cells: Vec<String> = row
+                .iter()
+                .zip(widths)
+                .map(|(cell, width)| format!("{cell:width$}"))
+                .collect();
+            let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
+        }
+        let _ = writeln!(text);
+    }
+    if !response.unmanaged_repos.is_empty() {
+        let _ = writeln!(text, "Clones mori didn't make (left alone):");
+        for repo in &response.unmanaged_repos {
+            let _ = writeln!(text, "  {}  {}", repo.repo, repo.path);
+        }
+        let _ = writeln!(text);
+    }
+    if !response.repos.is_empty() {
+        let _ = writeln!(text, "WORK is as of jj's last snapshot in each tree.");
+    }
+    text
+}
+
+fn ls_row(row: &TreeRow) -> [String; 6] {
+    let tree = row.tree.clone().unwrap_or_default();
+    let or_dash = |value: String| {
+        if value.is_empty() {
+            "-".to_owned()
+        } else {
+            value
+        }
+    };
+    let status = match row.status() {
+        Status::Tree | Status::Unspecified => "tree",
+        Status::Missing => "missing",
+        Status::Foreign => "foreign",
+    };
+    let work = match &row.state {
+        None => "-".to_owned(),
+        Some(state) => {
+            let mut parts = Vec::new();
+            if state.changed {
+                parts.push("edited".to_owned());
+            }
+            if state.unpushed > 0 {
+                parts.push(format!("{} unpushed", state.unpushed));
+            }
+            if parts.is_empty() {
+                "clean".to_owned()
+            } else {
+                parts.join(", ")
+            }
+        }
+    };
+    [
+        tree.name,
+        status.to_owned(),
+        or_dash(tree.owner),
+        or_dash(tree.task),
+        or_dash(tree.lifetime),
+        work,
+    ]
 }
 
 fn report(

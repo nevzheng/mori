@@ -5,6 +5,7 @@ from pytest_bdd import scenarios
 scenarios(
     "../spec/cuj/00-init.feature",
     "../spec/cuj/01-clone.feature",
+    "../spec/cuj/02-ls.feature",
     "../spec/cuj/03-tree-create.feature",
     "features/smoke.feature",
 )
