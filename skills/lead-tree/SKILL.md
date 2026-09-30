@@ -25,6 +25,29 @@ That gives `trees/widget/claude-lead`, on a new change on top of trunk. Make one
 coordinated effort, not one per task; if `claude-lead` exists, use a more specific task slug, such
 as `lead-auth`.
 
+## Handing work to the lead
+
+There is no handoff command: with jj, every tree of a clone already sees every change, so handing
+over is just saying which changes are ready.
+
+**An agent that finishes work for the lead:**
+
+1. Gives every change a description (`jj describe`): that is the note the lead reads.
+2. Stops editing its tree.
+3. Tells the lead its change IDs (`jj log -r '::<its tree>@ ~ ::trunk()'`) in its final message,
+   with one line on what they do.
+
+**The lead:**
+
+- Moves the changes into its stack with `jj rebase -s <first change> -d <where>`; the agent's
+  working copy follows them. Prefer moving to copying (`jj duplicate`): copied originals are
+  never pushed, so the agent's tree can never be removed. If a copy is unavoidable, abandon the
+  originals afterwards (`jj abandon`) so nothing is left behind.
+- The agent's tree becomes removable (`mori tree remove`) once the lead's bookmark is pushed.
+  Until then mori refuses to remove it, which is right: its work isn't on the remote yet.
+
+Across machines, push a bookmark instead.
+
 ## Work in it
 
 With jj, every workspace of a clone sees the same changes and bookmarks at once, so you don't pass
