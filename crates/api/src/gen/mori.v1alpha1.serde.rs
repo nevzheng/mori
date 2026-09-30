@@ -1258,6 +1258,328 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
         deserializer.deserialize_struct("mori.v1alpha1.ListTreesResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for RemoveTreeRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.agent.is_empty() {
+            len += 1;
+        }
+        if self.pinned {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.RemoveTreeRequest", len)?;
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.agent.is_empty() {
+            struct_ser.serialize_field("agent", &self.agent)?;
+        }
+        if self.pinned {
+            struct_ser.serialize_field("pinned", &self.pinned)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "repo",
+            "name",
+            "agent",
+            "pinned",
+            "validate_only",
+            "validateOnly",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Repo,
+            Name,
+            Agent,
+            Pinned,
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "repo" => Ok(GeneratedField::Repo),
+                            "name" => Ok(GeneratedField::Name),
+                            "agent" => Ok(GeneratedField::Agent),
+                            "pinned" => Ok(GeneratedField::Pinned),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = RemoveTreeRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.RemoveTreeRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<RemoveTreeRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut repo__ = None;
+                let mut name__ = None;
+                let mut agent__ = None;
+                let mut pinned__ = None;
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Agent => {
+                            if agent__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("agent"));
+                            }
+                            agent__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Pinned => {
+                            if pinned__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("pinned"));
+                            }
+                            pinned__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(RemoveTreeRequest {
+                    repo: repo__.unwrap_or_default(),
+                    name: name__.unwrap_or_default(),
+                    agent: agent__.unwrap_or_default(),
+                    pinned: pinned__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.RemoveTreeRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for RemoveTreeResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.tree.is_some() {
+            len += 1;
+        }
+        if self.workspace_forgotten {
+            len += 1;
+        }
+        if self.directory_removed {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("mori.v1alpha1.RemoveTreeResponse", len)?;
+        if let Some(v) = self.tree.as_ref() {
+            struct_ser.serialize_field("tree", v)?;
+        }
+        if self.workspace_forgotten {
+            struct_ser.serialize_field("workspaceForgotten", &self.workspace_forgotten)?;
+        }
+        if self.directory_removed {
+            struct_ser.serialize_field("directoryRemoved", &self.directory_removed)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "tree",
+            "workspace_forgotten",
+            "workspaceForgotten",
+            "directory_removed",
+            "directoryRemoved",
+            "validate_only",
+            "validateOnly",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Tree,
+            WorkspaceForgotten,
+            DirectoryRemoved,
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "tree" => Ok(GeneratedField::Tree),
+                            "workspaceForgotten" | "workspace_forgotten" => {
+                                Ok(GeneratedField::WorkspaceForgotten)
+                            }
+                            "directoryRemoved" | "directory_removed" => {
+                                Ok(GeneratedField::DirectoryRemoved)
+                            }
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = RemoveTreeResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.RemoveTreeResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<RemoveTreeResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut tree__ = None;
+                let mut workspace_forgotten__ = None;
+                let mut directory_removed__ = None;
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Tree => {
+                            if tree__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tree"));
+                            }
+                            tree__ = map_.next_value()?;
+                        }
+                        GeneratedField::WorkspaceForgotten => {
+                            if workspace_forgotten__.is_some() {
+                                return Err(serde::de::Error::duplicate_field(
+                                    "workspaceForgotten",
+                                ));
+                            }
+                            workspace_forgotten__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::DirectoryRemoved => {
+                            if directory_removed__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("directoryRemoved"));
+                            }
+                            directory_removed__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(RemoveTreeResponse {
+                    tree: tree__,
+                    workspace_forgotten: workspace_forgotten__.unwrap_or_default(),
+                    directory_removed: directory_removed__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "mori.v1alpha1.RemoveTreeResponse",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
 impl serde::Serialize for RepoTrees {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

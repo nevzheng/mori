@@ -15,7 +15,7 @@ from precisely import all_of, assert_that, contains_string, equal_to
 from pytest_bdd import given, parsers, then, when
 
 # Steps for one journey each.
-pytest_plugins = ["init_steps", "clone_steps", "ls_steps", "tree_steps"]
+pytest_plugins = ["init_steps", "clone_steps", "ls_steps", "remove_steps", "tree_steps"]
 
 
 def pytest_configure(config: pytest.Config) -> None:

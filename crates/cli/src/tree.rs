@@ -31,10 +31,7 @@ pub struct CreateArgs {
 /// Runs `tree create` against the real environment, disk and `jj` on `PATH`.
 pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetails>> {
     let repo = CloneUrl::parse(&args.repo).map_err(boxed)?.repo;
-    let owner = match args.agent {
-        Some(agent) => agent,
-        None => default_owner(std::env::var("USER").ok().as_deref()).map_err(boxed)?,
-    };
+    let owner = owner(args.agent)?;
     let paths = state::paths()?;
     let mut db = state::open_database(&paths)?;
     let policy = state::tree_policy(&paths)?;
@@ -64,6 +61,14 @@ pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetai
         id = record(&mut db, repo_id.as_deref().unwrap_or_default(), &plan)?;
     }
     Ok(response(&plan, id, args.dry_run))
+}
+
+/// Who is acting: `--agent` if given, else the login name.
+pub fn owner(agent: Option<String>) -> Result<String, Box<dyn ErrorDetails>> {
+    match agent {
+        Some(agent) => Ok(agent),
+        None => default_owner(std::env::var("USER").ok().as_deref()).map_err(boxed),
+    }
 }
 
 /// Looks at the repo's record, its trees, its workspaces and its `trees/` directory. Reads only.

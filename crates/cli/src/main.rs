@@ -9,6 +9,7 @@ mod ls;
 mod output;
 mod state;
 mod tree;
+mod tree_remove;
 
 use std::process::ExitCode;
 
@@ -94,6 +95,29 @@ enum TreeCommand {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Remove a task tree, only when nothing in it exists only on this machine: no edits and no
+    /// change missing from the remote. Never removes the clone itself or a workspace mori didn't
+    /// make.
+    Remove {
+        /// The repo, in any form `mori clone` accepts.
+        repo: String,
+
+        /// The tree's name, e.g. claude-fix-login.
+        name: String,
+
+        /// Who is asking; must be the tree's owner. Defaults to your login name.
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Allow removing a pinned tree.
+        #[arg(long)]
+        pinned: bool,
+
+        /// Check everything and remove nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -146,6 +170,29 @@ fn main() -> ExitCode {
                 cli.json,
                 &response,
                 output::tree_create_text(&response).as_str(),
+            ),
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Tree {
+            command:
+                TreeCommand::Remove {
+                    repo,
+                    name,
+                    agent,
+                    pinned,
+                    dry_run,
+                },
+        } => match tree_remove::run(tree_remove::RemoveArgs {
+            repo,
+            name,
+            agent,
+            pinned,
+            dry_run,
+        }) {
+            Ok(response) => output::success(
+                cli.json,
+                &response,
+                output::tree_remove_text(&response).as_str(),
             ),
             Err(error) => output::failure(cli.json, error.as_ref()),
         },

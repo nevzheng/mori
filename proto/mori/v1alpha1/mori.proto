@@ -23,6 +23,11 @@ service MoriService {
   // Lists the repos mori manages and their trees, with each tree's state read from the VCS
   // without snapshotting. Records and workspaces that don't match are rows, never errors.
   rpc ListTrees(ListTreesRequest) returns (ListTreesResponse);
+
+  // Removes a task tree mori made, only when nothing in it exists only on this machine (no edits,
+  // no change missing from the remote). Snapshots the tree first. Never removes the clone itself
+  // or a workspace mori didn't make.
+  rpc RemoveTree(RemoveTreeRequest) returns (RemoveTreeResponse);
 }
 
 // Request for `Init`.
@@ -231,4 +236,38 @@ message TreeState {
 
   // Non-empty changes on no remote bookmark and not in trunk: work only this machine has.
   uint32 unpushed = 3;
+}
+
+// Request for `RemoveTree`.
+message RemoveTreeRequest {
+  // The repo, in any form `Clone` accepts.
+  string repo = 1;
+
+  // The tree's name, e.g. "claude-fix-login".
+  string name = 2;
+
+  // Who is asking; must be the tree's owner. Defaults to the login name.
+  string agent = 3;
+
+  // Allow removing a pinned tree.
+  bool pinned = 4;
+
+  // Check everything and remove nothing (AIP-163; the CLI's --dry-run). The tree is still
+  // snapshotted, which changes only jj's record of it.
+  bool validate_only = 5;
+}
+
+// Response for `RemoveTree`.
+message RemoveTreeResponse {
+  // The tree removed, or that would be removed.
+  Tree tree = 1;
+
+  // True if its workspace was forgotten (false for a missing tree).
+  bool workspace_forgotten = 2;
+
+  // True if its directory was deleted. A missing tree's directory is left in place.
+  bool directory_removed = 3;
+
+  // Echoes the request: true if nothing was actually removed.
+  bool validate_only = 4;
 }
