@@ -1,0 +1,10 @@
+# mori skills
+
+> Skills for agents that use mori. Each skill is one directory, `<name>/SKILL.md`, with a `name`
+> and a `description` in its frontmatter; this file indexes them. The layout works with any agent
+> or tool that reads a skills directory or an llms.txt index, and people can add their own skills
+> for their own workflows beside these.
+
+## Skills
+
+- [using-mori](using-mori/SKILL.md): the commands, JSON output, errors and the rules agents follow when using mori

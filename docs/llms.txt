@@ -1,0 +1,21 @@
+# mori
+
+> mori tends a forest of git and jj worktrees for you and your coding agents: one clone per repo in
+> a fixed layout, an owner and a lifetime for every tree, and cleanup that never loses a change.
+> Pre-alpha: anything may change in any release.
+
+## Using mori
+
+- [Skills index](https://github.com/nevzheng/mori/blob/main/skills/llms.txt): every agent skill mori ships, one `skills/<name>/SKILL.md` each
+- [Using mori (agent skill)](https://github.com/nevzheng/mori/blob/main/skills/using-mori/SKILL.md): commands, JSON output, errors and the rules agents follow
+- [README](https://github.com/nevzheng/mori/blob/main/README.md): what mori is and how to build it
+
+## Design
+
+- [The forest layout and tree model](https://nevzheng.github.io/mori/design/core/forest-layout-and-tree-model/): where mori keeps repos and trees, and what it records
+- [How design docs work](https://nevzheng.github.io/mori/design/): the SPIP format and statuses
+
+## Contributing
+
+- [AGENTS.md](https://github.com/nevzheng/mori/blob/main/AGENTS.md): working rules for agents and humans changing mori
+- [CONTRIBUTING](https://nevzheng.github.io/mori/contributing/): how to propose and send changes
