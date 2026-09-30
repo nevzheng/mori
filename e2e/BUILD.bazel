@@ -11,6 +11,7 @@ py_test(
         "conftest.py",
         "harness.py",
         "init_steps.py",
+        "ls_steps.py",
         "matchers.py",
         "pytest_main.py",
         "test_features.py",

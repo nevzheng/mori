@@ -5,6 +5,7 @@
 
 mod clone;
 mod init;
+mod ls;
 mod output;
 mod state;
 mod tree;
@@ -48,6 +49,13 @@ enum Command {
         /// Make a jj-only clone. By default the clone is a git repo too (colocated).
         #[arg(long)]
         no_colocate: bool,
+    },
+
+    /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
+    /// only on this machine. Reads only; never snapshots a working copy.
+    Ls {
+        /// Only this repo, in any form `mori clone` accepts.
+        repo: Option<String>,
     },
 
     /// Work with trees: the jj workspaces mori creates for tasks.
@@ -107,6 +115,12 @@ fn main() -> ExitCode {
         } => match clone::run(&url, dry_run, no_colocate) {
             Ok(response) => {
                 output::success(cli.json, &response, output::clone_text(&response).as_str())
+            }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Ls { repo } => match ls::run(repo.as_deref()) {
+            Ok(response) => {
+                output::success(cli.json, &response, output::ls_text(&response).as_str())
             }
             Err(error) => output::failure(cli.json, error.as_ref()),
         },

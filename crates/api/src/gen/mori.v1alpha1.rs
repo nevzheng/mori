@@ -179,3 +179,99 @@ pub struct CreateTreeResponse {
     #[prost(bool, tag = "3")]
     pub validate_only: bool,
 }
+/// Request for `ListTrees`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ListTreesRequest {
+    /// Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+}
+/// Response for `ListTrees`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ListTreesResponse {
+    /// The repos mori manages, sorted by identity.
+    #[prost(message, repeated, tag = "1")]
+    pub repos: ::prost::alloc::vec::Vec<RepoTrees>,
+    /// Clones under the root that mori didn't make. Listed only when no repo was asked for.
+    #[prost(message, repeated, tag = "2")]
+    pub unmanaged_repos: ::prost::alloc::vec::Vec<UnmanagedRepo>,
+}
+/// One repo mori manages, and its trees.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RepoTrees {
+    /// The repo's identity, e.g. "github.com/acme/widget".
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// Absolute path of the clone.
+    #[prost(string, tag = "2")]
+    pub path: ::prost::alloc::string::String,
+    /// Every tree mori recorded and every workspace the VCS reports, sorted by name.
+    #[prost(message, repeated, tag = "3")]
+    pub trees: ::prost::alloc::vec::Vec<TreeRow>,
+}
+/// One tree, as mori recorded it and as the VCS reports it.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct TreeRow {
+    /// The tree. A foreign tree has only its name and path.
+    #[prost(message, optional, tag = "1")]
+    pub tree: ::core::option::Option<Tree>,
+    /// How the record and the VCS match.
+    #[prost(enumeration = "tree_row::Status", tag = "2")]
+    pub status: i32,
+    /// The VCS state; unset for a missing tree.
+    #[prost(message, optional, tag = "3")]
+    pub state: ::core::option::Option<TreeState>,
+}
+/// Nested message and enum types in `TreeRow`.
+pub mod tree_row {
+    /// How mori's record and the VCS match.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Not set.
+        Unspecified = 0,
+        /// Recorded by mori, and the VCS has its workspace.
+        Tree = 1,
+        /// Recorded by mori, but the VCS has no workspace of that name.
+        Missing = 2,
+        /// The VCS has the workspace, but mori didn't make it. mori leaves it alone.
+        Foreign = 3,
+    }
+    impl Status {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "STATUS_UNSPECIFIED",
+                Self::Tree => "STATUS_TREE",
+                Self::Missing => "STATUS_MISSING",
+                Self::Foreign => "STATUS_FOREIGN",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "STATUS_UNSPECIFIED" => Some(Self::Unspecified),
+                "STATUS_TREE" => Some(Self::Tree),
+                "STATUS_MISSING" => Some(Self::Missing),
+                "STATUS_FOREIGN" => Some(Self::Foreign),
+                _ => None,
+            }
+        }
+    }
+}
+/// A tree's state as of the VCS's last snapshot of it.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct TreeState {
+    /// The working-copy change's short ID.
+    #[prost(string, tag = "1")]
+    pub change: ::prost::alloc::string::String,
+    /// True if the working-copy change has edits.
+    #[prost(bool, tag = "2")]
+    pub changed: bool,
+    /// Non-empty changes on no remote bookmark and not in trunk: work only this machine has.
+    #[prost(uint32, tag = "3")]
+    pub unpushed: u32,
+}

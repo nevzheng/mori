@@ -19,6 +19,10 @@ service MoriService {
   // new change on top of `from`, recorded with its owner, task and lifetime. If the workspace is
   // made but recording it fails, the workspace is kept and the error says so.
   rpc CreateTree(CreateTreeRequest) returns (CreateTreeResponse);
+
+  // Lists the repos mori manages and their trees, with each tree's state read from the VCS
+  // without snapshotting. Records and workspaces that don't match are rows, never errors.
+  rpc ListTrees(ListTreesRequest) returns (ListTreesResponse);
 }
 
 // Request for `Init`.
@@ -164,4 +168,67 @@ message CreateTreeResponse {
 
   // Echoes the request: true if nothing was actually created.
   bool validate_only = 3;
+}
+
+// Request for `ListTrees`.
+message ListTreesRequest {
+  // Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
+  string repo = 1;
+}
+
+// Response for `ListTrees`.
+message ListTreesResponse {
+  // The repos mori manages, sorted by identity.
+  repeated RepoTrees repos = 1;
+
+  // Clones under the root that mori didn't make. Listed only when no repo was asked for.
+  repeated UnmanagedRepo unmanaged_repos = 2;
+}
+
+// One repo mori manages, and its trees.
+message RepoTrees {
+  // The repo's identity, e.g. "github.com/acme/widget".
+  string repo = 1;
+
+  // Absolute path of the clone.
+  string path = 2;
+
+  // Every tree mori recorded and every workspace the VCS reports, sorted by name.
+  repeated TreeRow trees = 3;
+}
+
+// One tree, as mori recorded it and as the VCS reports it.
+message TreeRow {
+  // How mori's record and the VCS match.
+  enum Status {
+    // Not set.
+    STATUS_UNSPECIFIED = 0;
+    // Recorded by mori, and the VCS has its workspace.
+    STATUS_TREE = 1;
+    // Recorded by mori, but the VCS has no workspace of that name.
+    STATUS_MISSING = 2;
+    // The VCS has the workspace, but mori didn't make it. mori leaves it alone.
+    STATUS_FOREIGN = 3;
+  }
+
+  // The tree. A foreign tree has only its name and path.
+  Tree tree = 1;
+
+  // How the record and the VCS match.
+  Status status = 2;
+
+  // The VCS state; unset for a missing tree.
+  TreeState state = 3;
+}
+
+// A tree's state as of the VCS's last snapshot of it.
+message TreeState {
+  // The working-copy change's short ID.
+  string change = 1;
+
+  // True if the working-copy change has edits.
+  bool changed = 2;
+
+  // Non-empty changes on no remote bookmark and not in trunk: work only this machine has.
+  uint32 unpushed = 3;
 }
