@@ -207,6 +207,8 @@ pub struct TreePolicy {
     pub lifetime: LifetimeDefaults,
     /// What counts as landed for [`Lifetime::TaskDone`].
     pub landed: LandedPolicy,
+    /// The cap for [`Lifetime::Lru`].
+    pub lru: LruPolicy,
 }
 
 impl TreePolicy {
@@ -236,6 +238,15 @@ impl Default for LifetimeDefaults {
             task: Lifetime::TaskDone,
         }
     }
+}
+
+/// `[trees.lru]`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LruPolicy {
+    /// How many task trees a repo keeps before its least recently changed `lru` trees become
+    /// cleanup candidates. Unset: `lru` trees are never candidates.
+    pub max: Option<u32>,
 }
 
 /// `[trees.landed]`.

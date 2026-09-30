@@ -8,6 +8,7 @@ pub mod clone;
 pub mod config;
 pub mod error;
 pub mod forest;
+pub mod gc;
 pub mod init;
 pub mod paths;
 pub mod skills;
