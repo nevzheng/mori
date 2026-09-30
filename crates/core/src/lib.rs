@@ -10,6 +10,7 @@ pub mod error;
 pub mod forest;
 pub mod init;
 pub mod paths;
+pub mod skills;
 pub mod tree;
 pub mod tree_create;
 pub mod tree_remove;
