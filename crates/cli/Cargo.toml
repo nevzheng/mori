@@ -12,6 +12,7 @@ publish.workspace = true
 clap.workspace = true
 mori-api = { path = "../api" }
 mori-core = { path = "../core" }
+mori-github = { path = "../github" }
 mori-jj = { path = "../jj" }
 mori-store = { path = "../store" }
 serde.workspace = true

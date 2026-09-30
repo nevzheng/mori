@@ -12,7 +12,7 @@ use mori_store::StoreError;
 use mori_store::records::TreeRecord;
 
 use crate::state::{self, boxed};
-use crate::tree;
+use crate::{landing, tree};
 
 /// What `mori tree remove` was asked for.
 pub struct RemoveArgs {
@@ -69,12 +69,37 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
         .map_err(boxed)?
         .iter()
         .any(|workspace| workspace.name == request.name);
+    // Work that landed (a recorded bookmark squash-merged and deleted on the remote) counts as
+    // saved, as well as work on the remote. Recording the bookmarks seen now keeps that knowable
+    // after the remote deletes them.
+    let landed = match (&record, has_workspace) {
+        (Some(record), true) => {
+            let policy = state::tree_policy(&paths)?.landed.when;
+            landing::observe(
+                &mut db,
+                &jj,
+                None,
+                &landing::TreeRef {
+                    repo: &repo_id,
+                    clone: &clone,
+                    id: &record.id,
+                    name: &request.name,
+                },
+                &policy,
+            )?
+            .commits
+        }
+        _ => Vec::new(),
+    };
     // First decide from what jj last saw, so a tree that can't go anyway (someone else's, pinned,
     // the clone itself, foreign) is never snapshotted. Then snapshot and decide again, so edits
     // since jj last ran in the tree count.
     let read_state = || -> Result<_, Box<dyn ErrorDetails>> {
         if has_workspace {
-            Ok(Some(jj.state(&clone, &request.name).map_err(boxed)?))
+            Ok(Some(
+                jj.state_covering(&clone, &request.name, &landed)
+                    .map_err(boxed)?,
+            ))
         } else {
             Ok(None)
         }

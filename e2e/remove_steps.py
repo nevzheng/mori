@@ -37,6 +37,21 @@ def push_work(env: dict[str, str], placeholders: Placeholders, bookmark: str) ->
     jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
 
 
+@given(parsers.parse('the remote deletes "{bookmark}" after a squash merge'))
+def remote_deletes(env: dict[str, str], placeholders: Placeholders, bookmark: str) -> None:
+    # The squashed commit lands on trunk elsewhere; what the tree sees is its bookmark vanishing.
+    tree = str(placeholders.path(f"{TREES}/claude-fix-login"))
+    jj(env, "--repository", tree, "bookmark", "delete", bookmark)
+    jj(env, "--repository", tree, "git", "push", "--deleted")
+
+
+@given(parsers.parse('someone commits more work in "{name}"'))
+def commit_more(env: dict[str, str], placeholders: Placeholders, name: str) -> None:
+    tree = placeholders.path(f"{TREES}/{name}")
+    (tree / "logout.rs").write_text("fn logout() {}\n")
+    jj(env, "--repository", str(tree), "commit", "--message", "logout")
+
+
 @then(parsers.parse('mori has no record of the tree "{name}"'))
 def no_record(placeholders: Placeholders, name: str) -> None:
     database = placeholders.path("$XDG_STATE_HOME/mori/mori.db")

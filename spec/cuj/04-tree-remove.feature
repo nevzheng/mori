@@ -37,6 +37,24 @@ Feature: CUJ 4 - an agent finishes and removes its own tree
     Then it succeeds
     And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
 
+  Scenario: A squash-merged tree is safe to remove
+    Given someone commits work in "claude-fix-login"
+    And pushes it to the remote as "claude/fix-login"
+    And I have run "mori ls"
+    And the remote deletes "claude/fix-login" after a squash merge
+    When I run "mori tree remove github.com/acme/widget claude-fix-login --agent claude"
+    Then it succeeds
+    And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
+
+  Scenario: Work newer than what landed still blocks removal
+    Given someone commits work in "claude-fix-login"
+    And pushes it to the remote as "claude/fix-login"
+    And I have run "mori ls"
+    And the remote deletes "claude/fix-login" after a squash merge
+    And someone commits more work in "claude-fix-login"
+    When I run "mori tree remove github.com/acme/widget claude-fix-login --agent claude"
+    Then it fails with status FAILED_PRECONDITION and reason "TREE_HAS_UNSAVED_WORK"
+
   Scenario: Only the owner removes a tree
     When I run "mori tree remove github.com/acme/widget claude-fix-login --agent codex"
     Then it fails with status FAILED_PRECONDITION and reason "NOT_TREE_OWNER"

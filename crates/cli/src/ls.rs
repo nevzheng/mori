@@ -10,16 +10,19 @@ use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::forest::{Entry, Workspace, Workspaces, reconcile};
 use mori_core::paths::Paths;
+use mori_core::tree::{Landed, Role};
 use mori_jj::JjCli;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::landing;
 use crate::state::{self, boxed};
 
 /// Runs `ls` for every repo mori manages, or only `repo`.
 pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths()?;
-    let db = state::open_database(&paths)?;
+    let mut db = state::open_database(&paths)?;
+    let policy = state::tree_policy(&paths)?.landed.when;
     let jj = JjCli::from_path();
     let mut records = db.repos().map_err(boxed)?;
     if let Some(repo) = repo {
@@ -32,7 +35,7 @@ pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails
     let managed: BTreeSet<String> = records.iter().map(|repo| repo.remote.clone()).collect();
     let repos = records
         .iter()
-        .map(|repo| list_repo(&paths, &db, &jj, repo))
+        .map(|repo| list_repo(&paths, &mut db, &jj, &policy, repo))
         .collect::<Result<_, _>>()?;
     let unmanaged_repos = if repo.is_some() {
         Vec::new()
@@ -54,8 +57,9 @@ pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails
 
 fn list_repo(
     paths: &Paths,
-    db: &Database,
+    db: &mut Database,
     jj: &JjCli,
+    policy: &[Landed],
     repo: &RepoRecord,
 ) -> Result<RepoTrees, Box<dyn ErrorDetails>> {
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
@@ -67,10 +71,31 @@ fn list_repo(
     } else {
         Vec::new()
     };
-    let trees = reconcile(records, workspaces, |record| record.name.as_str())
-        .into_iter()
-        .map(|entry| row(paths, jj, repo, &clone, entry))
-        .collect::<Result<_, _>>()?;
+    let mut trees = Vec::new();
+    for entry in reconcile(records, workspaces, |record| record.name.as_str()) {
+        // A task tree's landed work counts as saved, so a squash-merged tree isn't shown as
+        // unpushed; looking also records the bookmarks it pushed, for when the remote deletes
+        // them.
+        let landed = match &entry {
+            Entry::Tree { record, workspace } if record.role == Role::Task.as_str() => {
+                landing::observe(
+                    db,
+                    jj,
+                    None,
+                    &landing::TreeRef {
+                        repo: &id,
+                        clone: &clone,
+                        id: &record.id,
+                        name: &workspace.name,
+                    },
+                    policy,
+                )?
+                .commits
+            }
+            _ => Vec::new(),
+        };
+        trees.push(row(paths, jj, repo, &clone, entry, &landed)?);
+    }
     Ok(RepoTrees {
         repo: repo.remote.clone(),
         path: clone.display().to_string(),
@@ -84,9 +109,10 @@ fn row(
     repo: &RepoRecord,
     clone: &std::path::Path,
     entry: Entry<TreeRecord>,
+    landed: &[String],
 ) -> Result<TreeRow, Box<dyn ErrorDetails>> {
     let state = |workspace: &Workspace| {
-        jj.state(clone, &workspace.name)
+        jj.state_covering(clone, &workspace.name, landed)
             .map(|state| TreeState {
                 change: state.change,
                 changed: state.changed,
