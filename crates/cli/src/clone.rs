@@ -9,6 +9,7 @@ use mori_core::clone::{
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::paths::Paths;
 use mori_core::tree::{Lifetime, Role};
+use mori_core::tree_create::default_owner;
 use mori_jj::JjCli;
 use mori_store::StoreError;
 use mori_store::database::Database;
@@ -71,6 +72,9 @@ fn clone(plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetails>> {
 fn record(db: &mut Database, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetails>> {
     let repo = plan.url.repo.to_string();
     let lifetime = Lifetime::Pinned.to_string();
+    // The clone is the person's own checkout, so it's theirs, by the same name task trees use.
+    let owner = default_owner(std::env::var("USER").ok().as_deref())
+        .unwrap_or_else(|_| BASE_TREE_OWNER.to_owned());
     db.record_clone(
         &NewRepo {
             remote: &repo,
@@ -79,7 +83,7 @@ fn record(db: &mut Database, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetail
         &NewTree {
             name: BASE_TREE_NAME,
             role: Role::Base.as_str(),
-            owner: BASE_TREE_OWNER,
+            owner: &owner,
             task: None,
             lifetime: &lifetime,
         },
