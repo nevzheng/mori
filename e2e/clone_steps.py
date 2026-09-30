@@ -101,6 +101,17 @@ def records_repo(placeholders: Placeholders, repo: str) -> None:
     assert_that(rows, equal_to([(repo, "default", "base", "pinned")]))
 
 
+@then(parsers.parse('the base tree of "{repo}" belongs to "{owner}"'))
+def base_owner(placeholders: Placeholders, repo: str, owner: str) -> None:
+    with database(placeholders) as db:
+        (recorded,) = db.execute(
+            "SELECT trees.owner FROM trees JOIN repos ON repos.id = trees.repo_id"
+            " WHERE repos.remote = ? AND trees.role = 'base'",
+            (repo,),
+        ).fetchone()
+    assert_that(recorded, equal_to(owner))
+
+
 @then("mori records no repos")
 def records_nothing(placeholders: Placeholders) -> None:
     with database(placeholders) as db:

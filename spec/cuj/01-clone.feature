@@ -16,6 +16,12 @@ Feature: CUJ 1 - add a repo
     And mori records "github.com/acme/widget" with a pinned base tree
     And the output says it cloned "github.com/acme/widget"
 
+  Scenario: The clone belongs to the person who cloned it
+    Given USER is "Tester"
+    When I run "mori clone github.com/acme/widget"
+    Then it succeeds
+    And the base tree of "github.com/acme/widget" belongs to "tester"
+
   Scenario: A full URL names the same repo as the short form
     When I run "mori clone https://github.com/acme/widget.git"
     Then it succeeds
