@@ -1,10 +1,12 @@
-//! `config.toml`. It records only what differs from the built-in defaults; today that's the root.
+//! `config.toml`. It records only what differs from the built-in defaults: the root, and any
+//! `[trees]` policy someone wrote by hand.
 
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 use crate::error::ConfigError;
+use crate::tree::TreePolicy;
 
 /// The config schema this version of mori reads and writes.
 pub const SCHEMA: u32 = 1;
@@ -17,6 +19,9 @@ pub struct Config {
     pub schema: u32,
     /// The root mori was set up with.
     pub root: PathBuf,
+    /// How trees are named and how long they live. Optional; every key has a default.
+    #[serde(default)]
+    pub trees: TreePolicy,
 }
 
 impl Config {
@@ -67,6 +72,7 @@ impl Config {
 mod tests {
     use super::*;
     use crate::error::ErrorDetails;
+    use crate::tree::Landed;
 
     const PATH: &str = "/home/acme/.config/mori/config.toml";
 
@@ -80,7 +86,8 @@ mod tests {
             config,
             Config {
                 schema: SCHEMA,
-                root: PathBuf::from("/home/acme/mori")
+                root: PathBuf::from("/home/acme/mori"),
+                trees: TreePolicy::default(),
             }
         );
     }
@@ -102,10 +109,40 @@ mod tests {
             "schema = 1\nroot = \"mori\"",                 // relative root
             "schema = 1\nroot = \"/r\"\ncolour = \"red\"", // unknown key
             "not toml",
+            "schema = 1\nroot = \"/r\"\n[trees]\nname = \"{owner}/{task}\"",
+            "schema = 1\nroot = \"/r\"\n[trees.lifetime]\ntask = \"forever\"",
+            "schema = 1\nroot = \"/r\"\n[trees.lifetime]\nbase = \"lru\"",
+            "schema = 1\nroot = \"/r\"\n[trees.landed]\nwhen = [\"merged-by-ancestry\"]",
         ] {
             let error = Config::parse(text, Path::new(PATH)).unwrap_err();
 
             assert_eq!(error.reason(), "CONFIG_INVALID", "for {text:?}");
         }
+    }
+
+    #[test]
+    fn a_trees_section_sets_the_policy() {
+        let text = r#"
+            schema = 1
+            root = "/home/acme/mori"
+
+            [trees]
+            name = "{task}"
+
+            [trees.lifetime]
+            task = "ttl:14d"
+
+            [trees.landed]
+            when = ["pr-merged"]
+        "#;
+
+        let trees = Config::parse(text, Path::new(PATH)).unwrap().trees;
+
+        assert_eq!(
+            trees.name.render("claude", "fix-login").unwrap(),
+            "fix-login"
+        );
+        assert_eq!(trees.lifetime.task.to_string(), "ttl:14d");
+        assert_eq!(trees.landed.when, [Landed::PrMerged]);
     }
 }

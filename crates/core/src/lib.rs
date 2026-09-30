@@ -9,3 +9,4 @@ pub mod error;
 pub mod forest;
 pub mod init;
 pub mod paths;
+pub mod tree;

@@ -173,3 +173,46 @@ impl ErrorDetails for ConfigError {
         }
     }
 }
+
+/// Errors about trees (domain `tree.mori`).
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TreeError {
+    /// A tree name, given or made from the name template, can't be used.
+    #[error("{name:?} can't be a tree name: {why}")]
+    NameInvalid {
+        /// The name.
+        name: String,
+        /// Why not.
+        why: String,
+    },
+}
+
+impl TreeError {
+    /// The AIP-193 `ErrorInfo.domain`.
+    pub const DOMAIN: &'static str = "tree.mori";
+}
+
+impl ErrorDetails for TreeError {
+    fn code(&self) -> Code {
+        match self {
+            Self::NameInvalid { .. } => Code::InvalidArgument,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
+        match self {
+            Self::NameInvalid { .. } => "TREE_NAME_INVALID",
+        }
+    }
+
+    fn domain(&self) -> &'static str {
+        Self::DOMAIN
+    }
+
+    fn metadata(&self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::NameInvalid { name, .. } => vec![("name", name.clone())],
+        }
+    }
+}
