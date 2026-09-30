@@ -146,6 +146,13 @@ output says why. Each removal pins the tree's commit and goes into the journal, 
 gives the `mori restore <entry>` command that undoes it. Without `--yes` nothing is removed
 (`CONFIRMATION_NEEDED`); `--dry-run` shows what would go.
 
+### `mori restore <entry>`
+
+Brings back a tree `mori gc apply` removed, from the journal entry the apply printed: its
+workspace on the commit mori pinned when it removed it, at its old path, under its old record.
+If that commit is gone (`RESTORE_COMMIT_GONE`), it changes nothing; if the name or path is taken
+again, it refuses like `tree create`.
+
 ### `mori skills sync`
 
 Updates mori's skills in the root (`skills/`, and the `skills/llms.txt` and `llms.txt` indexes) to
@@ -171,6 +178,8 @@ error is a `google.rpc.Status`:
 | 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
 | 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
 | 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                         |
+| 5    | `REPORT_NOT_FOUND`      | No such cleanup report. Run `mori gc` for a new one.                           |
+| 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc apply`.                    |
 | 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.         |
 | 6    | `PATH_EXISTS`           | Something mori didn't make is at the path. Leave it; tell the person.          |
 | 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.     |
@@ -179,6 +188,8 @@ error is a `google.rpc.Status`:
 | 9    | `NOT_TREE_OWNER`        | Someone else's tree. Leave it; tell the person if it looks abandoned.          |
 | 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.       |
 | 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                |
+| 9    | `CONFIRMATION_NEEDED`   | `mori gc apply` needs `--yes`: only when the person asked for it.              |
+| 9    | `RESTORE_COMMIT_GONE`   | The removed tree's commit is gone; it can't come back. Tell the person.        |
 | 9    | `NOT_INITIALIZED`       | mori isn't set up. Run `mori init` if the task allows, else ask.               |
 | 9    | `ROOT_MISMATCH`         | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |
 | 9    | `JJ_NOT_FOUND`          | jj isn't installed or on `PATH`. Ask the person to install it.                 |
@@ -193,7 +204,6 @@ reason.
 
 ## Not yet
 
-These are designed but not built, so don't look for them: automatic cleanup (a report of trees
-that may go, confirmed in batches, with a journal) and restore. Until then, remove your own trees
-with `mori tree remove` when your work is pushed. Use `mori tree create` rather than making jj
-workspaces or git worktrees in a mori clone by hand: mori would list those as foreign.
+Designed but not built: pruning old pins and journal entries, and cleaning up bookmarks and
+branches. Leave those alone. Use `mori tree create` rather than making jj workspaces or git
+worktrees in a mori clone by hand: mori would list those as foreign.

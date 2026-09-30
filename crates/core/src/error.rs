@@ -477,6 +477,33 @@ pub enum CleanupError {
         id: String,
     },
 
+    /// There is no journal entry with that ID.
+    #[error("there is no journal entry {id:?}")]
+    EntryNotFound {
+        /// The entry ID.
+        id: String,
+    },
+
+    /// The entry removed only a record (its workspace was already gone): there is no tree to bring
+    /// back.
+    #[error("journal entry {id:?} removed only a record; there is no tree to bring back")]
+    NothingToRestore {
+        /// The entry ID.
+        id: String,
+    },
+
+    /// The removed tree's commit is no longer in the clone, so it can't be brought back.
+    #[error(
+        "the commit {commit} that {id:?} pinned is gone from the clone (was its pin deleted?); \
+         the tree can't be brought back"
+    )]
+    CommitGone {
+        /// The entry ID.
+        id: String,
+        /// The commit.
+        commit: String,
+    },
+
     /// Removing needs the person's confirmation, and it wasn't given.
     #[error("this would remove {count} tree(s); confirm with --yes, or look first with --dry-run")]
     NotConfirmed {
@@ -493,8 +520,10 @@ impl CleanupError {
 impl ErrorDetails for CleanupError {
     fn code(&self) -> Code {
         match self {
-            Self::ReportNotFound { .. } => Code::NotFound,
-            Self::NotConfirmed { .. } => Code::FailedPrecondition,
+            Self::ReportNotFound { .. } | Self::EntryNotFound { .. } => Code::NotFound,
+            Self::NotConfirmed { .. } | Self::NothingToRestore { .. } | Self::CommitGone { .. } => {
+                Code::FailedPrecondition
+            }
         }
     }
 
@@ -502,6 +531,9 @@ impl ErrorDetails for CleanupError {
         match self {
             Self::ReportNotFound { .. } => "REPORT_NOT_FOUND",
             Self::NotConfirmed { .. } => "CONFIRMATION_NEEDED",
+            Self::EntryNotFound { .. } => "ENTRY_NOT_FOUND",
+            Self::NothingToRestore { .. } => "RESTORE_NOTHING",
+            Self::CommitGone { .. } => "RESTORE_COMMIT_GONE",
         }
     }
 
@@ -513,6 +545,12 @@ impl ErrorDetails for CleanupError {
         match self {
             Self::ReportNotFound { id } => vec![("reportId", id.clone())],
             Self::NotConfirmed { count } => vec![("count", count.to_string())],
+            Self::EntryNotFound { id } | Self::NothingToRestore { id } => {
+                vec![("entryId", id.clone())]
+            }
+            Self::CommitGone { id, commit } => {
+                vec![("entryId", id.clone()), ("commit", commit.clone())]
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ mod init;
 mod landing;
 mod ls;
 mod output;
+mod restore;
 mod skills;
 mod state;
 mod tree;
@@ -77,6 +78,13 @@ enum Command {
     Ls {
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
+    },
+
+    /// Bring back a tree `mori gc apply` removed, from its journal entry: on its pinned commit, at
+    /// its old path, under its old record.
+    Restore {
+        /// The journal entry, from `mori gc apply`.
+        entry: String,
     },
 
     /// Agent skills in the root: mori's own, installed by `mori init`, and anyone else's.
@@ -238,6 +246,7 @@ fn main() -> ExitCode {
             repo,
             offline,
         } => respond(json, gc::run(repo.as_deref(), offline), output::gc_text),
+        Command::Restore { entry } => respond(json, restore::run(&entry), output::restore_text),
         Command::Ls { repo } => respond(json, ls::run(repo.as_deref()), output::ls_text),
         Command::Tree {
             command:
