@@ -341,6 +341,101 @@ impl JjCli {
         })
     }
 
+    /// The git repository behind the clone: `.git` when colocated, else jj's own store.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::OutputInvalid`] if the clone's `.jj/repo/store/git_target` can't be read.
+    pub fn git_dir(clone: &Path) -> Result<PathBuf, JjError> {
+        let store = clone.join(".jj/repo/store");
+        let target = std::fs::read_to_string(store.join("git_target")).map_err(|_| {
+            JjError::OutputInvalid {
+                output: format!("no git_target in {}", store.display()),
+            }
+        })?;
+        Ok(store.join(target.trim()))
+    }
+
+    /// Points the git ref `name` (e.g. `refs/mori/removed/<entry>`) at `commit_id`, so git's and
+    /// jj's garbage collection keep the commit. Refs outside `refs/heads` and `refs/tags` aren't
+    /// jj bookmarks, so the pin is never shown or pushed.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::Failed`] if git refuses (for example, no such commit).
+    pub fn pin(&self, clone: &Path, name: &str, commit_id: &str) -> Result<(), JjError> {
+        self.git(clone, &["update-ref", name, commit_id])
+            .map(|_| ())
+    }
+
+    /// Whether the commit exists in the clone's git repository.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::NotFound`] if git isn't installed.
+    pub fn commit_exists(&self, clone: &Path, commit_id: &str) -> Result<bool, JjError> {
+        match self.git(
+            clone,
+            &["cat-file", "-e", &format!("{commit_id}^{{commit}}")],
+        ) {
+            Ok(_) => Ok(true),
+            Err(JjError::Failed { .. }) => Ok(false),
+            Err(other) => Err(other),
+        }
+    }
+
+    /// Adds a workspace named `name` at `path` on a new change on top of `commit_id`, even if jj
+    /// has let go of that commit: a temporary bookmark imports it first, then goes away.
+    ///
+    /// # Errors
+    ///
+    /// As [`JjCli::add_workspace`], and [`JjError::Failed`] if the commit can't be imported.
+    pub fn add_workspace_at(
+        &self,
+        clone: &Path,
+        name: &str,
+        path: &Path,
+        commit_id: &str,
+    ) -> Result<(), JjError> {
+        let temporary = format!("refs/heads/mori-restore-{name}");
+        self.git(clone, &["update-ref", &temporary, commit_id])?;
+        let imported = self.write(clone, &["git", "import"]);
+        let added = imported
+            .and_then(|()| self.add_workspace(clone, name, path, &revset_string(commit_id)));
+        // Best effort: the workspace is what matters; the temporary bookmark only carried the
+        // commit in.
+        let _ = self.git(clone, &["update-ref", "-d", &temporary]);
+        let _ = self.write(clone, &["git", "import"]);
+        added
+    }
+
+    /// Runs `git` against the clone's git repository and returns its stdout.
+    fn git(&self, clone: &Path, args: &[&str]) -> Result<String, JjError> {
+        let git_dir = Self::git_dir(clone)?;
+        let output = Command::new("git")
+            .envs(self.envs.iter().map(|(key, value)| (key, value)))
+            .arg("--git-dir")
+            .arg(&git_dir)
+            .args(args)
+            .output()
+            .map_err(|source| match source.kind() {
+                ErrorKind::NotFound => JjError::NotFound {
+                    program: PathBuf::from("git"),
+                },
+                _ => JjError::Io {
+                    program: PathBuf::from("git"),
+                    source,
+                },
+            })?;
+        if !output.status.success() {
+            return Err(JjError::Failed {
+                clone: clone.to_path_buf(),
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+            });
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
     /// Fetches the clone's remotes, so its remote bookmarks are current. Changes only jj's
     /// record of the remote.
     ///
@@ -1013,6 +1108,56 @@ mod tests {
         let changed = jj.last_change(&clone, "claude-fix-login")?;
 
         assert!(now.abs_diff(changed) < 3600, "{changed} vs {now}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_pinned_commit_brings_a_removed_tree_back() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        for colocate in [true, false] {
+            let source = source_repo(&jj, dir.path())?;
+            let clone = dir.path().join(format!("widget-{colocate}"));
+            jj.clone_repo(&source.display().to_string(), &clone, colocate)?;
+            let tree = dir.path().join(format!("claude-fix-login-{colocate}"));
+            jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+            std::fs::write(tree.join("login.rs"), "fn login() {}\n")?;
+            jj.snapshot(&tree)?;
+            let commit = jj
+                .read(
+                    &clone,
+                    &[
+                        "log",
+                        "--no-graph",
+                        "-r",
+                        "\"claude-fix-login\"@",
+                        "-T",
+                        "commit_id",
+                    ],
+                )?
+                .trim()
+                .to_owned();
+
+            // Remove it as mori does: pin, forget, delete.
+            jj.pin(&clone, "refs/mori/removed/j-test", &commit)?;
+            jj.forget_workspace(&clone, "claude-fix-login")?;
+            std::fs::remove_dir_all(&tree)?;
+            assert!(jj.commit_exists(&clone, &commit)?);
+            assert!(!jj.commit_exists(&clone, "0123456789abcdef0123456789abcdef01234567")?);
+
+            jj.add_workspace_at(&clone, "claude-fix-login", &tree, &commit)?;
+
+            assert_eq!(
+                std::fs::read_to_string(tree.join("login.rs"))?,
+                "fn login() {}\n",
+                "colocated: {colocate}"
+            );
+            let bookmarks = jj.read(&clone, &["bookmark", "list", "-T", "name ++ \"\\n\""])?;
+            assert!(!bookmarks.contains("mori-restore"), "{bookmarks}");
+            std::fs::remove_dir_all(&source)?;
+        }
         Ok(())
     }
 }
