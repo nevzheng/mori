@@ -21,6 +21,13 @@ Feature: CUJ 1 - add a repo
     Then it succeeds
     And mori records "github.com/acme/widget" with a pinned base tree
 
+  Scenario: mori init doesn't call mori's own clones unmanaged
+    Given I have run "mori clone github.com/acme/widget"
+    When I run "mori init"
+    Then it succeeds
+    And the output says mori is already set up
+    And the output lists no unmanaged repos
+
   Scenario: A jj-only clone
     When I run "mori clone --no-colocate github.com/acme/widget"
     Then it succeeds

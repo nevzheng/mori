@@ -32,6 +32,8 @@ pub struct Observed {
     pub database_root: Option<PathBuf>,
     /// Clone directories found at `<root>/repos/<host>/<org>/<repo>`.
     pub clones: Vec<PathBuf>,
+    /// The repos mori recorded, e.g. `github.com/acme/widget`: their clones are mori's own.
+    pub managed: BTreeSet<String>,
 }
 
 /// One thing `init` creates, in the order it must be created.
@@ -172,7 +174,7 @@ pub fn plan(paths: &Paths, observed: &Observed) -> Result<InitPlan, ConfigError>
     Ok(InitPlan {
         root: paths.root.clone(),
         steps,
-        unmanaged: unmanaged(paths, &observed.clones),
+        unmanaged: unmanaged(paths, &observed.clones, &observed.managed),
     })
 }
 
@@ -207,8 +209,14 @@ fn missing_ancestors(
     missing
 }
 
-/// Every observed clone is unmanaged for now: mori doesn't manage any repos yet.
-fn unmanaged(paths: &Paths, clones: &[PathBuf]) -> Vec<UnmanagedRepo> {
+/// The clones mori didn't make: every clone at `<root>/repos/<host>/<owner>/<repo>` whose repo
+/// isn't in `managed`. Sorted by repo.
+#[must_use]
+pub fn unmanaged(
+    paths: &Paths,
+    clones: &[PathBuf],
+    managed: &BTreeSet<String>,
+) -> Vec<UnmanagedRepo> {
     let repos = paths.repos();
     let mut unmanaged: Vec<UnmanagedRepo> = clones
         .iter()
@@ -218,8 +226,9 @@ fn unmanaged(paths: &Paths, clones: &[PathBuf]) -> Vec<UnmanagedRepo> {
                 .iter()
                 .map(|part| part.to_str())
                 .collect::<Option<_>>()?;
-            (parts.len() == 3).then(|| UnmanagedRepo {
-                repo: parts.join("/"),
+            let repo = parts.join("/");
+            (parts.len() == 3 && !managed.contains(&repo)).then(|| UnmanagedRepo {
+                repo,
                 path: path.clone(),
             })
         })
@@ -261,6 +270,7 @@ mod tests {
             config_text: Some(Config::render(&paths.root).unwrap()),
             database_root: Some(paths.root.clone()),
             clones: vec![],
+            managed: BTreeSet::new(),
         }
     }
 
@@ -386,5 +396,27 @@ mod tests {
             .map(|repo| repo.repo.as_str())
             .collect();
         assert_eq!(names, ["github.com/acme/anvil", "github.com/acme/widget"]);
+    }
+
+    #[test]
+    fn clones_mori_recorded_arent_unmanaged() {
+        let repos = paths().repos();
+        let observed = Observed {
+            clones: vec![
+                repos.join("github.com/acme/widget"),
+                repos.join("github.com/acme/anvil"),
+            ],
+            managed: BTreeSet::from(["github.com/acme/widget".to_owned()]),
+            ..initialized()
+        };
+
+        let plan = plan(&paths(), &observed).unwrap();
+
+        let names: Vec<&str> = plan
+            .unmanaged
+            .iter()
+            .map(|repo| repo.repo.as_str())
+            .collect();
+        assert_eq!(names, ["github.com/acme/anvil"]);
     }
 }

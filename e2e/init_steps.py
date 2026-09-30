@@ -120,6 +120,11 @@ def says_already_set_up(mori: Mori) -> None:
     assert_that(mori.last.stdout, contains_string("mori is already set up at "))
 
 
+@then("the output lists no unmanaged repos")
+def lists_no_unmanaged(mori: Mori) -> None:
+    assert "Clones mori didn't make" not in mori.last.stdout, mori.last.stdout
+
+
 @then(parsers.parse('the output lists "{repo}" as unmanaged'))
 def lists_unmanaged(mori: Mori, repo: str) -> None:
     _, found, unmanaged = mori.last.stdout.partition("Clones mori didn't make (left alone):\n")
