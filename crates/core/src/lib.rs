@@ -12,3 +12,4 @@ pub mod init;
 pub mod paths;
 pub mod tree;
 pub mod tree_create;
+pub mod tree_remove;

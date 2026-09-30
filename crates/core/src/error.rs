@@ -229,6 +229,50 @@ pub enum TreeError {
         path: PathBuf,
     },
 
+    /// mori has no tree of that name, and the VCS has no such workspace.
+    #[error("there is no tree named {name:?} in this repo")]
+    NotFound {
+        /// The name.
+        name: String,
+    },
+
+    /// The base tree is the clone itself; `tree remove` never removes it.
+    #[error("{name:?} is the clone itself; mori never removes it")]
+    BaseTree {
+        /// The name.
+        name: String,
+    },
+
+    /// Someone else owns the tree.
+    #[error("{name:?} belongs to {owner}; only its owner removes it (pass --agent {owner})")]
+    NotOwner {
+        /// The name.
+        name: String,
+        /// Its owner.
+        owner: String,
+    },
+
+    /// The tree is pinned: it goes only when asked for explicitly.
+    #[error("{name:?} is pinned; pass --pinned to remove it anyway")]
+    Pinned {
+        /// The name.
+        name: String,
+    },
+
+    /// The tree has work that exists only on this machine.
+    #[error(
+        "{name:?} has work only this machine has (working copy edited: {edited}, unpushed \
+         changes: {unpushed}); push it or abandon it first"
+    )]
+    Unsaved {
+        /// The name.
+        name: String,
+        /// The working copy has edits.
+        edited: bool,
+        /// Changes on no remote bookmark and not in trunk.
+        unpushed: u32,
+    },
+
     /// The workspace was made, but mori couldn't record it. It is kept: mori never deletes work.
     #[error(
         "made the tree {name:?} at {}, but couldn't record it ({why}). The tree is kept; \
@@ -254,11 +298,16 @@ impl ErrorDetails for TreeError {
     fn code(&self) -> Code {
         match self {
             Self::NameInvalid { .. } => Code::InvalidArgument,
-            Self::OwnerUnknown => Code::FailedPrecondition,
+            Self::OwnerUnknown
+            | Self::BaseTree { .. }
+            | Self::NotOwner { .. }
+            | Self::Pinned { .. }
+            | Self::Unsaved { .. } => Code::FailedPrecondition,
             Self::TreeExists { .. } | Self::WorkspaceExists { .. } | Self::PathExists { .. } => {
                 Code::AlreadyExists
             }
             Self::NotRecorded { .. } => Code::Internal,
+            Self::NotFound { .. } => Code::NotFound,
         }
     }
 
@@ -270,6 +319,11 @@ impl ErrorDetails for TreeError {
             Self::WorkspaceExists { .. } => "WORKSPACE_EXISTS",
             Self::PathExists { .. } => "PATH_EXISTS",
             Self::NotRecorded { .. } => "TREE_NOT_RECORDED",
+            Self::NotFound { .. } => "TREE_NOT_FOUND",
+            Self::BaseTree { .. } => "BASE_TREE",
+            Self::NotOwner { .. } => "NOT_TREE_OWNER",
+            Self::Pinned { .. } => "TREE_PINNED",
+            Self::Unsaved { .. } => "TREE_HAS_UNSAVED_WORK",
         }
     }
 
@@ -281,7 +335,22 @@ impl ErrorDetails for TreeError {
         match self {
             Self::NameInvalid { name, .. }
             | Self::TreeExists { name }
-            | Self::WorkspaceExists { name } => vec![("name", name.clone())],
+            | Self::WorkspaceExists { name }
+            | Self::NotFound { name }
+            | Self::BaseTree { name }
+            | Self::Pinned { name } => vec![("name", name.clone())],
+            Self::NotOwner { name, owner } => {
+                vec![("name", name.clone()), ("owner", owner.clone())]
+            }
+            Self::Unsaved {
+                name,
+                edited,
+                unpushed,
+            } => vec![
+                ("name", name.clone()),
+                ("edited", edited.to_string()),
+                ("unpushed", unpushed.to_string()),
+            ],
             Self::OwnerUnknown => vec![],
             Self::PathExists { path } => vec![("path", path.display().to_string())],
             Self::NotRecorded { name, path, .. } => {
