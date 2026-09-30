@@ -25,11 +25,11 @@ const APPLICATION_ID: i32 = 0x6d6f_7269;
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The schema version this mori writes, and the newest it reads.
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 3;
 
 /// The steps from an empty file to each version: `MIGRATIONS[n]` takes version `n` to `n + 1`.
 /// Append only: a released step never changes.
-const MIGRATIONS: [&str; 2] = [SCHEMA_V1, SCHEMA_V2];
+const MIGRATIONS: [&str; 3] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3];
 
 const SCHEMA_V1: &str = "
     CREATE TABLE meta (
@@ -60,6 +60,20 @@ const SCHEMA_V2: &str = "
         created_at   TEXT NOT NULL,
         last_used_at TEXT NOT NULL,
         UNIQUE (repo_id, name)
+    ) STRICT;
+";
+
+// The remote bookmarks mori has seen pointing into a tree's own history, and where each pointed
+// when last seen. A row stays after the bookmark disappears from the remote: after a squash merge,
+// that disappearance and the recorded commit are what show the tree's work landed.
+const SCHEMA_V3: &str = "
+    CREATE TABLE tree_bookmarks (
+        tree_id   TEXT NOT NULL REFERENCES trees (id),
+        remote    TEXT NOT NULL,
+        bookmark  TEXT NOT NULL,
+        commit_id TEXT NOT NULL,
+        seen_at   TEXT NOT NULL,
+        PRIMARY KEY (tree_id, remote, bookmark)
     ) STRICT;
 ";
 
@@ -375,8 +389,8 @@ mod tests {
         assert!(matches!(
             error,
             StoreError::SchemaTooNew {
-                found: 3,
-                supported: 2,
+                found: 4,
+                supported: 3,
                 ..
             }
         ));
@@ -385,8 +399,8 @@ mod tests {
             error.metadata(),
             vec![
                 ("path", path.display().to_string()),
-                ("foundVersion", "3".to_owned()),
-                ("supportedVersion", "2".to_owned()),
+                ("foundVersion", "4".to_owned()),
+                ("supportedVersion", "3".to_owned()),
             ]
         );
     }
@@ -396,7 +410,10 @@ mod tests {
         let (_dir, path) = database_path().unwrap();
         let db = Database::create(&path, ROOT, 0o600).unwrap();
 
-        assert_eq!(tables(&db).unwrap(), ["meta", "repos", "trees"]);
+        assert_eq!(
+            tables(&db).unwrap(),
+            ["meta", "repos", "tree_bookmarks", "trees"]
+        );
     }
 
     #[test]
@@ -407,7 +424,10 @@ mod tests {
         let db = Database::open(&path).unwrap();
         assert_eq!(db.pragma("user_version").unwrap(), SCHEMA_VERSION);
         assert_eq!(db.root().unwrap(), PathBuf::from(ROOT));
-        assert_eq!(tables(&db).unwrap(), ["meta", "repos", "trees"]);
+        assert_eq!(
+            tables(&db).unwrap(),
+            ["meta", "repos", "tree_bookmarks", "trees"]
+        );
     }
 
     #[test]
