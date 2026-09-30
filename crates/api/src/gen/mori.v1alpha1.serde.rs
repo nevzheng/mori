@@ -304,6 +304,315 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
         deserializer.deserialize_struct("mori.v1alpha1.CloneResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for CreateTreeRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.task.is_empty() {
+            len += 1;
+        }
+        if !self.agent.is_empty() {
+            len += 1;
+        }
+        if !self.lifetime.is_empty() {
+            len += 1;
+        }
+        if !self.from.is_empty() {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CreateTreeRequest", len)?;
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.task.is_empty() {
+            struct_ser.serialize_field("task", &self.task)?;
+        }
+        if !self.agent.is_empty() {
+            struct_ser.serialize_field("agent", &self.agent)?;
+        }
+        if !self.lifetime.is_empty() {
+            struct_ser.serialize_field("lifetime", &self.lifetime)?;
+        }
+        if !self.from.is_empty() {
+            struct_ser.serialize_field("from", &self.from)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "repo",
+            "task",
+            "agent",
+            "lifetime",
+            "from",
+            "validate_only",
+            "validateOnly",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Repo,
+            Task,
+            Agent,
+            Lifetime,
+            From,
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "repo" => Ok(GeneratedField::Repo),
+                            "task" => Ok(GeneratedField::Task),
+                            "agent" => Ok(GeneratedField::Agent),
+                            "lifetime" => Ok(GeneratedField::Lifetime),
+                            "from" => Ok(GeneratedField::From),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = CreateTreeRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.CreateTreeRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<CreateTreeRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut repo__ = None;
+                let mut task__ = None;
+                let mut agent__ = None;
+                let mut lifetime__ = None;
+                let mut from__ = None;
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Task => {
+                            if task__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("task"));
+                            }
+                            task__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Agent => {
+                            if agent__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("agent"));
+                            }
+                            agent__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Lifetime => {
+                            if lifetime__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lifetime"));
+                            }
+                            lifetime__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::From => {
+                            if from__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("from"));
+                            }
+                            from__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(CreateTreeRequest {
+                    repo: repo__.unwrap_or_default(),
+                    task: task__.unwrap_or_default(),
+                    agent: agent__.unwrap_or_default(),
+                    lifetime: lifetime__.unwrap_or_default(),
+                    from: from__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.CreateTreeRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for CreateTreeResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.tree.is_some() {
+            len += 1;
+        }
+        if !self.from.is_empty() {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("mori.v1alpha1.CreateTreeResponse", len)?;
+        if let Some(v) = self.tree.as_ref() {
+            struct_ser.serialize_field("tree", v)?;
+        }
+        if !self.from.is_empty() {
+            struct_ser.serialize_field("from", &self.from)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["tree", "from", "validate_only", "validateOnly"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Tree,
+            From,
+            ValidateOnly,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "tree" => Ok(GeneratedField::Tree),
+                            "from" => Ok(GeneratedField::From),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = CreateTreeResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.CreateTreeResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<CreateTreeResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut tree__ = None;
+                let mut from__ = None;
+                let mut validate_only__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Tree => {
+                            if tree__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tree"));
+                            }
+                            tree__ = map_.next_value()?;
+                        }
+                        GeneratedField::From => {
+                            if from__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("from"));
+                            }
+                            from__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(CreateTreeResponse {
+                    tree: tree__,
+                    from: from__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "mori.v1alpha1.CreateTreeResponse",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
 impl serde::Serialize for CreatedPath {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -745,6 +1054,212 @@ impl<'de> serde::Deserialize<'de> for InitResponse {
             }
         }
         deserializer.deserialize_struct("mori.v1alpha1.InitResponse", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for Tree {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.id.is_empty() {
+            len += 1;
+        }
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.path.is_empty() {
+            len += 1;
+        }
+        if !self.role.is_empty() {
+            len += 1;
+        }
+        if !self.owner.is_empty() {
+            len += 1;
+        }
+        if !self.task.is_empty() {
+            len += 1;
+        }
+        if !self.lifetime.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.Tree", len)?;
+        if !self.id.is_empty() {
+            struct_ser.serialize_field("id", &self.id)?;
+        }
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.path.is_empty() {
+            struct_ser.serialize_field("path", &self.path)?;
+        }
+        if !self.role.is_empty() {
+            struct_ser.serialize_field("role", &self.role)?;
+        }
+        if !self.owner.is_empty() {
+            struct_ser.serialize_field("owner", &self.owner)?;
+        }
+        if !self.task.is_empty() {
+            struct_ser.serialize_field("task", &self.task)?;
+        }
+        if !self.lifetime.is_empty() {
+            struct_ser.serialize_field("lifetime", &self.lifetime)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for Tree {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "id", "repo", "name", "path", "role", "owner", "task", "lifetime",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Id,
+            Repo,
+            Name,
+            Path,
+            Role,
+            Owner,
+            Task,
+            Lifetime,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "id" => Ok(GeneratedField::Id),
+                            "repo" => Ok(GeneratedField::Repo),
+                            "name" => Ok(GeneratedField::Name),
+                            "path" => Ok(GeneratedField::Path),
+                            "role" => Ok(GeneratedField::Role),
+                            "owner" => Ok(GeneratedField::Owner),
+                            "task" => Ok(GeneratedField::Task),
+                            "lifetime" => Ok(GeneratedField::Lifetime),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = Tree;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.Tree")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Tree, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut id__ = None;
+                let mut repo__ = None;
+                let mut name__ = None;
+                let mut path__ = None;
+                let mut role__ = None;
+                let mut owner__ = None;
+                let mut task__ = None;
+                let mut lifetime__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Id => {
+                            if id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("id"));
+                            }
+                            id__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Path => {
+                            if path__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("path"));
+                            }
+                            path__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Role => {
+                            if role__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("role"));
+                            }
+                            role__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Owner => {
+                            if owner__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("owner"));
+                            }
+                            owner__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Task => {
+                            if task__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("task"));
+                            }
+                            task__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Lifetime => {
+                            if lifetime__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("lifetime"));
+                            }
+                            lifetime__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(Tree {
+                    id: id__.unwrap_or_default(),
+                    repo: repo__.unwrap_or_default(),
+                    name: name__.unwrap_or_default(),
+                    path: path__.unwrap_or_default(),
+                    role: role__.unwrap_or_default(),
+                    owner: owner__.unwrap_or_default(),
+                    task: task__.unwrap_or_default(),
+                    lifetime: lifetime__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.Tree", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for UnmanagedRepo {

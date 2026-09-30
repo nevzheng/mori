@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 use std::io::Write;
 use std::process::ExitCode;
 
-use mori_api::v1alpha1::{CloneResponse, InitResponse};
+use mori_api::v1alpha1::{CloneResponse, CreateTreeResponse, InitResponse};
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
 
@@ -122,6 +122,26 @@ pub fn clone_text(response: &CloneResponse) -> String {
     let _ = writeln!(text, "  from {} ({kind})", response.fetch_url);
     let _ = writeln!(text, "  base tree: default (pinned; the clone itself)");
     let _ = writeln!(text, "  task trees: trees/{}/", response.tree_dir);
+    text
+}
+
+/// The text `tree create` prints.
+pub fn tree_create_text(response: &CreateTreeResponse) -> String {
+    let mut text = String::new();
+    let Some(tree) = &response.tree else {
+        return text;
+    };
+    // Writing to a String can't fail.
+    let _ = if response.validate_only {
+        writeln!(text, "Would create tree {} (dry run):", tree.name)
+    } else {
+        writeln!(text, "Created tree {}:", tree.name)
+    };
+    let _ = writeln!(text, "  path: {}", tree.path);
+    let _ = writeln!(text, "  repo: {}", tree.repo);
+    let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
+    let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
+    let _ = writeln!(text, "  starts from: {}", response.from);
     text
 }
 

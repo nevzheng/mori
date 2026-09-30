@@ -8,3 +8,4 @@
 ## Skills
 
 - [using-mori](using-mori/SKILL.md): the commands, JSON output, errors and the rules agents follow when using mori
+- [lead-tree](lead-tree/SKILL.md): how to run a long-lived coordinating tree where several agents' work comes together

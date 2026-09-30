@@ -14,6 +14,11 @@ service MoriService {
   // Refuses a repo mori already has and any path it didn't make. If the clone succeeds but
   // recording it fails, the clone is kept and the error says so.
   rpc Clone(CloneRequest) returns (CloneResponse);
+
+  // Gives one piece of work its own task tree: a jj workspace at trees/<repo dir>/<name>, on a
+  // new change on top of `from`, recorded with its owner, task and lifetime. If the workspace is
+  // made but recording it fails, the workspace is kept and the error says so.
+  rpc CreateTree(CreateTreeRequest) returns (CreateTreeResponse);
 }
 
 // Request for `Init`.
@@ -99,4 +104,64 @@ message CloneResponse {
 
   // Echoes the request: true if nothing was actually cloned.
   bool validate_only = 6;
+}
+
+// A tree mori created.
+message Tree {
+  // Opaque and stable; never reused. Empty when nothing was created (a dry run).
+  string id = 1;
+
+  // The repo's identity, e.g. "github.com/acme/widget".
+  string repo = 2;
+
+  // The tree's name, which is also its workspace name, e.g. "claude-fix-login".
+  string name = 3;
+
+  // Absolute path of the tree.
+  string path = 4;
+
+  // "base" (the clone itself) or "task".
+  string role = 5;
+
+  // Who the tree is for: an agent such as "claude", or a person's login name.
+  string owner = 6;
+
+  // The task, e.g. "fix-login". Empty for the base tree.
+  string task = 7;
+
+  // When the tree may go: "pinned", "task-done", "lru", or "ttl:<n>d" / "ttl:<n>h".
+  string lifetime = 8;
+}
+
+// Request for `CreateTree`.
+message CreateTreeRequest {
+  // The repo, in any form `Clone` accepts.
+  string repo = 1;
+
+  // A short slug for the work: lowercase letters, digits and hyphens.
+  string task = 2;
+
+  // Who the tree is for. Defaults to the login name.
+  string agent = 3;
+
+  // A lifetime instead of the configured default for task trees.
+  string lifetime = 4;
+
+  // The jj revision the tree starts from. Defaults to "trunk()".
+  string from = 5;
+
+  // Report what would happen without creating anything (AIP-163; the CLI's --dry-run).
+  bool validate_only = 6;
+}
+
+// Response for `CreateTree`.
+message CreateTreeResponse {
+  // The tree created, or that would be created.
+  Tree tree = 1;
+
+  // The revision it starts from.
+  string from = 2;
+
+  // Echoes the request: true if nothing was actually created.
+  bool validate_only = 3;
 }
