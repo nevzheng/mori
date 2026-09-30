@@ -33,6 +33,10 @@ service MoriService {
   // skills/llms.txt and llms.txt indexes. Changes only files mori wrote and nobody edited since;
   // never touches anyone else's skills.
   rpc SyncSkills(SyncSkillsRequest) returns (SyncSkillsResponse);
+
+  // Reports which trees may be removed and whether each is safe to remove, and saves the report
+  // for `GcApply`. Changes no tree; fetches remote bookmarks unless offline.
+  rpc Gc(GcRequest) returns (GcResponse);
 }
 
 // Request for `Init`.
@@ -315,4 +319,57 @@ message SkillFile {
 
   // What happened to it.
   Action action = 2;
+}
+
+// Request for `Gc`.
+message GcRequest {
+  // Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
+  string repo = 1;
+
+  // Don't fetch or ask GitHub: work only from what the clone already knows.
+  bool offline = 2;
+}
+
+// Response for `Gc`.
+message GcResponse {
+  // The saved report's ID, for `GcApply`.
+  string report_id = 1;
+
+  // Every tree, sorted by repo and name.
+  repeated GcItem items = 2;
+}
+
+// One tree in a cleanup report.
+message GcItem {
+  // What cleanup does with it.
+  enum Class {
+    // Not set.
+    CLASS_UNSPECIFIED = 0;
+    // It may go, and nothing would be lost.
+    CLASS_REMOVE = 1;
+    // It may go, but it has work only this machine has.
+    CLASS_BLOCKED = 2;
+    // Its lifetime doesn't let it go yet.
+    CLASS_KEEP = 3;
+    // Cleanup never removes it.
+    CLASS_NEVER = 4;
+  }
+
+  // The repo, e.g. "github.com/acme/widget".
+  string repo = 1;
+
+  // The tree's name.
+  string name = 2;
+
+  // Absolute path of the tree.
+  string path = 3;
+
+  // What cleanup does with it.
+  Class class = 4;
+
+  // Why, e.g. "LANDED", "UNSAVED", "PINNED".
+  string reason = 5;
+
+  // The facts it was judged on, for people to read.
+  string facts = 6;
 }

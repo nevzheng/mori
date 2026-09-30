@@ -123,6 +123,21 @@ merge). Then it forgets the workspace, deletes the directory and drops the recor
 - It never removes the clone itself or a workspace mori didn't make. If mori's record has no
   workspace any more (`missing` in `mori ls`), it drops the record and leaves the directory.
 
+### `mori gc [repo]`
+
+Reports which trees may be removed and whether each is safe to, and saves the report. It changes
+no tree (it only fetches remote bookmarks; `--offline` skips that and GitHub). Each tree gets a
+class and a reason:
+
+- **remove**: its lifetime lets it go and nothing would be lost (`LANDED`, `IDLE`, `OVER_CAP`, or
+  `MISSING` when only a stale record is left).
+- **blocked** (`UNSAVED`): it may go, but has edits or unpushed work. Push it or ask the person.
+- **keep**: not yet (`NOT_YET`), or it can't be told (`UNKNOWN`: offline, or no `gh` login).
+- **never**: the clone itself, a pinned tree, or a workspace mori didn't make.
+
+Removing the trees a report lists is the person's decision: don't run `mori gc apply` unless they
+asked you to.
+
 ### `mori skills sync`
 
 Updates mori's skills in the root (`skills/`, and the `skills/llms.txt` and `llms.txt` indexes) to

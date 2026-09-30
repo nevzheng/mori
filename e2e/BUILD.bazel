@@ -5,10 +5,13 @@ exports_files(["requirements_lock.txt"])
 # Runs every CUJ feature (spec/cuj) and the harness smoke feature against the real `mori` binary.
 py_test(
     name = "e2e_test",
-    size = "small",
+    # Every CUJ runs end to end against real jj repos; slower CI runners need more than the
+    # 60 seconds a small test gets.
+    size = "medium",
     srcs = [
         "clone_steps.py",
         "conftest.py",
+        "gc_steps.py",
         "harness.py",
         "init_steps.py",
         "ls_steps.py",
