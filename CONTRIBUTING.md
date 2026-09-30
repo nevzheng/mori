@@ -76,6 +76,8 @@ an issue and ask.
 - Bazel is the build system: `bazel test //...` builds everything, runs clippy and rustfmt on
   every target, and runs the tests, including the end-to-end CUJ scenarios.
 - `cargo` works too, but Bazel is the supported path.
+- Tests use one pinned jj release, downloaded by Bazel (see `MODULE.bazel`); no jj version is
+  supported yet. Under plain `cargo test`, tests that need jj skip and say so.
 - The API is proto-first: edit `proto/`, run `bazel run //tools/protogen`, commit the result.
 - [AGENTS.md](https://github.com/nevzheng/mori/blob/main/AGENTS.md) has the full working rules; they
   apply to humans and agents alike.

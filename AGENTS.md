@@ -46,6 +46,10 @@ bazel test //...    # builds everything; clippy and rustfmt run on every target;
 Lints live in `Cargo.toml` (`[workspace.lints]`) and Bazel applies them through
 `extract_cargo_lints`. New crates under `crates/*` or `tools/*` are picked up automatically.
 
+Tests that need jj get the pinned release from `//third_party/jj` (version and checksums in
+`MODULE.bazel`), with its path in `MORI_TEST_JJ`. mori supports no particular jj version yet.
+`third_party/` holds pinned outside tools; `tools/*` is only for Rust crates.
+
 Markdown wraps at 100 columns with aligned tables (`.rumdl.toml`). Format with
 `uvx rumdl fmt .`; CI runs `rumdl check` and `rumdl fmt --check`.
 

@@ -1,0 +1,24 @@
+# The pinned jj that tests run (see MODULE.bazel), for the platform the tests run on.
+
+[
+    config_setting(
+        name = os + "_" + cpu,
+        constraint_values = [
+            "@platforms//os:" + os,
+            "@platforms//cpu:" + cpu,
+        ],
+    )
+    for os in ("macos", "linux")
+    for cpu in ("aarch64", "x86_64")
+]
+
+alias(
+    name = "jj",
+    actual = select({
+        ":macos_aarch64": "@jj_aarch64_apple_darwin//:jj",
+        ":macos_x86_64": "@jj_x86_64_apple_darwin//:jj",
+        ":linux_aarch64": "@jj_aarch64_unknown_linux_musl//:jj",
+        ":linux_x86_64": "@jj_x86_64_unknown_linux_musl//:jj",
+    }),
+    visibility = ["//visibility:public"],
+)

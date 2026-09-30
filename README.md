@@ -20,6 +20,10 @@ bazel test //...            # build everything, run clippy and rustfmt, run the 
 bazel run //crates/cli:mori -- --version
 ```
 
+**jj:** mori supports no particular jj version yet; jj changes quickly and mori is pre-alpha. Tests
+run against one pinned release (0.45.1 today, set in `MODULE.bazel`), which Bazel downloads, so you
+don't need jj installed to run them.
+
 ## License
 
 [Apache-2.0](https://github.com/nevzheng/mori/blob/main/LICENSE).
