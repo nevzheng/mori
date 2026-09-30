@@ -20,6 +20,8 @@ rust_test(
     name = "mori_jj_test",
     size = "small",
     crate = ":mori_jj",
+    data = ["//third_party/jj"],
+    env = {"MORI_TEST_JJ": "$(rootpath //third_party/jj)"},
     lint_config = ":lints",
     deps = all_crate_deps(normal_dev = True),
 )

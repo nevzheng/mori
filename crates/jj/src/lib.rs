@@ -230,11 +230,15 @@ mod tests {
         assert_eq!(error.reason(), "JJ_NOT_FOUND");
     }
 
-    /// Runs the real `jj`. Ignored by default because CI doesn't install jj yet; run it with
-    /// `cargo test -p mori-jj -- --include-ignored`.
+    /// Runs the real `jj`: the pinned release under `bazel test`, which sets `MORI_TEST_JJ`.
+    /// Plain `cargo test` has no pinned jj, so there the test says so and passes without running.
     #[test]
-    #[ignore = "needs jj on PATH"]
     fn lists_the_workspaces_of_a_real_repo() -> Result<(), Box<dyn std::error::Error>> {
+        let Some(program) = std::env::var_os("MORI_TEST_JJ") else {
+            eprintln!("skipped: MORI_TEST_JJ isn't set; `bazel test` sets it to the pinned jj");
+            return Ok(());
+        };
+        let program = std::fs::canonicalize(program)?;
         let dir = tempfile::tempdir()?;
         let clone = dir.path().join("widget");
         let tree = dir.path().join("claude-fix-login");
@@ -244,7 +248,7 @@ mod tests {
             "user.name = \"Test\"\nuser.email = \"test@example.com\"\n",
         )?;
         let jj = |args: &[&str]| {
-            Command::new("jj")
+            Command::new(&program)
                 .env("JJ_CONFIG", &config)
                 .args(args)
                 .status()
@@ -261,7 +265,7 @@ mod tests {
             &tree.display().to_string(),
         ])?;
 
-        let mut workspaces = JjCli::from_path().list(&clone)?;
+        let mut workspaces = JjCli::new(&program).list(&clone)?;
         workspaces.sort_by(|a, b| a.name.cmp(&b.name));
 
         let names: Vec<_> = workspaces.iter().map(|w| w.name.as_str()).collect();

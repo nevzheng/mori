@@ -2,6 +2,7 @@ module(name = "mori", version = "0.0.0")
 
 bazel_dep(name = "rules_rust", version = "0.74.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_python", version = "2.3.4")
 
 # The Rust toolchain comes from Bazel, pinned to the same version as rust-toolchain.toml.
@@ -42,3 +43,30 @@ pip.parse(
     requirements_lock = "//e2e:requirements_lock.txt",
 )
 use_repo(pip, "pypi")
+
+# jj for tests. mori supports no particular jj version yet; tests run against this one pinned
+# release, so CI and every machine test the same jj. To bump it, change the version and the four
+# checksums (from the release page).
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+JJ_VERSION = "0.45.1"
+
+JJ_RELEASES = {
+    "aarch64-apple-darwin": "51ba42e3d0682616f6eb015045bfe45289b396f03511f9897f645ce8e9272743",
+    "x86_64-apple-darwin": "6171582d0b5a98a1005cd9643faebff7936812ec264d7968a39d9cef3654a99b",
+    "aarch64-unknown-linux-musl": "7349a43dd5a20dbc998b10114daa0ee63d2ab863fb822c7eb6b0ebca5903cc69",
+    "x86_64-unknown-linux-musl": "f35438350b5d61963aac5dd74ede510b31d6b9690769d1a6268cf058cc825f72",
+}
+
+[
+    http_archive(
+        name = "jj_" + triple.replace("-", "_"),
+        build_file_content = 'exports_files(["jj"])',
+        sha256 = sha256,
+        urls = ["https://github.com/jj-vcs/jj/releases/download/v{v}/jj-v{v}-{t}.tar.gz".format(
+            t = triple,
+            v = JJ_VERSION,
+        )],
+    )
+    for triple, sha256 in JJ_RELEASES.items()
+]
