@@ -2,7 +2,8 @@
 //!
 //! Reads pass `--ignore-working-copy`, so jj doesn't even snapshot a working copy while mori looks.
 //! The writes, [`JjCli::clone_repo`] and [`JjCli::add_workspace`], each make one new directory and
-//! clean up after themselves if jj fails.
+//! clean up after themselves if jj fails. [`JjCli::snapshot`] and [`JjCli::forget_workspace`] are
+//! for removing a tree, and change only jj's own records.
 
 use std::ffi::OsString;
 use std::io::ErrorKind;
@@ -136,6 +137,44 @@ impl JjCli {
             .output();
         Err(JjError::Failed {
             clone: clone.to_path_buf(),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        })
+    }
+
+    /// Snapshots the working copy of the tree at `tree`, so jj records edits made since it last
+    /// ran there. Files aren't changed; only jj's record of them is.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::Failed`] with jj's message, [`JjError::NotFound`] if jj isn't installed.
+    pub fn snapshot(&self, tree: &Path) -> Result<(), JjError> {
+        self.write(tree, &["util", "snapshot"])
+    }
+
+    /// Makes the clone at `clone` forget the workspace named `name`. The workspace's files stay;
+    /// deleting them is the caller's next step.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::Failed`] with jj's message, [`JjError::NotFound`] if jj isn't installed.
+    pub fn forget_workspace(&self, clone: &Path, name: &str) -> Result<(), JjError> {
+        self.write(clone, &["workspace", "forget", "--", name])
+    }
+
+    /// Runs `jj args` in the repo at `repo`, letting it record what it does.
+    fn write(&self, repo: &Path, args: &[&str]) -> Result<(), JjError> {
+        let output = self
+            .command()
+            .args(["--no-pager", "--color=never", "--repository"])
+            .arg(repo)
+            .args(args)
+            .output()
+            .map_err(|source| self.spawn_error(source))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(JjError::Failed {
+            clone: repo.to_path_buf(),
             stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
         })
     }
@@ -699,6 +738,45 @@ mod tests {
         let committed = jj.state(&clone, "claude-fix-login")?;
         assert!(!committed.changed);
         assert_eq!(committed.unpushed, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_snapshot_makes_fresh_edits_visible() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("claude-fix-login");
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+        std::fs::write(tree.join("login.rs"), "fn login() {}\n")?;
+        assert!(
+            !jj.state(&clone, "claude-fix-login")?.changed,
+            "not yet snapshotted"
+        );
+
+        jj.snapshot(&tree)?;
+
+        assert!(jj.state(&clone, "claude-fix-login")?.changed);
+        Ok(())
+    }
+
+    #[test]
+    fn forgetting_a_workspace_keeps_its_files() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("claude-fix-login");
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+
+        jj.forget_workspace(&clone, "claude-fix-login")?;
+
+        let names: Vec<_> = jj.list(&clone)?.into_iter().map(|w| w.name).collect();
+        assert_eq!(names, ["default"]);
+        assert!(tree.join("README.md").exists());
         Ok(())
     }
 }
