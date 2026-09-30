@@ -66,8 +66,8 @@ const SCHEMA_V2: &str = "
 /// An open mori database.
 #[derive(Debug)]
 pub struct Database {
-    path: PathBuf,
-    conn: Connection,
+    pub(crate) path: PathBuf,
+    pub(crate) conn: Connection,
 }
 
 impl Database {
@@ -225,7 +225,7 @@ impl Database {
             .map_err(|source| self.sqlite(source))
     }
 
-    fn sqlite(&self, source: rusqlite::Error) -> StoreError {
+    pub(crate) fn sqlite(&self, source: rusqlite::Error) -> StoreError {
         StoreError::Sqlite {
             path: self.path.clone(),
             source,
