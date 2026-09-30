@@ -15,6 +15,7 @@ py_test(
         "matchers.py",
         "pytest_main.py",
         "remove_steps.py",
+        "skills_steps.py",
         "test_features.py",
         "tree_steps.py",
     ],

@@ -30,8 +30,9 @@ Follow these even when a command would let you do otherwise.
 
 ## Skills
 
-mori's skills live in `skills/<name>/SKILL.md`, indexed by `skills/llms.txt`. Read the index to
-find the skill for a task. The same layout suits skills of your own.
+mori's skills live in `skills/<name>/SKILL.md`, indexed by `skills/llms.txt`, both in mori's
+source repo and in every root (`~/mori/skills/`), where `mori init` installs them. Read the index
+to find the skill for a task. Skills of your own go beside mori's; the index lists them too.
 
 ## The layout
 
@@ -118,6 +119,13 @@ the directory and drops the record.
   abandon it). Never delete the directory yourself to get around it.
 - It never removes the clone itself or a workspace mori didn't make. If mori's record has no
   workspace any more (`missing` in `mori ls`), it drops the record and leaves the directory.
+
+### `mori skills sync`
+
+Updates mori's skills in the root (`skills/`, and the `skills/llms.txt` and `llms.txt` indexes) to
+this mori's version. It changes only files mori wrote and nobody edited since; an edited skill is
+kept, and a skill mori never wrote is left alone. `mori init` installs missing skills but never
+updates them. `--dry-run` shows what would change.
 
 ## Errors
 

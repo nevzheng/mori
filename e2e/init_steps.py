@@ -27,8 +27,16 @@ FIRST_RUN_CREATES = [
     "$XDG_STATE_HOME",
     "$XDG_STATE_HOME/mori",
     "$XDG_STATE_HOME/mori/mori.db",
+    "<home>/mori/skills",
+    "<home>/mori/skills/lead-tree",
+    "<home>/mori/skills/lead-tree/SKILL.md",
+    "<home>/mori/skills/using-mori",
+    "<home>/mori/skills/using-mori/SKILL.md",
+    "<home>/mori/skills/llms.txt",
+    "<home>/mori/llms.txt",
+    "$XDG_STATE_HOME/mori/skills.json",
 ]
-FILES = {"config.toml", "mori.db"}
+FILES = {"config.toml", "mori.db", "SKILL.md", "llms.txt", "skills.json"}
 
 
 def first_run_creates(placeholders: Placeholders) -> list[Path]:

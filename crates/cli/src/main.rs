@@ -7,6 +7,7 @@ mod clone;
 mod init;
 mod ls;
 mod output;
+mod skills;
 mod state;
 mod tree;
 mod tree_remove;
@@ -59,10 +60,27 @@ enum Command {
         repo: Option<String>,
     },
 
+    /// Agent skills in the root: mori's own, installed by `mori init`, and anyone else's.
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
+    },
+
     /// Work with trees: the jj workspaces mori creates for tasks.
     Tree {
         #[command(subcommand)]
         command: TreeCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum SkillsCommand {
+    /// Update mori's skills and the llms.txt indexes to this mori's version. Changes only files
+    /// mori wrote and nobody edited; never touches anyone else's skills.
+    Sync {
+        /// Show what would change, and write nothing.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -125,6 +143,9 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return output::usage_error(&error),
     };
+    if matches!(cli.command, Command::Init { .. } | Command::Ls { .. }) {
+        skills::stale_hint();
+    }
     match cli.command {
         Command::Init { dry_run } => match init::run(dry_run) {
             Ok(response) => {
@@ -139,6 +160,14 @@ fn main() -> ExitCode {
         } => match clone::run(&url, dry_run, no_colocate) {
             Ok(response) => {
                 output::success(cli.json, &response, output::clone_text(&response).as_str())
+            }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Skills {
+            command: SkillsCommand::Sync { dry_run },
+        } => match skills::sync(dry_run) {
+            Ok(response) => {
+                output::success(cli.json, &response, output::skills_text(&response).as_str())
             }
             Err(error) => output::failure(cli.json, error.as_ref()),
         },

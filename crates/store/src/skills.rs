@@ -59,6 +59,25 @@ pub struct Observed {
     pub skills: Vec<SkillInfo>,
 }
 
+/// The mori version that last wrote skills into the root, if any did and the manifest is
+/// readable. Best effort: it only feeds a hint.
+#[must_use]
+pub fn installed_version(paths: &Paths) -> Option<String> {
+    let text = std::fs::read_to_string(manifest_path(paths)).ok()?;
+    serde_json::from_str::<ManifestFile>(&text)
+        .ok()
+        .map(|file| file.version)
+}
+
+/// The version of mori this binary is.
+pub const THIS_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Where the manifest lives: in mori's state directory, not in the root.
+#[must_use]
+pub fn manifest_path(paths: &Paths) -> PathBuf {
+    paths.state_dir.join(MANIFEST)
+}
+
 fn skill_path(dir: &str) -> String {
     format!("skills/{dir}/SKILL.md")
 }
@@ -207,7 +226,7 @@ pub fn apply(
         });
     if !written.is_empty() {
         let file = ManifestFile {
-            version: env!("CARGO_PKG_VERSION").to_owned(),
+            version: THIS_VERSION.to_owned(),
             files: manifest,
         };
         let text = serde_json::to_string_pretty(&file).map_err(|error| StoreError::Io {
