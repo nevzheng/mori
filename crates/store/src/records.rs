@@ -86,14 +86,8 @@ impl Database {
         base: &NewTree,
     ) -> Result<(RepoRecord, TreeRecord), StoreError> {
         let path = self.path.clone();
-        // Only a clash on a key means "already recorded"; any other constraint is a bug.
-        let sqlite = |source: rusqlite::Error| match &source {
-            rusqlite::Error::SqliteFailure(error, _)
-                if matches!(
-                    error.extended_code,
-                    SQLITE_CONSTRAINT_UNIQUE | SQLITE_CONSTRAINT_PRIMARYKEY
-                ) =>
-            {
+        let sqlite = |source: rusqlite::Error| {
+            if is_key_clash(&source) {
                 StoreError::AlreadyRecorded {
                     path: path.clone(),
                     what: format!(
@@ -101,11 +95,12 @@ impl Database {
                         repo.remote, repo.dir_name
                     ),
                 }
+            } else {
+                StoreError::Sqlite {
+                    path: path.clone(),
+                    source,
+                }
             }
-            _ => StoreError::Sqlite {
-                path: path.clone(),
-                source,
-            },
         };
         let tx = self.conn.transaction().map_err(sqlite)?;
         let repo_id: String = tx
@@ -149,6 +144,48 @@ impl Database {
         Ok((recorded, base))
     }
 
+    /// Records a task tree mori just created in the repo with ID `repo_id`, and returns it.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::AlreadyRecorded`] if the repo already has a tree of that name (nothing is
+    /// written), otherwise a SQLite error, including when no repo has that ID.
+    pub fn record_tree(&mut self, repo_id: &str, tree: &NewTree) -> Result<TreeRecord, StoreError> {
+        let path = self.path.clone();
+        let sqlite = |source: rusqlite::Error| {
+            if is_key_clash(&source) {
+                StoreError::AlreadyRecorded {
+                    path: path.clone(),
+                    what: format!("tree {}", tree.name),
+                }
+            } else {
+                StoreError::Sqlite {
+                    path: path.clone(),
+                    source,
+                }
+            }
+        };
+        self.conn
+            .query_row(
+                &format!(
+                    "INSERT INTO trees
+                         (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
+                     VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})
+                     RETURNING {TREE_COLUMNS}"
+                ),
+                params![
+                    repo_id,
+                    tree.name,
+                    tree.role,
+                    tree.owner,
+                    tree.task,
+                    tree.lifetime
+                ],
+                tree_record,
+            )
+            .map_err(sqlite)
+    }
+
     /// The recorded repo with identity `remote`, if any.
     ///
     /// # Errors
@@ -189,28 +226,44 @@ impl Database {
         let sqlite = |source| self.sqlite(source);
         let mut statement = self
             .conn
-            .prepare(
-                "SELECT id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at
-                 FROM trees WHERE repo_id = ?1 ORDER BY name",
-            )
+            .prepare(&format!(
+                "SELECT {TREE_COLUMNS} FROM trees WHERE repo_id = ?1 ORDER BY name"
+            ))
             .map_err(sqlite)?;
         let rows = statement
-            .query_map([repo_id], |row| {
-                Ok(TreeRecord {
-                    id: row.get(0)?,
-                    repo_id: row.get(1)?,
-                    name: row.get(2)?,
-                    role: row.get(3)?,
-                    owner: row.get(4)?,
-                    task: row.get(5)?,
-                    lifetime: row.get(6)?,
-                    created_at: row.get(7)?,
-                    last_used_at: row.get(8)?,
-                })
-            })
+            .query_map([repo_id], tree_record)
             .map_err(sqlite)?;
         rows.collect::<Result<_, _>>().map_err(sqlite)
     }
+}
+
+/// Only a clash on a key means "already recorded"; any other constraint failure is a bug.
+fn is_key_clash(error: &rusqlite::Error) -> bool {
+    matches!(
+        error,
+        rusqlite::Error::SqliteFailure(failure, _)
+            if matches!(
+                failure.extended_code,
+                SQLITE_CONSTRAINT_UNIQUE | SQLITE_CONSTRAINT_PRIMARYKEY
+            )
+    )
+}
+
+const TREE_COLUMNS: &str =
+    "id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at";
+
+fn tree_record(row: &rusqlite::Row) -> rusqlite::Result<TreeRecord> {
+    Ok(TreeRecord {
+        id: row.get(0)?,
+        repo_id: row.get(1)?,
+        name: row.get(2)?,
+        role: row.get(3)?,
+        owner: row.get(4)?,
+        task: row.get(5)?,
+        lifetime: row.get(6)?,
+        created_at: row.get(7)?,
+        last_used_at: row.get(8)?,
+    })
 }
 
 fn repo_record(row: &rusqlite::Row) -> rusqlite::Result<RepoRecord> {
@@ -339,5 +392,62 @@ mod tests {
         );
         assert_eq!(db.trees(&repo.id).unwrap(), [tree]);
         assert_eq!(db.repo("github.com/acme/gadget").unwrap(), None);
+    }
+
+    fn task_tree(name: &'static str) -> NewTree<'static> {
+        NewTree {
+            name,
+            role: "task",
+            owner: "claude",
+            task: Some("fix-login"),
+            lifetime: "task-done",
+        }
+    }
+
+    #[test]
+    fn a_task_tree_is_recorded_beside_the_base_tree() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+
+        let tree = db
+            .record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        assert!(tree.id.starts_with("tree_"), "{}", tree.id);
+        assert_eq!(tree.repo_id, repo.id);
+        assert_eq!(tree.task.as_deref(), Some("fix-login"));
+        let names: Vec<_> = db
+            .trees(&repo.id)
+            .unwrap()
+            .into_iter()
+            .map(|tree| tree.name)
+            .collect();
+        assert_eq!(names, ["claude-fix-login", "default"]);
+    }
+
+    #[test]
+    fn a_tree_name_is_recorded_once_per_repo() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        db.record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        let error = db
+            .record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap_err();
+
+        assert_eq!(error.code(), Code::AlreadyExists);
+        assert_eq!(error.reason(), "ALREADY_RECORDED");
+    }
+
+    #[test]
+    fn a_tree_needs_a_recorded_repo() {
+        let (_dir, mut db) = database().unwrap();
+
+        let error = db
+            .record_tree("repo_missing", &task_tree("claude-fix-login"))
+            .unwrap_err();
+
+        assert_eq!(error.reason(), "DATABASE_ERROR");
     }
 }
