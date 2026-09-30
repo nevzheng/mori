@@ -8,8 +8,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
-    CloneResponse, CreateTreeResponse, InitResponse, ListTreesResponse, RemoveTreeResponse,
-    SyncSkillsResponse, TreeRow, skill_file::Action, tree_row::Status,
+    CloneResponse, CreateTreeResponse, GcResponse, InitResponse, ListTreesResponse,
+    RemoveTreeResponse, SyncSkillsResponse, TreeRow, skill_file::Action, tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -286,6 +286,50 @@ pub fn skills_text(response: &SyncSkillsResponse) -> String {
         };
         let _ = writeln!(text, "  {what}: {}", file.path);
     }
+    text
+}
+
+/// The text `gc` prints: every tree with its class and reason, then what to do next.
+pub fn gc_text(response: &GcResponse) -> String {
+    let mut text = String::new();
+    let _ = writeln!(text, "Cleanup report {}:", response.report_id);
+    let rows: Vec<[String; 4]> = response
+        .items
+        .iter()
+        .map(|item| {
+            [
+                crate::gc::class_name(item.class()).to_owned(),
+                format!("{} {}", item.repo, item.name),
+                item.reason.clone(),
+                item.facts.clone(),
+            ]
+        })
+        .collect();
+    let mut widths = [0; 4];
+    for row in &rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.len());
+        }
+    }
+    for row in &rows {
+        let cells: Vec<String> = row
+            .iter()
+            .zip(widths)
+            .map(|(cell, width)| format!("{cell:width$}"))
+            .collect();
+        let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
+    }
+    let counts = crate::gc::counts(&response.items);
+    let removable = counts.get("remove").copied().unwrap_or(0);
+    let _ = if removable == 0 {
+        writeln!(text, "Nothing to remove.")
+    } else {
+        writeln!(
+            text,
+            "{removable} tree(s) can go: `mori gc apply {} --yes` removes them, checking each again first.",
+            response.report_id
+        )
+    };
     text
 }
 

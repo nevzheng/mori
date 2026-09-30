@@ -386,3 +386,89 @@ pub mod skill_file {
         }
     }
 }
+/// Request for `Gc`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GcRequest {
+    /// Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// Don't fetch or ask GitHub: work only from what the clone already knows.
+    #[prost(bool, tag = "2")]
+    pub offline: bool,
+}
+/// Response for `Gc`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GcResponse {
+    /// The saved report's ID, for `GcApply`.
+    #[prost(string, tag = "1")]
+    pub report_id: ::prost::alloc::string::String,
+    /// Every tree, sorted by repo and name.
+    #[prost(message, repeated, tag = "2")]
+    pub items: ::prost::alloc::vec::Vec<GcItem>,
+}
+/// One tree in a cleanup report.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GcItem {
+    /// The repo, e.g. "github.com/acme/widget".
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree's name.
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// Absolute path of the tree.
+    #[prost(string, tag = "3")]
+    pub path: ::prost::alloc::string::String,
+    /// What cleanup does with it.
+    #[prost(enumeration = "gc_item::Class", tag = "4")]
+    pub class: i32,
+    /// Why, e.g. "LANDED", "UNSAVED", "PINNED".
+    #[prost(string, tag = "5")]
+    pub reason: ::prost::alloc::string::String,
+    /// The facts it was judged on, for people to read.
+    #[prost(string, tag = "6")]
+    pub facts: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `GcItem`.
+pub mod gc_item {
+    /// What cleanup does with it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Class {
+        /// Not set.
+        Unspecified = 0,
+        /// It may go, and nothing would be lost.
+        Remove = 1,
+        /// It may go, but it has work only this machine has.
+        Blocked = 2,
+        /// Its lifetime doesn't let it go yet.
+        Keep = 3,
+        /// Cleanup never removes it.
+        Never = 4,
+    }
+    impl Class {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "CLASS_UNSPECIFIED",
+                Self::Remove => "CLASS_REMOVE",
+                Self::Blocked => "CLASS_BLOCKED",
+                Self::Keep => "CLASS_KEEP",
+                Self::Never => "CLASS_NEVER",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "CLASS_UNSPECIFIED" => Some(Self::Unspecified),
+                "CLASS_REMOVE" => Some(Self::Remove),
+                "CLASS_BLOCKED" => Some(Self::Blocked),
+                "CLASS_KEEP" => Some(Self::Keep),
+                "CLASS_NEVER" => Some(Self::Never),
+                _ => None,
+            }
+        }
+    }
+}

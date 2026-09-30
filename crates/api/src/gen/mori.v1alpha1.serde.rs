@@ -793,6 +793,477 @@ impl<'de> serde::Deserialize<'de> for created_path::Kind {
         deserializer.deserialize_any(GeneratedVisitor)
     }
 }
+impl serde::Serialize for GcItem {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.path.is_empty() {
+            len += 1;
+        }
+        if self.class != 0 {
+            len += 1;
+        }
+        if !self.reason.is_empty() {
+            len += 1;
+        }
+        if !self.facts.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcItem", len)?;
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.path.is_empty() {
+            struct_ser.serialize_field("path", &self.path)?;
+        }
+        if self.class != 0 {
+            let v = gc_item::Class::try_from(self.class).map_err(|_| {
+                serde::ser::Error::custom(format!("Invalid variant {}", self.class))
+            })?;
+            struct_ser.serialize_field("class", &v)?;
+        }
+        if !self.reason.is_empty() {
+            struct_ser.serialize_field("reason", &self.reason)?;
+        }
+        if !self.facts.is_empty() {
+            struct_ser.serialize_field("facts", &self.facts)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GcItem {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["repo", "name", "path", "class", "reason", "facts"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Repo,
+            Name,
+            Path,
+            Class,
+            Reason,
+            Facts,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "repo" => Ok(GeneratedField::Repo),
+                            "name" => Ok(GeneratedField::Name),
+                            "path" => Ok(GeneratedField::Path),
+                            "class" => Ok(GeneratedField::Class),
+                            "reason" => Ok(GeneratedField::Reason),
+                            "facts" => Ok(GeneratedField::Facts),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GcItem;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.GcItem")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GcItem, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut repo__ = None;
+                let mut name__ = None;
+                let mut path__ = None;
+                let mut class__ = None;
+                let mut reason__ = None;
+                let mut facts__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Path => {
+                            if path__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("path"));
+                            }
+                            path__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Class => {
+                            if class__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("class"));
+                            }
+                            class__ = Some(map_.next_value::<gc_item::Class>()? as i32);
+                        }
+                        GeneratedField::Reason => {
+                            if reason__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("reason"));
+                            }
+                            reason__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Facts => {
+                            if facts__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("facts"));
+                            }
+                            facts__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(GcItem {
+                    repo: repo__.unwrap_or_default(),
+                    name: name__.unwrap_or_default(),
+                    path: path__.unwrap_or_default(),
+                    class: class__.unwrap_or_default(),
+                    reason: reason__.unwrap_or_default(),
+                    facts: facts__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.GcItem", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for gc_item::Class {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "CLASS_UNSPECIFIED",
+            Self::Remove => "CLASS_REMOVE",
+            Self::Blocked => "CLASS_BLOCKED",
+            Self::Keep => "CLASS_KEEP",
+            Self::Never => "CLASS_NEVER",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for gc_item::Class {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "CLASS_UNSPECIFIED",
+            "CLASS_REMOVE",
+            "CLASS_BLOCKED",
+            "CLASS_KEEP",
+            "CLASS_NEVER",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl serde::de::Visitor<'_> for GeneratedVisitor {
+            type Value = gc_item::Class;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "CLASS_UNSPECIFIED" => Ok(gc_item::Class::Unspecified),
+                    "CLASS_REMOVE" => Ok(gc_item::Class::Remove),
+                    "CLASS_BLOCKED" => Ok(gc_item::Class::Blocked),
+                    "CLASS_KEEP" => Ok(gc_item::Class::Keep),
+                    "CLASS_NEVER" => Ok(gc_item::Class::Never),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for GcRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if self.offline {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcRequest", len)?;
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if self.offline {
+            struct_ser.serialize_field("offline", &self.offline)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GcRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["repo", "offline"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Repo,
+            Offline,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "repo" => Ok(GeneratedField::Repo),
+                            "offline" => Ok(GeneratedField::Offline),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GcRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.GcRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GcRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut repo__ = None;
+                let mut offline__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Offline => {
+                            if offline__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("offline"));
+                            }
+                            offline__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(GcRequest {
+                    repo: repo__.unwrap_or_default(),
+                    offline: offline__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.GcRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for GcResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.report_id.is_empty() {
+            len += 1;
+        }
+        if !self.items.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcResponse", len)?;
+        if !self.report_id.is_empty() {
+            struct_ser.serialize_field("reportId", &self.report_id)?;
+        }
+        if !self.items.is_empty() {
+            struct_ser.serialize_field("items", &self.items)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GcResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["report_id", "reportId", "items"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            ReportId,
+            Items,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "reportId" | "report_id" => Ok(GeneratedField::ReportId),
+                            "items" => Ok(GeneratedField::Items),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GcResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.GcResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<GcResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut report_id__ = None;
+                let mut items__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::ReportId => {
+                            if report_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("reportId"));
+                            }
+                            report_id__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Items => {
+                            if items__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("items"));
+                            }
+                            items__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(GcResponse {
+                    report_id: report_id__.unwrap_or_default(),
+                    items: items__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.GcResponse", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for InitRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

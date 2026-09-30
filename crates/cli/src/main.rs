@@ -4,6 +4,7 @@
 //! success, 3 for bad arguments, 9 for a failed precondition, and so on.
 
 mod clone;
+mod gc;
 mod init;
 mod landing;
 mod ls;
@@ -52,6 +53,17 @@ enum Command {
         /// Make a jj-only clone. By default the clone is a git repo too (colocated).
         #[arg(long)]
         no_colocate: bool,
+    },
+
+    /// Report which trees may be removed and whether each is safe to remove, and save the report
+    /// for `mori gc apply`. Changes no tree.
+    Gc {
+        /// Only this repo, in any form `mori clone` accepts.
+        repo: Option<String>,
+
+        /// Don't fetch or ask GitHub; use only what the clones already know.
+        #[arg(long)]
+        offline: bool,
     },
 
     /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
@@ -169,6 +181,12 @@ fn main() -> ExitCode {
         } => match skills::sync(dry_run) {
             Ok(response) => {
                 output::success(cli.json, &response, output::skills_text(&response).as_str())
+            }
+            Err(error) => output::failure(cli.json, error.as_ref()),
+        },
+        Command::Gc { repo, offline } => match gc::run(repo.as_deref(), offline) {
+            Ok(response) => {
+                output::success(cli.json, &response, output::gc_text(&response).as_str())
             }
             Err(error) => output::failure(cli.json, error.as_ref()),
         },

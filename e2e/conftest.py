@@ -18,6 +18,7 @@ from pytest_bdd import given, parsers, then, when
 pytest_plugins = [
     "init_steps",
     "clone_steps",
+    "gc_steps",
     "ls_steps",
     "remove_steps",
     "skills_steps",
@@ -60,6 +61,8 @@ def env(tmp_path: Path) -> dict[str, str]:
     return {
         "PATH": f"{jj_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
         "JJ_CONFIG": str(jj_config),
+        # Never ask the real GitHub: with no gh, "PR merged" is unknown, as offline.
+        "MORI_GH": "/nonexistent/gh",
     }
 
 
