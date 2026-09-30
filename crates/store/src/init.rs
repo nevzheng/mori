@@ -4,6 +4,7 @@
 //! Nothing here overwrites or removes anything that existed before. If a step fails part way,
 //! what was created stays, and running `init` again plans only what is still missing.
 
+use std::collections::BTreeSet;
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
@@ -25,7 +26,7 @@ const CLONE_MARKERS: [&str; 2] = [".git", ".jj"];
 /// [`StoreError::NotADirectory`] if a file is where a directory must go, errors from opening an
 /// existing database, and I/O errors other than "not found".
 pub fn observe(paths: &Paths) -> Result<Observed, StoreError> {
-    let mut existing_dirs = std::collections::BTreeSet::new();
+    let mut existing_dirs = BTreeSet::new();
     for path in paths_to_observe(paths) {
         if is_dir(&path)? {
             existing_dirs.insert(path);
@@ -36,16 +37,19 @@ pub fn observe(paths: &Paths) -> Result<Observed, StoreError> {
         Err(error) if error.kind() == ErrorKind::NotFound => None,
         Err(source) => return Err(io(&paths.config_file, source)),
     };
-    let database_root = if exists(&paths.database)? {
-        Some(Database::open(&paths.database)?.root()?)
+    let (database_root, managed) = if exists(&paths.database)? {
+        let db = Database::open(&paths.database)?;
+        let managed = db.repos()?.into_iter().map(|repo| repo.remote).collect();
+        (Some(db.root()?), managed)
     } else {
-        None
+        (None, BTreeSet::new())
     };
     Ok(Observed {
         existing_dirs,
         config_text,
         database_root,
-        clones: clones(&paths.repos())?,
+        clones: find_clones(&paths.repos())?,
+        managed,
     })
 }
 
@@ -107,7 +111,11 @@ fn write_new(path: &Path, contents: &str, mode: u32) -> Result<(), StoreError> {
 
 /// Clone directories at `<repos>/<host>/<org>/<repo>`: those holding `.git` or `.jj`. Symlinks
 /// aren't followed.
-fn clones(repos: &Path) -> Result<Vec<PathBuf>, StoreError> {
+///
+/// # Errors
+///
+/// I/O errors other than "not found".
+pub fn find_clones(repos: &Path) -> Result<Vec<PathBuf>, StoreError> {
     let mut clones = Vec::new();
     for host in subdirs(repos)? {
         for org in subdirs(&host)? {
