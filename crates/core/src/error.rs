@@ -8,6 +8,8 @@ use std::path::PathBuf;
 pub enum Code {
     /// The caller passed something invalid.
     InvalidArgument,
+    /// Something the operation needs doesn't exist.
+    NotFound,
     /// Something the operation would create already exists.
     AlreadyExists,
     /// The system isn't in a state where the operation can run.
@@ -22,6 +24,7 @@ impl Code {
     pub fn name(self) -> &'static str {
         match self {
             Self::InvalidArgument => "INVALID_ARGUMENT",
+            Self::NotFound => "NOT_FOUND",
             Self::AlreadyExists => "ALREADY_EXISTS",
             Self::FailedPrecondition => "FAILED_PRECONDITION",
             Self::Internal => "INTERNAL",
@@ -33,6 +36,7 @@ impl Code {
     pub fn number(self) -> i32 {
         match self {
             Self::InvalidArgument => 3,
+            Self::NotFound => 5,
             Self::AlreadyExists => 6,
             Self::FailedPrecondition => 9,
             Self::Internal => 13,
@@ -197,6 +201,33 @@ pub enum TreeError {
         /// Why not.
         why: String,
     },
+
+    /// No owner was given, and there is no login name to default to.
+    #[error("no owner for the tree: pass --agent, or set USER")]
+    OwnerUnknown,
+
+    /// mori already has a tree of this name in the repo.
+    #[error("mori already has a tree named {name:?} in this repo")]
+    TreeExists {
+        /// The name.
+        name: String,
+    },
+
+    /// The VCS has a workspace of this name that mori didn't make. mori leaves it alone.
+    #[error(
+        "the clone already has a workspace named {name:?} that mori didn't make; pick another task"
+    )]
+    WorkspaceExists {
+        /// The name.
+        name: String,
+    },
+
+    /// Something is already where the tree would go. mori never touches what it didn't make.
+    #[error("{} already exists and mori didn't make it", path.display())]
+    PathExists {
+        /// The path.
+        path: PathBuf,
+    },
 }
 
 impl TreeError {
@@ -208,12 +239,20 @@ impl ErrorDetails for TreeError {
     fn code(&self) -> Code {
         match self {
             Self::NameInvalid { .. } => Code::InvalidArgument,
+            Self::OwnerUnknown => Code::FailedPrecondition,
+            Self::TreeExists { .. } | Self::WorkspaceExists { .. } | Self::PathExists { .. } => {
+                Code::AlreadyExists
+            }
         }
     }
 
     fn reason(&self) -> &'static str {
         match self {
             Self::NameInvalid { .. } => "TREE_NAME_INVALID",
+            Self::OwnerUnknown => "OWNER_UNKNOWN",
+            Self::TreeExists { .. } => "TREE_EXISTS",
+            Self::WorkspaceExists { .. } => "WORKSPACE_EXISTS",
+            Self::PathExists { .. } => "PATH_EXISTS",
         }
     }
 
@@ -223,7 +262,11 @@ impl ErrorDetails for TreeError {
 
     fn metadata(&self) -> Vec<(&'static str, String)> {
         match self {
-            Self::NameInvalid { name, .. } => vec![("name", name.clone())],
+            Self::NameInvalid { name, .. }
+            | Self::TreeExists { name }
+            | Self::WorkspaceExists { name } => vec![("name", name.clone())],
+            Self::OwnerUnknown => vec![],
+            Self::PathExists { path } => vec![("path", path.display().to_string())],
         }
     }
 }
@@ -239,6 +282,13 @@ pub enum RepoError {
         url: String,
         /// What's wrong with it.
         why: String,
+    },
+
+    /// mori doesn't manage the repo: it never cloned it.
+    #[error("mori doesn't manage {repo}; clone it with `mori clone` first")]
+    NotManaged {
+        /// The repo.
+        repo: String,
     },
 
     /// mori already manages the repo.
@@ -292,6 +342,7 @@ impl ErrorDetails for RepoError {
     fn code(&self) -> Code {
         match self {
             Self::UrlInvalid { .. } => Code::InvalidArgument,
+            Self::NotManaged { .. } => Code::NotFound,
             Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
             Self::TreeDirTaken { .. } => Code::FailedPrecondition,
             Self::NotRecorded { .. } => Code::Internal,
@@ -301,6 +352,7 @@ impl ErrorDetails for RepoError {
     fn reason(&self) -> &'static str {
         match self {
             Self::UrlInvalid { .. } => "CLONE_URL_INVALID",
+            Self::NotManaged { .. } => "REPO_NOT_MANAGED",
             Self::RepoExists { .. } => "REPO_EXISTS",
             Self::PathExists { .. } => "PATH_EXISTS",
             Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
@@ -315,7 +367,9 @@ impl ErrorDetails for RepoError {
     fn metadata(&self) -> Vec<(&'static str, String)> {
         match self {
             Self::UrlInvalid { url, .. } => vec![("url", url.clone())],
-            Self::RepoExists { repo } | Self::TreeDirTaken { repo } => vec![("repo", repo.clone())],
+            Self::NotManaged { repo } | Self::RepoExists { repo } | Self::TreeDirTaken { repo } => {
+                vec![("repo", repo.clone())]
+            }
             Self::PathExists { repo, path } | Self::NotRecorded { repo, path, .. } => {
                 vec![("repo", repo.clone()), ("path", path.display().to_string())]
             }
