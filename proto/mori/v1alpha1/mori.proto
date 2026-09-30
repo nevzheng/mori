@@ -42,6 +42,10 @@ service MoriService {
   // judged again first, and skipped if anything changed; each removal pins the tree's commit and
   // goes into the journal, so `Restore` can bring it back.
   rpc GcApply(GcApplyRequest) returns (GcApplyResponse);
+
+  // Brings back a tree `GcApply` removed, from its journal entry: its workspace on the pinned
+  // commit, at its old path, recorded under its old ID. Says so if the commit is gone.
+  rpc Restore(RestoreRequest) returns (RestoreResponse);
 }
 
 // Request for `Init`.
@@ -442,4 +446,19 @@ message GcApplyItem {
 
   // The journal entry for a removal, for `Restore`.
   string entry_id = 5;
+}
+
+// Request for `Restore`.
+message RestoreRequest {
+  // The journal entry, from `GcApply`.
+  string entry_id = 1;
+}
+
+// Response for `Restore`.
+message RestoreResponse {
+  // The tree, back under its old ID.
+  Tree tree = 1;
+
+  // The commit it was restored on.
+  string commit_id = 2;
 }

@@ -9,8 +9,8 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, GcApplyResponse, GcResponse, InitResponse,
-    ListTreesResponse, RemoveTreeResponse, SyncSkillsResponse, TreeRow, skill_file::Action,
-    tree_row::Status,
+    ListTreesResponse, RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow,
+    skill_file::Action, tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -364,6 +364,18 @@ pub fn gc_apply_text(response: &GcApplyResponse) -> String {
             }
         };
         let _ = writeln!(text, "  {} {}: {what}", item.repo, item.name);
+    }
+    text
+}
+
+/// The text `restore` prints.
+pub fn restore_text(response: &RestoreResponse) -> String {
+    let mut text = String::new();
+    if let Some(tree) = &response.tree {
+        let _ = writeln!(text, "Restored tree {}:", tree.name);
+        let _ = writeln!(text, "  path: {}", tree.path);
+        let _ = writeln!(text, "  on commit: {}", response.commit_id);
+        let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     }
     text
 }

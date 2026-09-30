@@ -570,3 +570,20 @@ pub mod gc_apply_item {
         }
     }
 }
+/// Request for `Restore`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct RestoreRequest {
+    /// The journal entry, from `GcApply`.
+    #[prost(string, tag = "1")]
+    pub entry_id: ::prost::alloc::string::String,
+}
+/// Response for `Restore`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct RestoreResponse {
+    /// The tree, back under its old ID.
+    #[prost(message, optional, tag = "1")]
+    pub tree: ::core::option::Option<Tree>,
+    /// The commit it was restored on.
+    #[prost(string, tag = "2")]
+    pub commit_id: ::prost::alloc::string::String,
+}

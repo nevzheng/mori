@@ -282,6 +282,54 @@ impl Database {
         rows.collect::<Result<_, _>>().map_err(sqlite)
     }
 
+    /// Records a restored tree under its old ID, so it is the same tree coming back.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::AlreadyRecorded`] if the ID or the name is taken (nothing is written),
+    /// otherwise a SQLite error.
+    pub fn restore_tree(
+        &mut self,
+        repo_id: &str,
+        tree_id: &str,
+        tree: &NewTree,
+    ) -> Result<TreeRecord, StoreError> {
+        let path = self.path.clone();
+        let sqlite = |source: rusqlite::Error| {
+            if is_key_clash(&source) {
+                StoreError::AlreadyRecorded {
+                    path: path.clone(),
+                    what: format!("tree {} ({tree_id})", tree.name),
+                }
+            } else {
+                StoreError::Sqlite {
+                    path: path.clone(),
+                    source,
+                }
+            }
+        };
+        self.conn
+            .query_row(
+                &format!(
+                    "INSERT INTO trees
+                         (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, {NOW}, {NOW})
+                     RETURNING {TREE_COLUMNS}"
+                ),
+                params![
+                    tree_id,
+                    repo_id,
+                    tree.name,
+                    tree.role,
+                    tree.owner,
+                    tree.task,
+                    tree.lifetime
+                ],
+                tree_record,
+            )
+            .map_err(sqlite)
+    }
+
     /// The recorded repo with identity `remote`, if any.
     ///
     /// # Errors
@@ -586,5 +634,25 @@ mod tests {
 
         assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
         assert_eq!(db.tree_bookmarks(&tree.id).unwrap(), []);
+    }
+
+    #[test]
+    fn a_restored_tree_keeps_its_old_id() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        let tree = db
+            .record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+        db.delete_tree(&repo.id, "claude-fix-login").unwrap();
+
+        let back = db
+            .restore_tree(&repo.id, &tree.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        assert_eq!(back.id, tree.id);
+        let again = db
+            .restore_tree(&repo.id, &tree.id, &task_tree("claude-fix-login"))
+            .unwrap_err();
+        assert_eq!(again.reason(), "ALREADY_RECORDED");
     }
 }

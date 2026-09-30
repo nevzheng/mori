@@ -1,6 +1,7 @@
 """Steps for CUJ 6, the cleanup report (spec/cuj/06-gc.feature)."""
 
 import json
+import sqlite3
 import subprocess
 
 import pytest
@@ -89,3 +90,51 @@ def says_kept_unsaved(mori: Mori, name: str) -> None:
     assert_that(
         mori.last.stdout, contains_string(f"{name}: kept: it has work only this machine has")
     )
+
+
+# Restoring
+
+
+@given("I have applied the report")
+def applied(mori: Mori, cleanup: dict[str, str]) -> None:
+    result = mori.run(f"mori gc apply {cleanup['id']} --yes --json")
+    if result.returncode != 0:
+        pytest.fail(f"setup: mori gc apply exited {result.returncode}\n{result.stderr}")
+    removed = [
+        item for item in json.loads(result.stdout)["items"] if item["outcome"] == "OUTCOME_REMOVED"
+    ]
+    assert removed, result.stdout
+    cleanup["entry"] = removed[0]["entryId"]
+
+
+@given("I have restored the removed tree")
+def restored(mori: Mori, cleanup: dict[str, str]) -> None:
+    result = mori.run(f"mori restore {cleanup['entry']}")
+    if result.returncode != 0:
+        pytest.fail(f"setup: mori restore exited {result.returncode}\n{result.stderr}")
+
+
+@given("the removed tree's commit is gone from the clone")
+def commit_gone(placeholders: Placeholders, cleanup: dict[str, str]) -> None:
+    # Point the entry at a commit the clone never had: the same as its commit being collected.
+    journal = placeholders.path("$XDG_STATE_HOME/mori/journal.jsonl")
+    entries = [json.loads(line) for line in journal.read_text().splitlines()]
+    for entry in entries:
+        if entry["id"] == cleanup["entry"]:
+            entry["commit_id"] = "0123456789abcdef0123456789abcdef01234567"
+    journal.write_text("".join(json.dumps(entry) + "\n" for entry in entries))
+
+
+@when("I restore the removed tree")
+def restore(mori: Mori, cleanup: dict[str, str]) -> None:
+    mori.run(f"mori restore {cleanup['entry']}")
+
+
+@then(parsers.parse('mori records the tree "{name}" under its old ID'))
+def old_id(placeholders: Placeholders, name: str) -> None:
+    journal = placeholders.path("$XDG_STATE_HOME/mori/journal.jsonl").read_text().splitlines()
+    old = next(json.loads(line) for line in journal if json.loads(line)["name"] == name)
+    database = placeholders.path("$XDG_STATE_HOME/mori/mori.db")
+    with sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True) as db:
+        (tree_id,) = db.execute("SELECT id FROM trees WHERE name = ?", (name,)).fetchone()
+    assert_that(tree_id, equal_to(old["tree_id"]))
