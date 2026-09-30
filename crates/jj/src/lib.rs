@@ -1,7 +1,8 @@
 //! mori's jj backend, driving the `jj` CLI.
 //!
 //! Reads pass `--ignore-working-copy`, so jj doesn't even snapshot a working copy while mori looks.
-//! The only write so far is [`JjCli::clone_repo`], which makes a new directory and nothing else.
+//! The writes, [`JjCli::clone_repo`] and [`JjCli::add_workspace`], each make one new directory and
+//! clean up after themselves if jj fails.
 
 use std::ffi::OsString;
 use std::io::ErrorKind;
@@ -87,6 +88,54 @@ impl JjCli {
         let _ = std::fs::remove_dir_all(path);
         Err(JjError::Failed {
             clone: path.to_path_buf(),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        })
+    }
+
+    /// Adds a workspace named `name` to the clone at `clone`, with its working copy at `path` (which
+    /// must not exist) on a new change on top of `from`, a jj revset such as `trunk()`.
+    ///
+    /// If jj fails, whatever it left is undone: the directory is removed and a workspace it
+    /// registered is forgotten. This call created both, so no one else's work is there.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::DestinationExists`] if anything is at `path` (it is left alone),
+    /// [`JjError::Failed`] with jj's message if jj fails (for example, `from` matches nothing),
+    /// [`JjError::NotFound`] if jj isn't installed.
+    pub fn add_workspace(
+        &self,
+        clone: &Path,
+        name: &str,
+        path: &Path,
+        from: &str,
+    ) -> Result<(), JjError> {
+        if path.symlink_metadata().is_ok() {
+            return Err(JjError::DestinationExists {
+                path: path.to_path_buf(),
+            });
+        }
+        let output = self
+            .command()
+            .args(["--no-pager", "--color=never", "--repository"])
+            .arg(clone)
+            .args(["workspace", "add", "--name", name, "--revision", from, "--"])
+            .arg(path)
+            .output()
+            .map_err(|source| self.spawn_error(source))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        // Best effort: jj already failed, and that is the error worth reporting.
+        let _ = std::fs::remove_dir_all(path);
+        let _ = self
+            .command()
+            .args(["--no-pager", "--color=never", "--repository"])
+            .arg(clone)
+            .args(["workspace", "forget", "--", name])
+            .output();
+        Err(JjError::Failed {
+            clone: clone.to_path_buf(),
             stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
         })
     }
@@ -468,5 +517,70 @@ mod tests {
         assert_eq!(error.reason(), "JJ_FAILED");
         assert!(!clone.exists());
         Ok(())
+    }
+
+    /// A clone of [`source_repo`], so `trunk()` resolves to its `main`.
+    fn cloned(jj: &JjCli, dir: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let source = source_repo(jj, dir)?;
+        let clone = dir.join("widget");
+        jj.clone_repo(&source.display().to_string(), &clone, true)?;
+        Ok(clone)
+    }
+
+    #[test]
+    fn adds_a_workspace_on_trunk() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("trees").join("claude-fix-login");
+        std::fs::create_dir(dir.path().join("trees"))?;
+
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+
+        assert_eq!(std::fs::read_to_string(tree.join("README.md"))?, "widget\n");
+        let mut names: Vec<_> = jj.list(&clone)?.into_iter().map(|w| w.name).collect();
+        names.sort();
+        assert_eq!(names, ["claude-fix-login", "default"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_failed_add_leaves_nothing_behind() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("claude-fix-login");
+
+        let error = jj
+            .add_workspace(&clone, "claude-fix-login", &tree, "no_such_bookmark")
+            .unwrap_err();
+
+        assert_eq!(error.reason(), "JJ_FAILED");
+        assert!(!tree.exists());
+        let names: Vec<_> = jj.list(&clone)?.into_iter().map(|w| w.name).collect();
+        assert_eq!(names, ["default"]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_existing_tree_path_is_refused_and_left_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let tree = dir.path().join("claude-fix-login");
+        std::fs::create_dir(&tree).unwrap();
+        std::fs::write(tree.join("notes.txt"), "someone's work").unwrap();
+
+        let error = JjCli::new("/nonexistent/jj")
+            .add_workspace(dir.path(), "claude-fix-login", &tree, "trunk()")
+            .unwrap_err();
+
+        assert_eq!(error.reason(), "PATH_EXISTS");
+        assert_eq!(
+            std::fs::read_to_string(tree.join("notes.txt")).unwrap(),
+            "someone's work"
+        );
     }
 }
