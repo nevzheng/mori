@@ -228,6 +228,38 @@ impl Workspaces for JjCli {
     }
 
     fn state(&self, clone: &Path, name: &str) -> Result<TreeState, JjError> {
+        self.state_covering(clone, name, &[])
+    }
+}
+
+/// A remote bookmark and the commit it points to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RemoteBookmark {
+    /// The bookmark, e.g. `claude/fix-login`.
+    pub name: String,
+    /// The remote, e.g. `origin`.
+    pub remote: String,
+    /// The full commit ID it points to.
+    pub commit_id: String,
+}
+
+/// Lists remote bookmarks as tab-separated name, remote and commit ID. A conflicted bookmark
+/// has no single target and is left out.
+const REMOTE_BOOKMARK_TEMPLATE: &str = r#"if(remote && normal_target, name ++ "\t" ++ remote ++ "\t" ++ normal_target.commit_id() ++ "\n")"#;
+
+impl JjCli {
+    /// Like [`Workspaces::state`], but changes that are ancestors of any of `landed` (commit IDs
+    /// of work that landed, e.g. a squash-merged bookmark's last target) count as saved too.
+    ///
+    /// # Errors
+    ///
+    /// As [`Workspaces::state`].
+    pub fn state_covering(
+        &self,
+        clone: &Path,
+        name: &str,
+        landed: &[String],
+    ) -> Result<TreeState, JjError> {
         let working_copy = format!("{}@", revset_string(name));
         let head = self.read(
             clone,
@@ -240,19 +272,106 @@ impl Workspaces for JjCli {
                 STATE_TEMPLATE,
             ],
         )?;
+        let saved = std::iter::once("remote_bookmarks() | trunk()".to_owned())
+            .chain(landed.iter().map(|commit| revset_string(commit)))
+            .collect::<Vec<_>>()
+            .join(" | ");
         let unpushed = self.read(
             clone,
             &[
                 "log",
                 "--no-graph",
                 "-r",
-                &format!("(::{working_copy} ~ ::(remote_bookmarks() | trunk())) ~ empty()"),
+                &format!("(::{working_copy} ~ ::({saved})) ~ empty()"),
                 "-T",
                 r#"change_id.short() ++ "\n""#,
             ],
         )?;
         parse_state(&head, &unpushed)
     }
+
+    /// The remote bookmarks pointing into the tree's own history (its changes not in trunk).
+    /// The colocated `git` pseudo-remote is left out.
+    ///
+    /// # Errors
+    ///
+    /// When jj can't be run or its answer can't be read.
+    pub fn pushed_bookmarks(
+        &self,
+        clone: &Path,
+        name: &str,
+    ) -> Result<Vec<RemoteBookmark>, JjError> {
+        let own = format!("::{}@ ~ ::trunk()", revset_string(name));
+        let stdout = self.read(
+            clone,
+            &[
+                "bookmark",
+                "list",
+                "--all-remotes",
+                "-r",
+                &own,
+                "-T",
+                REMOTE_BOOKMARK_TEMPLATE,
+            ],
+        )?;
+        parse_remote_bookmarks(&stdout)
+    }
+
+    /// When the tree last changed: the latest committer time among its own changes and its
+    /// working copy, in seconds since the Unix epoch.
+    ///
+    /// # Errors
+    ///
+    /// When jj can't be run or its answer can't be read.
+    pub fn last_change(&self, clone: &Path, name: &str) -> Result<u64, JjError> {
+        let working_copy = format!("{}@", revset_string(name));
+        let stdout = self.read(
+            clone,
+            &[
+                "log",
+                "--no-graph",
+                "-r",
+                &format!("latest((::{working_copy} ~ ::trunk()) | {working_copy})"),
+                "-T",
+                r#"committer.timestamp().utc().format("%s") ++ "\n""#,
+            ],
+        )?;
+        stdout.trim().parse().map_err(|_| JjError::OutputInvalid {
+            output: stdout.clone(),
+        })
+    }
+
+    /// Fetches the clone's remotes, so its remote bookmarks are current. Changes only jj's
+    /// record of the remote.
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::Failed`] with jj's message (for example, no network).
+    pub fn fetch(&self, clone: &Path) -> Result<(), JjError> {
+        self.write(clone, &["git", "fetch"])
+    }
+}
+
+/// Parses [`REMOTE_BOOKMARK_TEMPLATE`] output, leaving out the `git` pseudo-remote.
+fn parse_remote_bookmarks(stdout: &str) -> Result<Vec<RemoteBookmark>, JjError> {
+    stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.split('\t').collect();
+            match parts[..] {
+                [_, "git", _] => None,
+                [name, remote, commit_id] => Some(Ok(RemoteBookmark {
+                    name: name.to_owned(),
+                    remote: remote.to_owned(),
+                    commit_id: commit_id.to_owned(),
+                })),
+                _ => Some(Err(JjError::OutputInvalid {
+                    output: line.to_owned(),
+                })),
+            }
+        })
+        .collect()
 }
 
 /// Prints the working-copy change's ID and whether it has edits.
@@ -777,6 +896,123 @@ mod tests {
         let names: Vec<_> = jj.list(&clone)?.into_iter().map(|w| w.name).collect();
         assert_eq!(names, ["default"]);
         assert!(tree.join("README.md").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn remote_bookmark_lines_parse_without_the_git_pseudo_remote() {
+        let stdout = "main\tgit\taaaa\nclaude/fix-login\torigin\tbbbb\n";
+
+        assert_eq!(
+            parse_remote_bookmarks(stdout).unwrap(),
+            [RemoteBookmark {
+                name: "claude/fix-login".to_owned(),
+                remote: "origin".to_owned(),
+                commit_id: "bbbb".to_owned(),
+            }]
+        );
+        assert!(parse_remote_bookmarks("just-a-name\n").is_err());
+    }
+
+    /// A clone of [`source_repo`] with a tree `claude-fix-login` holding one committed change.
+    fn tree_with_a_commit(
+        jj: &JjCli,
+        dir: &Path,
+    ) -> Result<(PathBuf, PathBuf), Box<dyn std::error::Error>> {
+        let clone = cloned(jj, dir)?;
+        let tree = dir.join("claude-fix-login");
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+        std::fs::write(tree.join("login.rs"), "fn login() {}\n")?;
+        let tree_arg = tree.display().to_string();
+        run(
+            jj,
+            &["--repository", &tree_arg, "commit", "--message", "login"],
+        )?;
+        Ok((clone, tree))
+    }
+
+    #[test]
+    fn pushed_bookmarks_and_landed_work() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let (clone, tree) = tree_with_a_commit(&jj, dir.path())?;
+        let tree_arg = tree.display().to_string();
+        assert_eq!(jj.pushed_bookmarks(&clone, "claude-fix-login")?, []);
+        assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 1);
+
+        run(
+            &jj,
+            &[
+                "--repository",
+                &tree_arg,
+                "bookmark",
+                "create",
+                "claude/fix-login",
+                "-r",
+                "@-",
+            ],
+        )?;
+        run(
+            &jj,
+            &[
+                "--repository",
+                &tree_arg,
+                "git",
+                "push",
+                "--bookmark",
+                "claude/fix-login",
+            ],
+        )?;
+        let pushed = jj.pushed_bookmarks(&clone, "claude-fix-login")?;
+        assert_eq!(pushed.len(), 1);
+        assert_eq!(pushed[0].name, "claude/fix-login");
+        assert_eq!(pushed[0].remote, "origin");
+        assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 0);
+
+        // The remote deletes the bookmark (as after a squash merge): the work is only local again,
+        // unless the commit the bookmark last pointed to counts as landed.
+        run(
+            &jj,
+            &[
+                "--repository",
+                &tree_arg,
+                "bookmark",
+                "delete",
+                "claude/fix-login",
+            ],
+        )?;
+        run(
+            &jj,
+            &["--repository", &tree_arg, "git", "push", "--deleted"],
+        )?;
+        jj.fetch(&clone)?;
+        assert_eq!(jj.pushed_bookmarks(&clone, "claude-fix-login")?, []);
+        assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 1);
+        let landed = [pushed[0].commit_id.clone()];
+        assert_eq!(
+            jj.state_covering(&clone, "claude-fix-login", &landed)?
+                .unpushed,
+            0
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn last_change_is_a_recent_epoch_time() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let (clone, _) = tree_with_a_commit(&jj, dir.path())?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        let changed = jj.last_change(&clone, "claude-fix-login")?;
+
+        assert!(now.abs_diff(changed) < 3600, "{changed} vs {now}");
         Ok(())
     }
 }
