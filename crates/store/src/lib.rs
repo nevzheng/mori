@@ -5,5 +5,6 @@ pub mod database;
 mod error;
 pub mod init;
 pub mod records;
+pub mod skills;
 
 pub use error::StoreError;

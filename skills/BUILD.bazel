@@ -1,0 +1,6 @@
+# mori's agent skills, embedded in the binary by //crates/store (see crates/store/src/skills.rs).
+filegroup(
+    name = "files",
+    srcs = glob(["**/SKILL.md"]) + ["llms.txt"],
+    visibility = ["//crates/store:__pkg__"],
+)
