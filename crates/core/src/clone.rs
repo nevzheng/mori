@@ -167,6 +167,45 @@ pub fn clone_path(paths: &Paths, repo: &RepoId) -> PathBuf {
         .join(&repo.name)
 }
 
+/// Which repo `arg` names. Any form `mori clone` accepts names that repo, managed or not;
+/// otherwise `arg` is a short name, `<repo>` or `<owner>/<repo>`, matched against the repos mori
+/// manages (`managed`).
+///
+/// # Errors
+///
+/// [`RepoError::UrlInvalid`] if `arg` looks like a URL but isn't one mori accepts,
+/// [`RepoError::Ambiguous`] if a short name matches more than one managed repo, and
+/// [`RepoError::NotManaged`] if it matches none.
+pub fn resolve_repo(arg: &str, managed: &[RepoId]) -> Result<RepoId, RepoError> {
+    let parse_error = match CloneUrl::parse(arg) {
+        Ok(url) => return Ok(url.repo),
+        Err(error) => error,
+    };
+    if arg.contains(':') || arg.trim_end_matches('/').matches('/').count() > 1 {
+        return Err(parse_error);
+    }
+    let wanted = arg.trim_end_matches('/').to_ascii_lowercase();
+    let mut candidates: Vec<&RepoId> = managed
+        .iter()
+        .filter(|repo| match wanted.split_once('/') {
+            Some((owner, name)) => repo.owner == owner && repo.name == name,
+            None => repo.name == wanted,
+        })
+        .collect();
+    candidates.sort();
+    candidates.dedup();
+    match candidates.as_slice() {
+        [one] => Ok((*one).clone()),
+        [] => Err(RepoError::NotManaged {
+            repo: arg.to_owned(),
+        }),
+        many => Err(RepoError::Ambiguous {
+            name: arg.to_owned(),
+            candidates: many.iter().map(ToString::to_string).collect(),
+        }),
+    }
+}
+
 /// Plans `clone` from what the adapter observed.
 ///
 /// # Errors
@@ -366,5 +405,66 @@ mod tests {
 
         assert_eq!(error, RepoError::ColocateNeedsJj);
         assert_eq!(error.reason(), "COLOCATE_NEEDS_JJ");
+    }
+
+    fn managed() -> Vec<RepoId> {
+        [
+            "github.com/acme/widget",
+            "github.com/acme/gadget",
+            "gitlab.com/other/widget",
+        ]
+        .iter()
+        .map(|repo| CloneUrl::parse(repo).unwrap().repo)
+        .collect()
+    }
+
+    #[test]
+    fn a_full_name_always_resolves() {
+        let repo = resolve_repo("github.com/acme/unmanaged", &managed()).unwrap();
+
+        assert_eq!(repo.to_string(), "github.com/acme/unmanaged");
+    }
+
+    #[test]
+    fn a_unique_short_name_resolves() {
+        assert_eq!(
+            resolve_repo("gadget", &managed()).unwrap().to_string(),
+            "github.com/acme/gadget"
+        );
+        assert_eq!(
+            resolve_repo("Other/Widget", &managed())
+                .unwrap()
+                .to_string(),
+            "gitlab.com/other/widget"
+        );
+    }
+
+    #[test]
+    fn an_ambiguous_short_name_lists_the_candidates() {
+        let error = resolve_repo("widget", &managed()).unwrap_err();
+
+        assert_eq!(error.reason(), "REPO_AMBIGUOUS");
+        assert_eq!(error.code(), Code::InvalidArgument);
+        assert!(error.to_string().contains("github.com/acme/widget"));
+        assert!(error.to_string().contains("gitlab.com/other/widget"));
+    }
+
+    #[test]
+    fn a_bad_url_is_still_a_bad_url() {
+        for arg in [
+            "http://github.com/acme/widget",
+            "github.com/acme/widget/extra",
+        ] {
+            let error = resolve_repo(arg, &managed()).unwrap_err();
+
+            assert_eq!(error.reason(), "CLONE_URL_INVALID", "for {arg}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_short_name_is_not_managed() {
+        let error = resolve_repo("nothing", &managed()).unwrap_err();
+
+        assert_eq!(error.reason(), "REPO_NOT_MANAGED");
     }
 }

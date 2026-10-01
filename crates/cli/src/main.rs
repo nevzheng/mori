@@ -62,7 +62,7 @@ enum Command {
     /// also remove a batch of them: each is checked again first, and each removal is journalled,
     /// so `mori restore` can undo it.
     Gc {
-        /// Only this repo, in any form `mori clone` accepts.
+        /// Only this repo: its full name, any form `mori clone` accepts, or a unique short name.
         repo: Option<String>,
 
         /// Don't fetch or ask GitHub; use only what the clones already know.
@@ -98,7 +98,7 @@ enum Command {
     /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
     /// only on this machine. Reads only; never snapshots a working copy.
     Ls {
-        /// Only this repo, in any form `mori clone` accepts.
+        /// Only this repo: its full name, any form `mori clone` accepts, or a unique short name.
         repo: Option<String>,
 
         /// Show how much disk each tree uses. Walks every file, so it can take a while; sizes
@@ -115,7 +115,7 @@ enum Command {
     /// problem with the command that fixes it. Reads only, unless --fix --yes repairs the safe
     /// ones (removals are journalled for `mori restore`). Findings don't change the exit code.
     Doctor {
-        /// Only this repo, in any form `mori clone` accepts.
+        /// Only this repo: its full name, any form `mori clone` accepts, or a unique short name.
         repo: Option<String>,
 
         /// Repair the auto-fixable findings (needs --yes).
@@ -167,7 +167,7 @@ enum TreeCommand {
     /// Give one task its own tree: a jj workspace under trees/<repo>/, on a new change on top of
     /// trunk, recorded with its owner, task and lifetime.
     Create {
-        /// The repo, in any form `mori clone` accepts, e.g. github.com/acme/widget.
+        /// The repo: its full name (github.com/acme/widget), or a unique short name (widget).
         repo: String,
 
         /// A short slug for the work: lowercase letters, digits and hyphens.
@@ -196,7 +196,7 @@ enum TreeCommand {
     /// change missing from the remote. Never removes the clone itself or a workspace mori didn't
     /// make.
     Remove {
-        /// The repo, in any form `mori clone` accepts.
+        /// The repo: its full name, or a unique short name.
         repo: String,
 
         /// The tree's name, e.g. claude-fix-login.

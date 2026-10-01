@@ -360,10 +360,19 @@ pub enum RepoError {
     },
 
     /// mori doesn't manage the repo: it never cloned it.
-    #[error("mori doesn't manage {repo}; clone it with `mori clone` first")]
+    #[error("mori doesn't manage {repo}; `mori ls` lists the repos it does, `mori clone` adds one")]
     NotManaged {
         /// The repo.
         repo: String,
+    },
+
+    /// A short repo name matches more than one repo mori manages.
+    #[error("{name:?} could be any of {}; use the full name", candidates.join(", "))]
+    Ambiguous {
+        /// The name given.
+        name: String,
+        /// The repos it matches.
+        candidates: Vec<String>,
     },
 
     /// mori already manages the repo.
@@ -420,7 +429,9 @@ impl RepoError {
 impl ErrorDetails for RepoError {
     fn code(&self) -> Code {
         match self {
-            Self::UrlInvalid { .. } | Self::ColocateNeedsJj => Code::InvalidArgument,
+            Self::UrlInvalid { .. } | Self::ColocateNeedsJj | Self::Ambiguous { .. } => {
+                Code::InvalidArgument
+            }
             Self::NotManaged { .. } => Code::NotFound,
             Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
             Self::TreeDirTaken { .. } => Code::FailedPrecondition,
@@ -437,6 +448,7 @@ impl ErrorDetails for RepoError {
             Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
             Self::NotRecorded { .. } => "CLONE_NOT_RECORDED",
             Self::ColocateNeedsJj => "COLOCATE_NEEDS_JJ",
+            Self::Ambiguous { .. } => "REPO_AMBIGUOUS",
         }
     }
 
@@ -454,6 +466,9 @@ impl ErrorDetails for RepoError {
                 vec![("repo", repo.clone()), ("path", path.display().to_string())]
             }
             Self::ColocateNeedsJj => vec![],
+            Self::Ambiguous { name, candidates } => {
+                vec![("name", name.clone()), ("candidates", candidates.join(","))]
+            }
         }
     }
 }

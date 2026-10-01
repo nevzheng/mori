@@ -126,7 +126,9 @@ of trunk, or in a git clone a detached git worktree at trunk; recorded with its 
 lifetime. Work in that directory; it is yours.
 
 - **`<repo>`** is the full `host/owner/repo` that `mori ls` prints, e.g.
-  `github.com/acme/widget`; `widget` alone is refused.
+  `github.com/acme/widget`, or a short name (`widget`, `acme/widget`) when exactly one managed repo
+  has it. An ambiguous short name is refused (`REPO_AMBIGUOUS`) with the full names to choose
+  from.
 - **`--agent <name>`**: who the tree is for, e.g. `claude`. Always pass it when you are an agent,
   unless your harness sets `MORI_AGENT`; without either, the owner is the person's login name.
 - **`--task <slug>`**: lowercase letters, digits and hyphens, e.g. `fix-login`. The tree's name is
@@ -239,6 +241,7 @@ error is a `google.rpc.Status`:
 | 3    | `INVALID_USAGE`         | Bad flags or arguments. Check `mori <command> --help`.                          |
 | 3    | `CLONE_URL_INVALID`     | The URL isn't a form mori accepts. Use one of the forms above.                  |
 | 3    | `COLOCATE_NEEDS_JJ`     | `--no-colocate` with `--vcs git`. A git clone is always git; drop one flag.     |
+| 3    | `REPO_AMBIGUOUS`        | A short repo name fits several repos. Use one of the full names it lists.       |
 | 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.      |
 | 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.         |
 | 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                          |
