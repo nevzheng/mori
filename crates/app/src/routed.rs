@@ -139,6 +139,15 @@ impl<J: Adapter, G: Adapter> Vcs for Routed<J, G> {
     fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, Self::Error> {
         route!(self, clone, |vcs| vcs.remote_bookmarks(clone))
     }
+
+    fn conflicted_bookmarks(&self, clone: &Path) -> Result<Vec<String>, Self::Error> {
+        route!(self, clone, |vcs| vcs.conflicted_bookmarks(clone))
+    }
+
+    /// Both backends can be run.
+    fn available(&self) -> bool {
+        self.jj.available() && self.git.available()
+    }
 }
 
 impl<J: Adapter, G: Adapter> Backend for Routed<J, G> {
@@ -159,6 +168,17 @@ impl<J: Adapter, G: Adapter> Backend for Routed<J, G> {
                 .clone_repo(url, path, colocate)
                 .map_err(RoutedError::Git),
         }
+    }
+
+    fn missing_tools(&self, needed: &[VcsKind]) -> Vec<VcsKind> {
+        needed
+            .iter()
+            .copied()
+            .filter(|kind| match kind {
+                VcsKind::Jj => !self.jj.available(),
+                VcsKind::Git => !self.git.available(),
+            })
+            .collect()
     }
 }
 

@@ -43,6 +43,10 @@ service MoriService {
   // Brings back a tree `Gc` removed, from its journal entry: its workspace on the pinned
   // commit, at its old path, recorded under its old ID. Says so if the commit is gone.
   rpc Restore(RestoreRequest) returns (RestoreResponse);
+
+  // Checks the root, every clone and every tree against the VCS and the disk, and lists each
+  // problem with the command that fixes it. Reads only.
+  rpc Doctor(DoctorRequest) returns (DoctorResponse);
 }
 
 // Request for `Init`.
@@ -482,4 +486,52 @@ message RestoreResponse {
 
   // The commit it was restored on.
   string commit_id = 2;
+}
+
+// Request for `Doctor`.
+message DoctorRequest {
+  // Only this repo, in any form `Clone` accepts. Empty: the whole root.
+  string repo = 1;
+}
+
+// Response for `Doctor`.
+message DoctorResponse {
+  // Everything found, worst first. Empty when the root is healthy.
+  repeated Finding findings = 1;
+
+  // One line: how many problems, and how many `mori doctor --fix --yes` would repair.
+  string summary = 2;
+}
+
+// One problem, or one thing worth knowing, that doctor found.
+message Finding {
+  // How bad a finding is.
+  enum Severity {
+    // Not set.
+    SEVERITY_UNSPECIFIED = 0;
+    // Worth knowing; nothing is wrong.
+    SEVERITY_INFO = 1;
+    // Something is off, and mori still works.
+    SEVERITY_WARN = 2;
+    // Something mori or the VCS will trip over.
+    SEVERITY_PROBLEM = 3;
+  }
+
+  // Stable, UPPER_SNAKE_CASE, e.g. "TREE_DIR_GONE".
+  string code = 1;
+
+  // How bad it is.
+  Severity severity = 2;
+
+  // What it is about: "root", a repo, "<repo> <tree>", or a path.
+  string subject = 3;
+
+  // What is wrong, in a sentence.
+  string message = 4;
+
+  // What fixes it: a command, or what to do by hand.
+  string fix = 5;
+
+  // True if `mori doctor --fix --yes` repairs it.
+  bool auto_fixable = 6;
 }

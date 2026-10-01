@@ -589,6 +589,85 @@ pub struct RestoreResponse {
     #[prost(string, tag = "2")]
     pub commit_id: ::prost::alloc::string::String,
 }
+/// Request for `Doctor`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct DoctorRequest {
+    /// Only this repo, in any form `Clone` accepts. Empty: the whole root.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+}
+/// Response for `Doctor`.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DoctorResponse {
+    /// Everything found, worst first. Empty when the root is healthy.
+    #[prost(message, repeated, tag = "1")]
+    pub findings: ::prost::alloc::vec::Vec<Finding>,
+    /// One line: how many problems, and how many `mori doctor --fix --yes` would repair.
+    #[prost(string, tag = "2")]
+    pub summary: ::prost::alloc::string::String,
+}
+/// One problem, or one thing worth knowing, that doctor found.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Finding {
+    /// Stable, UPPER_SNAKE_CASE, e.g. "TREE_DIR_GONE".
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+    /// How bad it is.
+    #[prost(enumeration = "finding::Severity", tag = "2")]
+    pub severity: i32,
+    /// What it is about: "root", a repo, "<repo> <tree>", or a path.
+    #[prost(string, tag = "3")]
+    pub subject: ::prost::alloc::string::String,
+    /// What is wrong, in a sentence.
+    #[prost(string, tag = "4")]
+    pub message: ::prost::alloc::string::String,
+    /// What fixes it: a command, or what to do by hand.
+    #[prost(string, tag = "5")]
+    pub fix: ::prost::alloc::string::String,
+    /// True if `mori doctor --fix --yes` repairs it.
+    #[prost(bool, tag = "6")]
+    pub auto_fixable: bool,
+}
+/// Nested message and enum types in `Finding`.
+pub mod finding {
+    /// How bad a finding is.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Severity {
+        /// Not set.
+        Unspecified = 0,
+        /// Worth knowing; nothing is wrong.
+        Info = 1,
+        /// Something is off, and mori still works.
+        Warn = 2,
+        /// Something mori or the VCS will trip over.
+        Problem = 3,
+    }
+    impl Severity {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "SEVERITY_UNSPECIFIED",
+                Self::Info => "SEVERITY_INFO",
+                Self::Warn => "SEVERITY_WARN",
+                Self::Problem => "SEVERITY_PROBLEM",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "SEVERITY_UNSPECIFIED" => Some(Self::Unspecified),
+                "SEVERITY_INFO" => Some(Self::Info),
+                "SEVERITY_WARN" => Some(Self::Warn),
+                "SEVERITY_PROBLEM" => Some(Self::Problem),
+                _ => None,
+            }
+        }
+    }
+}
 /// The VCS a clone and its trees use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

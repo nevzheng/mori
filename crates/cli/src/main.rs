@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use mori_app::routed::Routed;
-use mori_app::{App, Host, clone, gc, init, ls, restore, skills, tree, tree_remove};
+use mori_app::{App, Host, clone, doctor, gc, init, ls, restore, skills, tree, tree_remove};
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
 use mori_core::vcs::VcsKind;
@@ -93,6 +93,13 @@ enum Command {
     /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
     /// only on this machine. Reads only; never snapshots a working copy.
     Ls {
+        /// Only this repo, in any form `mori clone` accepts.
+        repo: Option<String>,
+    },
+
+    /// Check the root, every clone and every tree against the VCS and the disk, and list each
+    /// problem with the command that fixes it. Reads only. Exits 9 if any problem is found.
+    Doctor {
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
     },
@@ -235,6 +242,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
             ),
             output::gc_text,
         ),
+        Command::Doctor { repo } => run_doctor(app, json, repo.as_deref()),
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
@@ -299,6 +307,18 @@ fn real_app() -> App<Routed<JjCli, GitCli>, GhCli> {
         },
         std::env::var_os("MORI_GH").map_or_else(GhCli::from_path, GhCli::new),
     )
+}
+
+/// Runs `doctor` and prints its report; problems found make the exit code non-zero.
+fn run_doctor(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, repo: Option<&str>) -> ExitCode {
+    let result = doctor::run(app, repo);
+    let problems = result.as_ref().is_ok_and(output::doctor_has_problems);
+    let code = respond(json, result, output::doctor_text);
+    if problems {
+        output::doctor_problems_exit()
+    } else {
+        code
+    }
 }
 
 /// Prints a command's result: its response as JSON or text, or its error.

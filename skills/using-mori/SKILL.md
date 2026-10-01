@@ -164,6 +164,19 @@ workspace on the commit mori pinned when it removed it, at its old path, under i
 If that commit is gone (`RESTORE_COMMIT_GONE`), it changes nothing; if the name or path is taken
 again, it refuses like `tree create`.
 
+### `mori doctor [repo]`
+
+Checks the root, every clone and every tree against the VCS and the disk, and lists each problem
+with the command that fixes it. It only reads, so run it whenever a jj or git command fails in a
+mori tree, or before handing out work. It exits 9 if it finds a problem.
+
+- Each finding has a code (`TREE_DIR_GONE`, `WORKSPACE_GONE`, `CONFLICTED_BOOKMARK`,
+  `BACKEND_CHANGED`, …), a severity (`problem`, `warn`, `info`), what it is about, and a `fix`.
+- Run the fix it gives, or tell the person if it involves someone else's work. Findings marked
+  auto-fixable are the safe, single-answer ones.
+- With `--json`, findings are in `findings[]` with `code`, `severity`, `subject`, `message`, `fix`
+  and `autoFixable`.
+
 ### `mori skills sync`
 
 Updates mori's skills in the root (`context/skills/`, and the `context/llms.txt` and `llms.txt`
