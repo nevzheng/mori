@@ -28,7 +28,10 @@ One agent (the coordinator) splits a task; worker agents each do a piece in thei
    repo go in `~/mori/context/projects/<repo>/`.
 4. **The coordinator** moves the changes into its stack (`jj rebase -s <first> -d <where>`),
    resolves conflicts in its own tree, tests, and pushes only with the person's yes.
-5. **Cleanup:** once the coordinator's bookmark is pushed (or the pull request lands), the
+5. **Hand the result to the person** as one local `ready/<topic>` bookmark or branch, with the
+   lead tree's purpose saying what is ready, and one message telling them. They review it from their
+   root checkout; see `lead-tree`, "Handing finished work to the person".
+6. **Cleanup:** once the coordinator's bookmark is pushed (or the pull request lands), the
    workers' trees are safe to remove: `mori tree remove <repo> <tree>`, or `mori gc --apply --yes`
    when the person asks.
 
