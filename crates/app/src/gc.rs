@@ -307,7 +307,10 @@ fn describe(row: &Row, reason: Reason) -> String {
             days(row.facts.idle_seconds.unwrap_or_default())
         ),
         Reason::NotYet => "its lifetime doesn't let it go yet".to_owned(),
-        Reason::Unknown => "can't tell yet (offline, no gh, or no change time)".to_owned(),
+        Reason::Unknown => {
+            "can't tell yet (offline, gh not installed or not logged in, or no change time)"
+                .to_owned()
+        }
         Reason::Unsaved => {
             let state = row
                 .facts
