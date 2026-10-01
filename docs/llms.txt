@@ -6,6 +6,7 @@
 
 ## Using mori
 
+- [Release policy](https://nevzheng.github.io/mori/releases/): versioning, when a release is cut, and what mori promises before 1.0
 - [Install and release channels](https://nevzheng.github.io/mori/install/): head (every commit on main, what we dogfood) and the planned tagged releases
 - [Disk usage tips](https://nevzheng.github.io/mori/disk-usage/): what mori shows and does about disk, the caches to set up for each language so trees share their builds, and Docker and OrbStack cleanup
 - [Shared caches](https://nevzheng.github.io/mori/shared-caches/): set build caches at the user level so every tree shares them, and clean up Bazel output left by deleted trees
