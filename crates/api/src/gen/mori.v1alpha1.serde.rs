@@ -148,6 +148,9 @@ impl serde::Serialize for CloneResponse {
         if self.validate_only {
             len += 1;
         }
+        if !self.context_dir.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CloneResponse", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -166,6 +169,9 @@ impl serde::Serialize for CloneResponse {
         }
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        if !self.context_dir.is_empty() {
+            struct_ser.serialize_field("contextDir", &self.context_dir)?;
         }
         struct_ser.end()
     }
@@ -186,6 +192,8 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             "treeDir",
             "validate_only",
             "validateOnly",
+            "context_dir",
+            "contextDir",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -196,6 +204,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             Colocated,
             TreeDir,
             ValidateOnly,
+            ContextDir,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -226,6 +235,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             "colocated" => Ok(GeneratedField::Colocated),
                             "treeDir" | "tree_dir" => Ok(GeneratedField::TreeDir),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -251,6 +261,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                 let mut colocated__ = None;
                 let mut tree_dir__ = None;
                 let mut validate_only__ = None;
+                let mut context_dir__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -289,6 +300,12 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::ContextDir => {
+                            if context_dir__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("contextDir"));
+                            }
+                            context_dir__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CloneResponse {
@@ -298,6 +315,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                     colocated: colocated__.unwrap_or_default(),
                     tree_dir: tree_dir__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    context_dir: context_dir__.unwrap_or_default(),
                 })
             }
         }

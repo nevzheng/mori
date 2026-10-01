@@ -139,3 +139,9 @@ def json_names_the_clone(mori: Mori, placeholders: Placeholders, repo: str) -> N
     assert_that(response["path"], equal_to(str(placeholders.path(CLONE))))
     assert_that(response["colocated"], equal_to(True))
     assert_that(response["fetchUrl"], equal_to(f"https://{repo}.git"))
+
+
+@then(parsers.parse('"{path}" lists the repo context "{folder}" for "{repo}"'))
+def index_lists_repo(placeholders: Placeholders, path: str, folder: str, repo: str) -> None:
+    index = placeholders.path(path).read_text()
+    assert_that(index, contains_string(f"- [{folder}](projects/{folder}/): {repo}"))

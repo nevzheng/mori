@@ -15,6 +15,8 @@ Feature: CUJ 1 - add a repo
     And the clone is a jj repo colocated with git
     And mori records "github.com/acme/widget" with a pinned base tree
     And the output says it cloned "github.com/acme/widget"
+    And "<home>/mori/context/projects/widget/README.md" exists
+    And "<home>/mori/context/llms.txt" lists the repo context "widget" for "github.com/acme/widget"
 
   Scenario: The clone belongs to the person who cloned it
     Given USER is "Tester"

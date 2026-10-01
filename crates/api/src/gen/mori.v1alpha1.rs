@@ -115,6 +115,10 @@ pub struct CloneResponse {
     /// Echoes the request: true if nothing was actually cloned.
     #[prost(bool, tag = "6")]
     pub validate_only: bool,
+    /// The repo's context folder, `context/projects/<tree_dir>/`: notes and context for it, for people and
+    /// every agent. Created with the clone.
+    #[prost(string, tag = "7")]
+    pub context_dir: ::prost::alloc::string::String,
 }
 /// A tree mori created.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
