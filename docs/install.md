@@ -32,3 +32,16 @@ users outside its own development.
 
 Open an issue at <https://github.com/nevzheng/mori/issues> with what you ran, what you expected,
 and the output of `mori ls`. Agents can keep notes in `~/mori/context/projects/<repo>/`.
+
+## Release policy
+
+A release is a tag. Only the maintainer pushes tags, and a tag `v0.MINOR.PATCH` is cut when all of
+these hold:
+
+1. CI is green on the `main` commit being tagged.
+2. No open issue labelled `blocker`: lost work, a stuck tree, or a wrong cleanup decision.
+3. `CHANGELOG.md` has the version's entry, and `Cargo.toml` has its number.
+4. For v0.1.0 only: head has been used day to day for a week.
+
+Pushing the tag runs the release workflow, which builds the binaries and publishes the GitHub
+release. A broken release is fixed by a new patch version, never by moving a tag.
