@@ -15,6 +15,7 @@ nav = [
   { "Disk usage tips" = "disk-usage.md" },
   { "Shared caches" = "shared-caches.md" },
   { "Contributing" = "contributing.md" },
+  { "CLI style guide" = "cli-style.md" },
   { "Brand" = "brand.md" },
   { "Design docs" = [
     { "How design docs work" = "design/README.md" },

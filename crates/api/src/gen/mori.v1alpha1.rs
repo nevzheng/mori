@@ -364,9 +364,6 @@ pub struct RemoveTreeRequest {
     /// The tree's name, e.g. "claude-fix-login".
     #[prost(string, tag = "2")]
     pub name: ::prost::alloc::string::String,
-    /// Who is asking; must be the tree's owner. Defaults to the login name.
-    #[prost(string, tag = "3")]
-    pub agent: ::prost::alloc::string::String,
     /// Allow removing a pinned tree.
     #[prost(bool, tag = "4")]
     pub pinned: bool,

@@ -113,7 +113,7 @@ enum Command {
 
     /// Check the root, every clone and every tree against the VCS and the disk, and list each
     /// problem with the command that fixes it. Reads only, unless --fix --yes repairs the safe
-    /// ones (removals are journalled for `mori restore`). Exits 9 if a problem remains.
+    /// ones (removals are journalled for `mori restore`). Findings don't change the exit code.
     Doctor {
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
@@ -369,21 +369,15 @@ fn real_app() -> App<Routed<JjCli, GitCli>, GhCli> {
     )
 }
 
-/// Runs `doctor` and prints its report; problems found make the exit code non-zero.
+/// Runs `doctor` and prints its report. Findings are its output, not a failure: it exits 0
+/// unless the check itself couldn't run.
 fn run_doctor(
     app: &App<Routed<JjCli, GitCli>, GhCli>,
     json: bool,
     repo: Option<&str>,
     fix: Option<doctor::Fix>,
 ) -> ExitCode {
-    let result = doctor::run(app, repo, fix);
-    let problems = result.as_ref().is_ok_and(output::doctor_has_problems);
-    let code = respond(json, result, output::doctor_text);
-    if problems {
-        output::doctor_problems_exit()
-    } else {
-        code
-    }
+    respond(json, doctor::run(app, repo, fix), output::doctor_text)
 }
 
 /// Prints a command's result: its response as JSON or text, or its error.
