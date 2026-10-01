@@ -31,6 +31,17 @@ One agent (the coordinator) splits a task; worker agents each do a piece in thei
    workers' trees are safe to remove: `mori tree remove <repo> <tree>`, or `mori gc --apply --yes`
    when the person asks.
 
+**On a git clone** (`mori clone --vcs git`), the same steps with git:
+
+- **A worker finishing** commits (`git commit`), stays on its detached HEAD (or runs
+  `git switch --detach` if it made a branch), and reports its commits
+  (`git log --oneline origin/HEAD..HEAD`) with a line on what they do.
+- **The coordinator** merges them into its branch in its own tree: `git switch -c <branch>` once,
+  then `git merge <sha>` per worker. Prefer merge: a rebase or cherry-pick copies the commits,
+  and the worker's tree keeps reading as unsaved until it runs `git switch --detach <lead's tip>`.
+- **Cleanup** works as with jj: once the coordinator's branch is pushed, and after it lands, the
+  workers' trees are safe to remove.
+
 Threads that run in parallel without a coordinator just push their own bookmarks and open their own
 pull requests; no combining needed.
 
