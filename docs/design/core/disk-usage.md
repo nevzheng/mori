@@ -46,27 +46,32 @@ Measure, show, and let gc act on a size target:
   Plain `ls` doesn't measure.
 - **Free space.** Every `ls` and `tree create` reads free space on the disk under the root (one
   `statvfs` call, instant) and warns below a floor: 10% free by default.
-- **Bazel leftovers.** An output base whose workspace was under the mori root and no longer exists
-  belongs to a tree mori deleted. Nothing can use it again. gc lists leftovers as safe to remove.
+- **Bazel leftovers.** An output base whose workspace is a tree path mori recorded (a tree row whose
+  directory is gone, or a journalled removal) and no longer exists belongs to a tree mori deleted.
+  Nothing can use it again. gc lists leftovers as safe to remove, unless a Bazel server still
+  runs on it.
 - **`gc --free <size>`.** From the trees gc already classed as safe to remove, plus leftovers, it
-  picks leftovers first (only cache), then trees from the least recently changed, until the total
-  reaches the target. Without `--apply` it shows the plan; with `--apply --yes` it carries it out.
-  Removed trees are journalled and restorable as always.
+  picks leftovers first (only cache), then trees from the least recently changed (unknown change
+  times last), until the total reaches the target; the last pick may overshoot it. Missing trees
+  free nothing and aren't picked. Without `--apply` it shows the plan; with `--apply --yes` it
+  carries it out. Removed trees are journalled and restorable as always.
 - **Nudges toward shared caches.** A repo that builds with Bazel (`MODULE.bazel` or `WORKSPACE`)
   with no `--disk_cache` or `--remote_cache` in any bazelrc it reads, or with Cargo (`Cargo.toml`)
   and no `rustc-wrapper` or `RUSTC_WRAPPER`, gets a doctor finding `NO_SHARED_CACHE` (info) and a
   one-line tip after `mori clone`, both linking the tips page. The low-disk warning names `gc
   --free` and the page too. mori only reads these files; it never edits them.
-- **Opt-in limits.** `[disk]` in `config.toml` can set a floor, tree counts and disk budgets. Each
-  limit only warns and suggests the `gc --free` that fixes it.
+- **Opt-in limits.** `[disk]` in `config.toml` can set tree counts and disk budgets, none set by
+  default. Each limit only warns and suggests the `gc --free` that fixes it. `[trees.lru] max`
+  stays as it is: it decides which lru trees gc may remove, while these limits only warn.
 
 It works because the hard part already exists: gc already decides what is safe, and removal already
 pins and journals. This adds numbers and a target.
 
 **Speed.** Measuring walks every file, so it runs in parallel across trees and directories, counts
-allocated blocks (not apparent size), and counts a hard-linked file once. Each result is saved in
-the database with when it was measured, and reused for 15 minutes; `--fresh` measures again.
-Output says how old a number is.
+allocated blocks (not apparent size), and counts a hard-linked file once within a tree. Each result
+is saved in the database with when it was measured, and reused for 15 minutes; `ls --size --fresh`
+measures again, and `gc --free --apply` always measures the trees it picked before removing them.
+Output says how old a cached number is.
 
 ## Q5. Who cares? If it works, what difference does it make?
 
@@ -86,6 +91,9 @@ Output says how old a number is.
 - **Deleting a leftover that is in use.** A leftover's workspace directory is gone, so no build
   can use it. If a tree is restored to the same path, Bazel rebuilds into a new output base; only
   cache is lost.
+- **Sizes are an upper bound.** APFS clones and reflinks share blocks invisibly, and a file
+  hard-linked into several trees (a pnpm store) counts in each. Sizes can over-count, never
+  under-count what a tree's own directory holds.
 - **Stale numbers.** A cached size can be up to 15 minutes old. Output shows its age, and `gc
   --free` measures again before applying.
 
@@ -109,35 +117,35 @@ Appendix E pass, and on a forest with leftovers `mori gc --free` frees what it p
 
 ## Appendix A. API (proto) changes
 
-All additive.
+All additive. Sums (per repo, reclaimable, total used) are left to the client.
 
-- `ListTreesRequest.size` (bool) and `fresh` (bool).
-- `TreeRow.size` (`Size`): `bytes`, `bazel_bytes`, `measured_at` (RFC 3339).
-- `RepoTrees.bytes`: the sum for the repo, when measured.
-- `ListTreesResponse.disk` (`Disk`): `root_bytes` (used by mori, when measured), `free_bytes`,
-  `total_bytes`, `low` (bool), and `warnings` (repeated string, from limits).
-- `GcRequest.free_bytes` (uint64) and `fresh` (bool).
-- `GcItem.bytes` and `GcItem.selected` (picked by `--free`).
-- `GcItem.Class` unchanged; a leftover is a `GcItem` with `kind = BAZEL_LEFTOVER` (new enum
-  `GcItem.Kind`: `TREE`, `BAZEL_LEFTOVER`), class remove, reason `ORPHANED`.
-- `GcResponse.reclaimable_bytes` and `GcResponse.disk`.
-- `CreateTreeResponse.warnings` (repeated string).
-- `CloneResponse.tips` (repeated string): the shared-cache tip.
+- `ListTreesRequest.include_sizes` (bool) and `skip_size_cache` (bool).
+- `TreeRow.size_bytes`, `TreeRow.bazel_output_bytes`, `TreeRow.size_partial` (bool: some files
+  couldn't be read) and `TreeRow.size_measured_at` (RFC 3339, as the database's other times).
+- `ListTreesResponse.disk` (`Disk`): `free_bytes` and `total_bytes` of the disk under the root.
+- `ListTreesResponse.warnings`, `CreateTreeResponse.warnings`, `CloneResponse.warnings`
+  (repeated string): the low-space warning, limit warnings, and the shared-cache tip.
+- `GcRequest.free_target_bytes` (uint64).
+- `GcItem.size_bytes`. A tree picked by `--free` without `--apply` gets `OUTCOME_WOULD_REMOVE`,
+  as a dry run does today.
+- New enum `GcItem.Kind` (`KIND_UNSPECIFIED`, `KIND_TREE`, `KIND_BAZEL_LEFTOVER`) and
+  `GcItem.kind`. A leftover is class remove, reason `ORPHANED`, path its output base.
+- `GcResponse.disk` and `GcResponse.warnings`.
 - New doctor finding code `NO_SHARED_CACHE`, severity info, subject the repo, fix a link to the
   tips page.
 
-No new error reasons: `--free` with nothing safe to free is a plan with nothing selected, not an
-error.
+No new error reasons: `--free` with nothing safe to free is a plan with nothing picked.
 
 ## Appendix B. Design sketch
 
 ```text
-mori-core::disk      pure: Usage, Limits, warnings(), pick_to_free(), parse/format sizes
-mori-core::disk::Disk  trait: measure(path) -> bytes, free(path) -> (free, total),
-                     bazel_output_bases() -> [(base, workspace)], remove_leftover(base)
-mori-store::disk     the adapter: parallel walk, statvfs (rustix), Bazel root lookup
-mori-store           schema v5: tree_sizes(path PRIMARY KEY, bytes, measured_at)
-mori-app::ls / gc    ask Disk, cache, attach numbers, call the pure functions
+mori-core::disk      pure: DiskPolicy, Floor, Space, warnings, pick_to_free, leftover rules,
+                     size parsing and formatting
+mori-store::disk     the filesystem side: parallel walk, free space (`df -Pk`, no unsafe code),
+                     Bazel output bases and their DO_NOT_BUILD_HERE
+mori-store           schema v5: tree_sizes(tree_id PRIMARY KEY, bytes, bazel_bytes, partial,
+                     measured_at)
+mori-app::ls / gc    measure or reuse, attach numbers, call the pure functions
 ```
 
 `config.toml`, all optional:
@@ -185,9 +193,18 @@ selected 5 items, 214G. Run `mori gc --free 200G --apply --yes` to remove them.
   fails the command.
 - The walk never follows symlinks and stays on one filesystem, so a link to `/` can't make a tree
   look huge or make mori read outside it.
-- A leftover is removed only if its `DO_NOT_BUILD_HERE` names a path under the mori root that
-  doesn't exist, and the base itself is under the Bazel output user root. Read-only files are made
-  writable first. Leftovers aren't journalled: they hold only cache.
+- A leftover is removed only if its `DO_NOT_BUILD_HERE` (trimmed) names a tree path mori
+  recorded that doesn't exist, compared by path components after resolving symlinks (so
+  `/home/acme/mori2` never matches `/home/acme/mori`), the base itself is a direct child of the
+  Bazel output user root, and no Bazel server runs on it (`server/server.pid.txt` names no live
+  process). `install/` and `cache/` beside the bases have no `DO_NOT_BUILD_HERE` and are never
+  touched. Read-only files are made writable first. Leftovers aren't journalled: they hold only
+  cache.
+- The shared-cache check reads only: the system bazelrc (`/etc/bazel.bazelrc`), the repo's
+  `.bazelrc` and the files it imports, and `~/.bazelrc`, where `--disk_cache` or `--remote_cache`
+  in any section counts; and for Cargo, `$CARGO_HOME/config.toml` (default `~/.cargo`), the repo's
+  `.cargo/config.toml`, and `RUSTC_WRAPPER`, `CARGO_BUILD_RUSTC_WRAPPER` or a shared target
+  directory. The finding names what it checked, and isn't reported when a file can't be read.
 - `gc --free --apply` re-runs the safety checks per tree before removing it, as `--apply` does
   today.
 
