@@ -275,7 +275,7 @@ impl JjCli {
                 "-r",
                 &format!("(::{working_copy} ~ ::({saved})) ~ empty()"),
                 "-T",
-                r#"change_id.short() ++ "\n""#,
+                UNPUSHED_TEMPLATE,
             ],
         )?;
         parse_state(&head, &unpushed)
@@ -538,9 +538,12 @@ fn parse_remote_bookmarks(stdout: &str) -> Result<Vec<RemoteBookmark>, JjError> 
         .collect()
 }
 
-/// Prints the working-copy change's ID and whether it has edits.
+/// Prints the working-copy change's ID, its commit ID and whether it has edits.
 const STATE_TEMPLATE: &str =
-    r#"change_id.short(12) ++ " " ++ if(empty, "clean", "changed") ++ "\n""#;
+    r#"change_id.short(12) ++ " " ++ commit_id ++ " " ++ if(empty, "clean", "changed") ++ "\n""#;
+
+/// Prints a commit ID per line: the unpushed changes in [`JjCli::state_covering`].
+const UNPUSHED_TEMPLATE: &str = r#"commit_id ++ "\n""#;
 
 /// Quotes `name` as a revset string, so any workspace name, even a foreign one, is taken
 /// literally.
@@ -549,19 +552,31 @@ fn revset_string(name: &str) -> String {
     format!("\"{escaped}\"")
 }
 
-/// Parses [`STATE_TEMPLATE`] output and the list of unpushed changes.
+/// Parses [`STATE_TEMPLATE`] output and the commit IDs of the unpushed changes
+/// ([`UNPUSHED_TEMPLATE`]). Edits in the working copy count as changed only while the working
+/// copy is itself unpushed: once a remote bookmark, trunk or landed work covers it, they're saved.
 fn parse_state(head: &str, unpushed: &str) -> Result<TreeState, JjError> {
     let invalid = || JjError::OutputInvalid {
         output: head.to_owned(),
     };
-    let (change, edits) = head.trim().split_once(' ').ok_or_else(invalid)?;
-    let changed = match edits {
+    let mut fields = head.split_whitespace();
+    let (Some(change), Some(commit), Some(edits), None) =
+        (fields.next(), fields.next(), fields.next(), fields.next())
+    else {
+        return Err(invalid());
+    };
+    let edited = match edits {
         "changed" => true,
         "clean" => false,
         _ => return Err(invalid()),
     };
-    let unpushed = u32::try_from(unpushed.lines().filter(|line| !line.is_empty()).count())
-        .map_err(|_| invalid())?;
+    let unpushed: Vec<&str> = unpushed
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    let changed = edited && unpushed.contains(&commit);
+    let unpushed = u32::try_from(unpushed.len()).map_err(|_| invalid())?;
     Ok(TreeState {
         change: change.to_owned(),
         changed,
@@ -966,7 +981,7 @@ mod tests {
 
     #[test]
     fn state_lines_parse() {
-        let state = parse_state("vmvywosutlnw changed\n", "abc\ndef\n").unwrap();
+        let state = parse_state("vmvywosutlnw c0ffee changed\n", "abc\nc0ffee\n").unwrap();
 
         assert_eq!(
             state,
@@ -976,9 +991,24 @@ mod tests {
                 unpushed: 2,
             }
         );
-        assert!(!parse_state("vmvywosutlnw clean\n", "").unwrap().changed);
-        assert!(parse_state("vmvywosutlnw dirty\n", "").is_err());
+        assert!(
+            !parse_state("vmvywosutlnw c0ffee clean\n", "")
+                .unwrap()
+                .changed
+        );
+        assert!(parse_state("vmvywosutlnw c0ffee dirty\n", "").is_err());
+        assert!(parse_state("vmvywosutlnw changed\n", "").is_err());
         assert!(parse_state("", "").is_err());
+    }
+
+    #[test]
+    fn a_working_copy_already_saved_is_not_changed() {
+        // Edits in the working copy that is itself on a remote bookmark (so not unpushed) are
+        // saved.
+        let state = parse_state("vmvywosutlnw c0ffee changed\n", "abc\n").unwrap();
+
+        assert!(!state.changed);
+        assert_eq!(state.unpushed, 1);
     }
 
     #[test]
@@ -1160,6 +1190,62 @@ mod tests {
                 .unpushed,
             0
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_pushed_working_copy_is_saved() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let clone = cloned(&jj, dir.path())?;
+        let tree = dir.path().join("claude-fix-login");
+        jj.add_workspace(&clone, "claude-fix-login", &tree, "trunk()")?;
+        let tree_arg = tree.display().to_string();
+
+        // Describe the edit instead of committing it: it stays the working-copy change.
+        std::fs::write(tree.join("login.rs"), "fn login() {}\n")?;
+        run(
+            &jj,
+            &["--repository", &tree_arg, "describe", "--message", "login"],
+        )?;
+        let described = jj.state(&clone, "claude-fix-login")?;
+        assert!(described.changed);
+        assert_eq!(described.unpushed, 1);
+
+        // Push the working-copy change itself: a remote bookmark now points at it.
+        run(
+            &jj,
+            &[
+                "--repository",
+                &tree_arg,
+                "bookmark",
+                "create",
+                "claude/fix-login",
+                "-r",
+                "@",
+            ],
+        )?;
+        run(
+            &jj,
+            &[
+                "--repository",
+                &tree_arg,
+                "git",
+                "push",
+                "--bookmark",
+                "claude/fix-login",
+            ],
+        )?;
+        let pushed = jj.state(&clone, "claude-fix-login")?;
+        assert!(!pushed.changed, "the pushed working copy is saved");
+        assert_eq!(pushed.unpushed, 0);
+
+        // A further edit to the working copy isn't on the remote, so it counts again.
+        std::fs::write(tree.join("login.rs"), "fn login() { check() }\n")?;
+        jj.snapshot(&tree)?;
+        assert!(jj.state(&clone, "claude-fix-login")?.changed);
         Ok(())
     }
 
