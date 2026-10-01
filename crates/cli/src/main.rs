@@ -144,7 +144,7 @@ enum TreeCommand {
         #[arg(long)]
         agent: Option<String>,
 
-        /// When the tree may go: pinned, task-done, or ttl:<n>d. Defaults to the
+        /// When the tree may go: pinned, task-done, lru, or ttl:<n>d. Defaults to the
         /// [trees.lifetime] task setting (task-done).
         #[arg(long)]
         lifetime: Option<Lifetime>,

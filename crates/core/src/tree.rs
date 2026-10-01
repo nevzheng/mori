@@ -44,6 +44,8 @@ pub enum Lifetime {
     TaskDone,
     /// When it hasn't been used for this long.
     Ttl(Duration),
+    /// When its repo is over the `[trees.lru] max` cap and it is among the least recently used.
+    Lru,
 }
 
 const HOUR: u64 = 60 * 60;
@@ -53,13 +55,17 @@ impl FromStr for Lifetime {
     type Err = String;
 
     /// Parses the form used in `config.toml`, flags and the database: `pinned`, `task-done`,
-    /// or `ttl:<n>d` / `ttl:<n>h`.
+    /// `lru`, or `ttl:<n>d` / `ttl:<n>h`.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let invalid =
-            || format!("invalid lifetime {text:?}: use pinned, task-done, or ttl:<n>d or ttl:<n>h");
+        let invalid = || {
+            format!(
+                "invalid lifetime {text:?}: use pinned, task-done, lru, or ttl:<n>d or ttl:<n>h"
+            )
+        };
         match text {
             "pinned" => Ok(Self::Pinned),
             "task-done" => Ok(Self::TaskDone),
+            "lru" => Ok(Self::Lru),
             _ => {
                 let span = text.strip_prefix("ttl:").ok_or_else(invalid)?;
                 let (count, unit) = span.split_at(span.len().saturating_sub(1));
@@ -91,6 +97,7 @@ impl fmt::Display for Lifetime {
         match self {
             Self::Pinned => f.write_str("pinned"),
             Self::TaskDone => f.write_str("task-done"),
+            Self::Lru => f.write_str("lru"),
             Self::Ttl(span) if span.as_secs() % DAY == 0 => {
                 write!(f, "ttl:{}d", span.as_secs() / DAY)
             }
@@ -188,6 +195,8 @@ pub struct TreePolicy {
     pub name: NameTemplate,
     /// Default lifetimes.
     pub lifetime: LifetimeDefaults,
+    /// The cap for [`Lifetime::Lru`].
+    pub lru: LruPolicy,
 }
 
 impl TreePolicy {
@@ -219,6 +228,15 @@ impl Default for LifetimeDefaults {
     }
 }
 
+/// `[trees.lru]`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LruPolicy {
+    /// How many task trees a repo keeps before its least recently changed `lru` trees become
+    /// cleanup candidates. Unset: `lru` trees are never candidates.
+    pub max: Option<u32>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,7 +244,7 @@ mod tests {
 
     #[test]
     fn lifetimes_round_trip_through_their_text_form() {
-        for text in ["pinned", "task-done", "ttl:14d", "ttl:36h"] {
+        for text in ["pinned", "task-done", "lru", "ttl:14d", "ttl:36h"] {
             let lifetime: Lifetime = text.parse().unwrap();
 
             assert_eq!(lifetime.to_string(), text);
@@ -255,7 +273,7 @@ mod tests {
             "ttl:-1d",
             "ttl:99999999999999999999d",
             "Pinned",
-            "lru",
+            "LRU",
         ] {
             assert!(text.parse::<Lifetime>().is_err(), "for {text:?}");
         }
