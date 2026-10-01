@@ -7,6 +7,7 @@
 ## Using mori
 
 - [Install and release channels](https://nevzheng.github.io/mori/install/): head (every commit on main, what we dogfood) and the planned tagged releases
+- [Shared caches](https://nevzheng.github.io/mori/shared-caches/): set build caches at the user level so every tree shares them, and clean up Bazel output left by deleted trees
 - [Skills index](https://github.com/nevzheng/mori/blob/main/skills/llms.txt): every agent skill mori ships, one `skills/<name>/SKILL.md` each
 - [Using mori (agent skill)](https://github.com/nevzheng/mori/blob/main/skills/using-mori/SKILL.md): commands, JSON output, errors and the rules agents follow
 - [README](https://github.com/nevzheng/mori/blob/main/README.md): what mori is and how to build it
