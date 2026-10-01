@@ -31,6 +31,8 @@ FIRST_RUN_CREATES = [
     "<home>/mori/context/skills",
     "<home>/mori/context/skills/agent-workflows",
     "<home>/mori/context/skills/agent-workflows/SKILL.md",
+    "<home>/mori/context/skills/disk-usage",
+    "<home>/mori/context/skills/disk-usage/SKILL.md",
     "<home>/mori/context/skills/lead-tree",
     "<home>/mori/context/skills/lead-tree/SKILL.md",
     "<home>/mori/context/skills/using-mori",

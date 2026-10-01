@@ -17,10 +17,14 @@ use crate::StoreError;
 
 /// mori's skills, by directory name: the repo's `skills/<name>/SKILL.md`, fixed at build time.
 /// `skills/llms.txt` in the repo lists them; a test keeps the two in step.
-pub const EMBEDDED: [(&str, &str); 4] = [
+pub const EMBEDDED: [(&str, &str); 5] = [
     (
         "agent-workflows",
         include_str!("../../../skills/agent-workflows/SKILL.md"),
+    ),
+    (
+        "disk-usage",
+        include_str!("../../../skills/disk-usage/SKILL.md"),
     ),
     (
         "lead-tree",
