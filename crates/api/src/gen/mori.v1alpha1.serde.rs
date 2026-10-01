@@ -563,6 +563,9 @@ impl serde::Serialize for CreateTreeResponse {
         if self.validate_only {
             len += 1;
         }
+        if self.vcs != 0 {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("mori.v1alpha1.CreateTreeResponse", len)?;
         if let Some(v) = self.tree.as_ref() {
@@ -574,6 +577,11 @@ impl serde::Serialize for CreateTreeResponse {
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
         }
+        if self.vcs != 0 {
+            let v = Vcs::try_from(self.vcs)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
+            struct_ser.serialize_field("vcs", &v)?;
+        }
         struct_ser.end()
     }
 }
@@ -583,13 +591,14 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["tree", "from", "validate_only", "validateOnly"];
+        const FIELDS: &[&str] = &["tree", "from", "validate_only", "validateOnly", "vcs"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Tree,
             From,
             ValidateOnly,
+            Vcs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -617,6 +626,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             "tree" => Ok(GeneratedField::Tree),
                             "from" => Ok(GeneratedField::From),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "vcs" => Ok(GeneratedField::Vcs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -639,6 +649,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                 let mut tree__ = None;
                 let mut from__ = None;
                 let mut validate_only__ = None;
+                let mut vcs__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -659,12 +670,19 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Vcs => {
+                            if vcs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vcs"));
+                            }
+                            vcs__ = Some(map_.next_value::<Vcs>()? as i32);
+                        }
                     }
                 }
                 Ok(CreateTreeResponse {
                     tree: tree__,
                     from: from__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    vcs: vcs__.unwrap_or_default(),
                 })
             }
         }

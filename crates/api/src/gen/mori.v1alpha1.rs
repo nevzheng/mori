@@ -186,6 +186,9 @@ pub struct CreateTreeResponse {
     /// Echoes the request: true if nothing was actually created.
     #[prost(bool, tag = "3")]
     pub validate_only: bool,
+    /// Which VCS the tree uses: its clone's.
+    #[prost(enumeration = "Vcs", tag = "4")]
+    pub vcs: i32,
 }
 /// Request for `ListTrees`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

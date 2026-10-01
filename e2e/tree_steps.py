@@ -122,6 +122,12 @@ def says_jj_workspace(mori: Mori, skill: str) -> None:
     assert_that(mori.last.stdout, contains_string(skill))
 
 
+@then("the output says the tree is a git worktree on a detached HEAD")
+def says_git_worktree(mori: Mori) -> None:
+    assert_that(mori.last.stdout, contains_string("git worktree on a detached HEAD"))
+    assert "jj workspace" not in mori.last.stdout
+
+
 @then(parsers.parse('it names the tree "{name}", its path and its lifetime "{lifetime}"'))
 def json_names_the_tree(mori: Mori, placeholders: Placeholders, name: str, lifetime: str) -> None:
     tree = json.loads(mori.last.stdout)["tree"]

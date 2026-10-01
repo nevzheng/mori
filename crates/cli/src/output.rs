@@ -149,10 +149,13 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
     let _ = writeln!(text, "  starts from: {}", response.from);
-    let _ = writeln!(
-        text,
+    let hint = if response.vcs() == Vcs::Git {
+        "  a git worktree on a detached HEAD: commit, then push with \
+         `git push origin HEAD:refs/heads/<branch>` (see the vcs-in-mori skill)"
+    } else {
         "  a jj workspace: use jj here, not git (see the vcs-in-mori skill)"
-    );
+    };
+    let _ = writeln!(text, "{hint}");
     text
 }
 
