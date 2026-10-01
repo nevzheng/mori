@@ -33,17 +33,21 @@ two weeks; a fix for lost work ships as soon as it is ready.
 
 1. A release PR sets the version in `Cargo.toml` and `version.bzl`: `-dev` becomes `-alpha.N` for a
    pre-release, or is dropped for a release. It dates the CHANGELOG entry.
-2. When it merges, tag the merge commit `vX.Y.Z` and push the tag.
-3. The release workflow checks the tag against both version files, builds `mori` for macOS (Apple
-   silicon and Intel) and Linux (x86-64 and arm64), and attaches the archives and their SHA-256
-   checksums to a **draft** GitHub release, marked as a pre-release for a version with a suffix.
-4. A maintainer reads the draft and publishes it. Nothing is public before that.
-5. A PR sets `main` back to a `-dev` version: the same one after a pre-release, the next one after
+   **Its review is the gate**: what it says is what ships, and the CHANGELOG entry becomes the
+   release notes.
+2. Merging it releases it. The release workflow checks both version files and the CHANGELOG
+   entry, builds `mori` for macOS (Apple silicon and Intel) and Linux (x86-64 and arm64), attaches
+   the archives and their SHA-256 checksums to a draft, and publishes it, which tags the merge
+   commit `vX.Y.Z`. A version with a suffix is marked as a pre-release.
+3. A PR sets `main` back to a `-dev` version: the same one after a pre-release, the next one after
    a release.
 
 A fix for a release comes from a branch off its tag: fix, bump the patch version, tag
-`vX.Y.(Z+1)`, and bring the fix to `main` too. A tag is never moved or reused: a broken release
-is fixed by the next version.
+`vX.Y.(Z+1)`, push the tag (which releases it the same way), and bring the fix to `main` too.
+
+Releases are immutable: once published, a release's tag and archives can't change, and GitHub
+attests to them. Release tags can't be moved or deleted either. A broken release is fixed by the
+next version.
 
 ## What mori promises before 1.0
 

@@ -1,29 +1,39 @@
 name: release
 
-# The release channel (docs/install.md). Pushing a tag vX.Y.Z builds mori for macOS and Linux and
-# attaches the archives and their checksums to a draft GitHub release, which a maintainer reviews
-# and publishes by hand. Running it by hand, or a pull request that changes this workflow or the
-# version, builds the same archives without releasing anything.
+# The release channel (docs/releases.md). Merging a release PR, which sets a version without -dev
+# in Cargo.toml and version.bzl, releases it: this workflow builds mori for macOS and Linux,
+# attaches the archives and their checksums to a draft, and publishes it, which creates the tag
+# vX.Y.Z on the merge commit. Pushing such a tag by hand does the same. A pull request that changes
+# this workflow or the version, or a run by hand, builds the archives without releasing anything.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   pull_request:
-    paths: [".github/workflows/release.yml", "version.bzl", "Cargo.toml"]
+    paths: [".github/workflows/release.yml", "version.bzl", "Cargo.toml", "CHANGELOG.md"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# One release at a time; a second push waits rather than racing for the same tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   version:
-    # A release's version has no -dev suffix and matches the tag, in Cargo.toml and version.bzl.
+    # A release's version has no -dev suffix, matches the tag, is the same in Cargo.toml and
+    # version.bzl, and has a CHANGELOG entry.
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
+      release: ${{ steps.check.outputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: check
         env:
+          EVENT: ${{ github.event_name }}
           TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: |
           set -euo pipefail
@@ -33,6 +43,7 @@ jobs:
             echo "::error::Cargo.toml says $cargo_version but version.bzl says $bzl_version"
             exit 1
           fi
+          release=false
           if [[ -n "$TAG" ]]; then
             if [[ "$TAG" != "v$cargo_version" ]]; then
               echo "::error::tag $TAG doesn't match version $cargo_version"
@@ -42,11 +53,24 @@ jobs:
               echo "::error::$cargo_version is a head version; a release drops -dev"
               exit 1
             fi
+            release=true
+          elif [[ "$EVENT" == push && "$cargo_version" != *-dev ]]; then
+            # A release PR just merged, unless this version was already released.
+            if [[ -z "$(git ls-remote --tags origin "refs/tags/v$cargo_version")" ]]; then
+              release=true
+            fi
+          fi
+          if [[ "$cargo_version" != *-dev ]] && ! grep -q "^## $cargo_version " CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for $cargo_version"
+            exit 1
           fi
           echo "version=$cargo_version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
+    # Every push to main runs this workflow, but only a release needs the archives.
+    if: github.event_name != 'push' || needs.version.outputs.release == 'true'
     strategy:
       matrix:
         include:
@@ -77,23 +101,31 @@ jobs:
           path: ${{ env.ARCHIVE }}.tar.gz*
 
   release:
-    # Only for a tag: a draft, so nothing is public until a maintainer publishes it.
-    if: github.ref_type == 'tag'
+    # Draft first, so every archive is attached before publishing locks the release (immutable
+    # releases); then publish, which creates the tag on this commit if it doesn't exist yet.
+    if: needs.version.outputs.release == 'true'
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           merge-multiple: true
       - env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          # A version with a suffix (v0.1.0-alpha.1) is a pre-release.
+          set -euo pipefail
+          tag="v$VERSION"
+          # The notes are the version's CHANGELOG entry, reviewed in the release PR.
+          awk -v heading="## $VERSION " 'index($0, heading) == 1 {found = 1; next}
+            /^## / {found = 0} found' CHANGELOG.md > notes.md
+          # A version with a suffix (0.1.0-alpha.1) is a pre-release.
           prerelease=()
-          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft "${prerelease[@]}" \
-            --title "mori $TAG" --generate-notes
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --draft "${prerelease[@]}" --title "mori $tag" --notes-file notes.md
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
