@@ -20,6 +20,16 @@ def run(env: dict[str, str], *args: str) -> None:
         pytest.fail(f"setup: {args} exited {result.returncode}\nstderr:\n{result.stderr}")
 
 
+@given(parsers.parse('I have fixed it with "{command}"'))
+def fixed_with(mori: Mori, cleanup: dict[str, str], command: str) -> None:
+    result = mori.run(f"{command} --json")
+    if result.returncode != 0:
+        pytest.fail(f"setup: {command} exited {result.returncode}\n{result.stderr}")
+    entries = [f["journalEntry"] for f in json.loads(result.stdout)["fixed"] if f.get("journalEntry")]
+    assert entries, result.stdout
+    cleanup["entry"] = entries[0]
+
+
 @given(parsers.parse('the directory of "{name}" was deleted by hand'))
 def tree_dir_deleted(placeholders: Placeholders, name: str) -> None:
     shutil.rmtree(placeholders.path(f"{TREES}/{name}"))

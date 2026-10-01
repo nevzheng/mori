@@ -1046,9 +1046,27 @@ impl serde::Serialize for DoctorRequest {
         if !self.repo.is_empty() {
             len += 1;
         }
+        if self.fix {
+            len += 1;
+        }
+        if self.confirmed {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.DoctorRequest", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if self.fix {
+            struct_ser.serialize_field("fix", &self.fix)?;
+        }
+        if self.confirmed {
+            struct_ser.serialize_field("confirmed", &self.confirmed)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
         }
         struct_ser.end()
     }
@@ -1059,11 +1077,14 @@ impl<'de> serde::Deserialize<'de> for DoctorRequest {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["repo"];
+        const FIELDS: &[&str] = &["repo", "fix", "confirmed", "validate_only", "validateOnly"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repo,
+            Fix,
+            Confirmed,
+            ValidateOnly,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1089,6 +1110,9 @@ impl<'de> serde::Deserialize<'de> for DoctorRequest {
                     {
                         match value {
                             "repo" => Ok(GeneratedField::Repo),
+                            "fix" => Ok(GeneratedField::Fix),
+                            "confirmed" => Ok(GeneratedField::Confirmed),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1109,6 +1133,9 @@ impl<'de> serde::Deserialize<'de> for DoctorRequest {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut repo__ = None;
+                let mut fix__ = None;
+                let mut confirmed__ = None;
+                let mut validate_only__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -1117,10 +1144,31 @@ impl<'de> serde::Deserialize<'de> for DoctorRequest {
                             }
                             repo__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Fix => {
+                            if fix__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("fix"));
+                            }
+                            fix__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Confirmed => {
+                            if confirmed__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("confirmed"));
+                            }
+                            confirmed__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(DoctorRequest {
                     repo: repo__.unwrap_or_default(),
+                    fix: fix__.unwrap_or_default(),
+                    confirmed: confirmed__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
                 })
             }
         }
@@ -1141,12 +1189,24 @@ impl serde::Serialize for DoctorResponse {
         if !self.summary.is_empty() {
             len += 1;
         }
+        if !self.fixed.is_empty() {
+            len += 1;
+        }
+        if self.validate_only {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.DoctorResponse", len)?;
         if !self.findings.is_empty() {
             struct_ser.serialize_field("findings", &self.findings)?;
         }
         if !self.summary.is_empty() {
             struct_ser.serialize_field("summary", &self.summary)?;
+        }
+        if !self.fixed.is_empty() {
+            struct_ser.serialize_field("fixed", &self.fixed)?;
+        }
+        if self.validate_only {
+            struct_ser.serialize_field("validateOnly", &self.validate_only)?;
         }
         struct_ser.end()
     }
@@ -1157,12 +1217,20 @@ impl<'de> serde::Deserialize<'de> for DoctorResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["findings", "summary"];
+        const FIELDS: &[&str] = &[
+            "findings",
+            "summary",
+            "fixed",
+            "validate_only",
+            "validateOnly",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Findings,
             Summary,
+            Fixed,
+            ValidateOnly,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1189,6 +1257,8 @@ impl<'de> serde::Deserialize<'de> for DoctorResponse {
                         match value {
                             "findings" => Ok(GeneratedField::Findings),
                             "summary" => Ok(GeneratedField::Summary),
+                            "fixed" => Ok(GeneratedField::Fixed),
+                            "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1210,6 +1280,8 @@ impl<'de> serde::Deserialize<'de> for DoctorResponse {
             {
                 let mut findings__ = None;
                 let mut summary__ = None;
+                let mut fixed__ = None;
+                let mut validate_only__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Findings => {
@@ -1224,11 +1296,25 @@ impl<'de> serde::Deserialize<'de> for DoctorResponse {
                             }
                             summary__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Fixed => {
+                            if fixed__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("fixed"));
+                            }
+                            fixed__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::ValidateOnly => {
+                            if validate_only__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("validateOnly"));
+                            }
+                            validate_only__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(DoctorResponse {
                     findings: findings__.unwrap_or_default(),
                     summary: summary__.unwrap_or_default(),
+                    fixed: fixed__.unwrap_or_default(),
+                    validate_only: validate_only__.unwrap_or_default(),
                 })
             }
         }
@@ -1493,6 +1579,130 @@ impl<'de> serde::Deserialize<'de> for finding::Severity {
             }
         }
         deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for Fixed {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.code.is_empty() {
+            len += 1;
+        }
+        if !self.subject.is_empty() {
+            len += 1;
+        }
+        if !self.journal_entry.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.Fixed", len)?;
+        if !self.code.is_empty() {
+            struct_ser.serialize_field("code", &self.code)?;
+        }
+        if !self.subject.is_empty() {
+            struct_ser.serialize_field("subject", &self.subject)?;
+        }
+        if !self.journal_entry.is_empty() {
+            struct_ser.serialize_field("journalEntry", &self.journal_entry)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for Fixed {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["code", "subject", "journal_entry", "journalEntry"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Code,
+            Subject,
+            JournalEntry,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "code" => Ok(GeneratedField::Code),
+                            "subject" => Ok(GeneratedField::Subject),
+                            "journalEntry" | "journal_entry" => Ok(GeneratedField::JournalEntry),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = Fixed;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.Fixed")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Fixed, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut code__ = None;
+                let mut subject__ = None;
+                let mut journal_entry__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Code => {
+                            if code__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("code"));
+                            }
+                            code__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Subject => {
+                            if subject__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("subject"));
+                            }
+                            subject__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::JournalEntry => {
+                            if journal_entry__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("journalEntry"));
+                            }
+                            journal_entry__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(Fixed {
+                    code: code__.unwrap_or_default(),
+                    subject: subject__.unwrap_or_default(),
+                    journal_entry: journal_entry__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.Fixed", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for GcItem {
