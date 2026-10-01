@@ -69,8 +69,26 @@ column. `mori clone` picks the backend from `--vcs`, else `[vcs] default` in `co
 - **Double maintenance.** Two adapters to keep working. Mitigated by running the main e2e
   scenarios against both backends.
 - **Worktree admin state.** A worktree whose directory was deleted by hand leaves an entry under
-  `.git/worktrees/`. mori shows it as missing, as with a jj workspace, and `git worktree prune`
-  clears it; mori never prunes worktrees it didn't make.
+  `.git/worktrees/`. mori shows it as missing, as with a jj workspace. Removing it runs
+  `git worktree remove --force <path>`, which clears that one entry even with the directory gone.
+  mori never runs a bare `git worktree prune`, which would clear every stale entry, including
+  worktrees mori didn't make.
+- **Rebase and cherry-pick copy commits.** If a lead rebases or cherry-picks a worker's commits,
+  the worker's own commits stay on no remote branch and its tree keeps reading as unsaved. Only a
+  merge keeps the worker's commits. The skills say: hand over the commit SHA, and the lead runs
+  `git merge <sha>`. If the lead rebases anyway, the worker runs `git switch --detach <lead tip>`
+  afterwards, which leaves nothing unsaved.
+- **Branches in worker trees.** git refuses to rebase or check out a branch that another worktree
+  has checked out, so a worker on a branch blocks the lead. Trees start detached, and the skills
+  say to `git switch --detach` before handing off.
+- **Detached HEAD trips git habits.** `git push -u origin HEAD` and a bare `git pull` fail on a
+  detached HEAD. The skills give `git push origin HEAD:refs/heads/<branch>` (or
+  `git switch -c <branch>` first), and `gh pr create --head <branch>`.
+- **Stashes hide work.** `git stash` moves edits out of the working tree into the shared
+  `refs/stash`, so the safety check sees a clean tree. Stashes can't be told apart by tree, so mori
+  can't count them; the skills say to commit, not stash. `mori doctor` may report stashes later.
+- **Submodules** come up empty in a new worktree. The skills say to run
+  `git submodule update --init`; mori doesn't run it, since it fetches.
 
 ## Q7. How long will it take?
 
@@ -81,8 +99,9 @@ Four CLs after this doc:
    accept that git deletes the directory itself (Appendix B).
 3. cli: `mori clone --vcs jj|git` and `[vcs] default`; e2e scenarios for the git backend
    (`spec/cuj/08-git-backend.feature`) and the pinned git in the test environment.
-4. skills: `vcs-in-mori` gets the git-tree workflow (detached HEAD, `git push origin
-   HEAD:refs/heads/<branch>`).
+4. skills: `vcs-in-mori` gets the git-tree workflow: the backend rule (`.jj` present means jj,
+   else git, so use the matching tool), detached HEAD and pushing it, handing over a SHA for
+   `git merge`, commit rather than stash, and submodules (Q6).
 
 ## Q8. How will we know it worked?
 
@@ -117,8 +136,9 @@ Nothing existing breaks: an unset `vcs` means jj, as today.
 | `forget_tree`                   | `jj workspace forget`                           | `git worktree remove --force` (also deletes the directory)            |
 | `pin`, `commit_exists`, `fetch` | `git update-ref`, `cat-file -e`, `jj git fetch` | the same through `git`; `git fetch --prune`                           |
 
-A tree's name is its worktree's directory name, which is also git's name for it under
-`.git/worktrees/`; mori already names the directory after the tree.
+A tree's name is its worktree's directory name, taken from the path in
+`git worktree list --porcelain`. git's own name under `.git/worktrees/` usually matches but can
+differ (git adds a number on a clash), so mori never uses it.
 
 **Removal order.** The flows forget the tree and then delete its directory. `git worktree remove`
 does both, so the directory delete treats "already gone" as done. The jj path is unchanged.
@@ -142,8 +162,9 @@ with no clone yet; the clone flow passes the chosen backend explicitly.
 ## Appendix D. Failure modes and security
 
 - **git missing:** `GIT_NOT_FOUND` before anything is created.
-- **A failed `worktree add`:** whatever it left at the path is removed and `git worktree prune` is
-  run for that entry only, as the jj adapter forgets a half-made workspace.
+- **A failed `worktree add`:** whatever it left at the path is removed and
+  `git worktree remove --force <path>` clears its entry, as the jj adapter forgets a half-made
+  workspace. Never a bare `git worktree prune` (Q6).
 - **Hooks:** git runs the repo's hooks on some operations (`post-checkout` on `worktree add`). mori
   runs git as the person, as they would; it doesn't disable hooks.
 - **Paths and names** come from mori's own validated tree names and are always passed after `--`.
