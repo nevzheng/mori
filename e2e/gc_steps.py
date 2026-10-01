@@ -16,12 +16,37 @@ CLASSES = {
     "never": "CLASS_NEVER",
 }
 
+TREES = "<home>/mori/trees/widget"
+
+
+def jj(env: dict[str, str], *args: str) -> None:
+    result = subprocess.run(
+        ["jj", *args], env=env, capture_output=True, text=True, timeout=60, check=False
+    )
+    if result.returncode != 0:
+        pytest.fail(f"setup: jj {args} exited {result.returncode}\nstderr:\n{result.stderr}")
+
 
 @then(parsers.parse('the report has "{name}" as "{cls}" because "{reason}"'))
 def report_has(mori: Mori, name: str, cls: str, reason: str) -> None:
     items = {item["name"]: item for item in json.loads(mori.last.stdout).get("items", [])}
     assert name in items, f"no item {name!r} in {sorted(items)}"
     assert_that((items[name]["class"], items[name]["reason"]), equal_to((CLASSES[cls], reason)))
+
+
+@given(parsers.parse('someone stacks work in "{upper}" on top of "{lower}"'))
+def stack_work(env: dict[str, str], placeholders: Placeholders, upper: str, lower: str) -> None:
+    tree = placeholders.path(f"{TREES}/{upper}")
+    jj(env, "--repository", str(tree), "new", f"{lower}@-")
+    (tree / "logout.rs").write_text("fn logout() {}\n")
+    jj(env, "--repository", str(tree), "commit", "--message", "logout")
+
+
+@given(parsers.parse('pushes the top of "{name}" to the remote as "{bookmark}"'))
+def push_top(env: dict[str, str], placeholders: Placeholders, name: str, bookmark: str) -> None:
+    tree = str(placeholders.path(f"{TREES}/{name}"))
+    jj(env, "--repository", tree, "bookmark", "create", bookmark, "--revision", "@-")
+    jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
 
 
 @then("the output says how to apply the report")
