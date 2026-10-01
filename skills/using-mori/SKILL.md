@@ -41,6 +41,14 @@ listed in `context/llms.txt`. Before working on a repo, read what is there; put 
 anything the next agent should know there too. It is shared by the person and every agent and
 harness, and mori never changes it after writing its starter `README.md`.
 
+### Builds and disk
+
+Every tree builds from scratch unless the build tools share their caches, so many trees can fill a
+disk. Caches belong in the person's user-level config (`~/.bazelrc`, `~/.cargo/config.toml`), never
+in the repo or a tree: see [Shared caches](https://nevzheng.github.io/mori/shared-caches/). If a
+build is slow in every new tree, or the disk is filling, tell the person and point them there;
+don't change their config yourself.
+
 ## The layout
 
 ```text
