@@ -12,6 +12,8 @@ use std::process::Command;
 
 use mori_core::error::{Code, ErrorDetails};
 use mori_core::forest::{TreeState, Workspace, Workspaces};
+pub use mori_core::vcs::RemoteBookmark;
+use mori_core::vcs::Vcs;
 
 /// Prints each workspace as two JSON strings, name then root, so any path parses exactly.
 const WORKSPACE_TEMPLATE: &str = r#"json(name) ++ " " ++ json(root) ++ "\n""#;
@@ -232,17 +234,6 @@ impl Workspaces for JjCli {
     }
 }
 
-/// A remote bookmark and the commit it points to.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RemoteBookmark {
-    /// The bookmark, e.g. `claude/fix-login`.
-    pub name: String,
-    /// The remote, e.g. `origin`.
-    pub remote: String,
-    /// The full commit ID it points to.
-    pub commit_id: String,
-}
-
 /// Lists remote bookmarks as tab-separated name, remote and commit ID. A conflicted bookmark
 /// has no single target and is left out.
 const REMOTE_BOOKMARK_TEMPLATE: &str = r#"if(remote && normal_target, name ++ "\t" ++ remote ++ "\t" ++ normal_target.commit_id() ++ "\n")"#;
@@ -460,6 +451,68 @@ impl JjCli {
     /// [`JjError::Failed`] with jj's message (for example, no network).
     pub fn fetch(&self, clone: &Path) -> Result<(), JjError> {
         self.write(clone, &["git", "fetch"])
+    }
+}
+
+/// Every method is the inherent one of the same name; the trait lets flows take any backend.
+impl Vcs for JjCli {
+    fn clone_repo(&self, url: &str, path: &Path, colocate: bool) -> Result<(), JjError> {
+        Self::clone_repo(self, url, path, colocate)
+    }
+
+    fn add_tree(&self, clone: &Path, name: &str, path: &Path, from: &str) -> Result<(), JjError> {
+        self.add_workspace(clone, name, path, from)
+    }
+
+    fn add_tree_at(
+        &self,
+        clone: &Path,
+        name: &str,
+        path: &Path,
+        commit_id: &str,
+    ) -> Result<(), JjError> {
+        self.add_workspace_at(clone, name, path, commit_id)
+    }
+
+    fn snapshot(&self, tree: &Path) -> Result<(), JjError> {
+        Self::snapshot(self, tree)
+    }
+
+    fn forget_tree(&self, clone: &Path, name: &str) -> Result<(), JjError> {
+        self.forget_workspace(clone, name)
+    }
+
+    fn state_covering(
+        &self,
+        clone: &Path,
+        name: &str,
+        landed: &[String],
+    ) -> Result<TreeState, JjError> {
+        Self::state_covering(self, clone, name, landed)
+    }
+
+    fn working_copy_commit(&self, clone: &Path, name: &str) -> Result<String, JjError> {
+        Self::working_copy_commit(self, clone, name)
+    }
+
+    fn pushed_bookmarks(&self, clone: &Path, name: &str) -> Result<Vec<RemoteBookmark>, JjError> {
+        Self::pushed_bookmarks(self, clone, name)
+    }
+
+    fn last_change(&self, clone: &Path, name: &str) -> Result<u64, JjError> {
+        Self::last_change(self, clone, name)
+    }
+
+    fn pin(&self, clone: &Path, name: &str, commit_id: &str) -> Result<(), JjError> {
+        Self::pin(self, clone, name, commit_id)
+    }
+
+    fn commit_exists(&self, clone: &Path, commit_id: &str) -> Result<bool, JjError> {
+        Self::commit_exists(self, clone, commit_id)
+    }
+
+    fn fetch(&self, clone: &Path) -> Result<(), JjError> {
+        Self::fetch(self, clone)
     }
 }
 

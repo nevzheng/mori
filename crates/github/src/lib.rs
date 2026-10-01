@@ -7,17 +7,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use mori_core::clone::RepoId;
-
-/// Whether a bookmark's pull request merged.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Merged {
-    /// `gh` says the pull request merged.
-    Yes,
-    /// There is no pull request for the bookmark, or it is open or closed without merging.
-    No,
-    /// `gh` couldn't answer: not installed, not logged in, offline, or an unexpected reply.
-    Unknown,
-}
+use mori_core::vcs::Forge;
+pub use mori_core::vcs::Merged;
 
 /// Runs the `gh` program.
 #[derive(Clone, Debug)]
@@ -63,6 +54,12 @@ impl GhCli {
         } else {
             Merged::Unknown
         }
+    }
+}
+
+impl Forge for GhCli {
+    fn pr_merged(&self, repo: &RepoId, bookmark: &str) -> Merged {
+        Self::pr_merged(self, repo, bookmark)
     }
 }
 
