@@ -21,6 +21,7 @@ nav = [
     { "The forest layout and tree model" = "design/core/forest-layout-and-tree-model.md" },
     { "Skills and llms.txt in the root" = "design/skills/install-skills-and-llms-txt-into-the-root.md" },
     { "Cleanup that never loses work" = "design/core/cleanup-never-loses-work.md" },
+    { "Disk usage" = "design/core/disk-usage.md" },
   ] },
 ]
 
