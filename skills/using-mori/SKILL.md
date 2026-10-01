@@ -125,30 +125,25 @@ merge). Then it forgets the workspace, deletes the directory and drops the recor
 
 ### `mori gc [repo]`
 
-Reports which trees may be removed and whether each is safe to, and saves the report. It changes
-no tree (it only fetches remote bookmarks; `--offline` skips that and GitHub). Each tree gets a
-class and a reason:
+Reports which trees may be removed and whether each is safe to. Without `--apply` it changes no
+tree (it only fetches remote bookmarks; `--offline` skips that and GitHub). Each tree gets a class
+and a reason:
 
-- **remove**: its lifetime lets it go and nothing would be lost (`LANDED`, `IDLE`, or
-  `MISSING` when only a stale record is left).
+- **remove**: its lifetime lets it go and nothing would be lost (`LANDED`, `IDLE`, or `MISSING`
+  when only a stale record is left).
 - **blocked** (`UNSAVED`): it may go, but has edits or unpushed work. Push it or ask the person.
 - **keep**: not yet (`NOT_YET`), or it can't be told (`UNKNOWN`: offline, or no `gh` login).
 - **never**: the clone itself, a pinned tree, or a workspace mori didn't make.
 
-Removing the trees a report lists is the person's decision: don't run `mori gc apply` unless they
-asked you to.
-
-### `mori gc apply <report> --yes`
-
-Removes the trees a report lists to remove, at most 10 per run (`--max`, `--only <name>`). Each
-tree is snapshotted and judged again first; one that changed since the report is kept and the
-output says why. Each removal pins the tree's commit and goes into the journal, and the output
-gives the `mori restore <entry>` command that undoes it. Without `--yes` nothing is removed
-(`CONFIRMATION_NEEDED`); `--dry-run` shows what would go.
+`mori gc --apply --yes` also removes the removable trees, at most 10 per run (`--max`, `--only
+<name>`). Each is snapshotted and judged again first, and kept if it changed; each removal pins the
+tree's commit and goes into the journal, and the output gives the `mori restore <entry>` command
+that undoes it. Without `--yes` nothing is removed (`CONFIRMATION_NEEDED`); `--apply --dry-run`
+shows what would go. Removing is the person's decision: don't run `--apply` unless they asked.
 
 ### `mori restore <entry>`
 
-Brings back a tree `mori gc apply` removed, from the journal entry the apply printed: its
+Brings back a tree `mori gc --apply` removed, from the journal entry it printed: its
 workspace on the commit mori pinned when it removed it, at its old path, under its old record.
 If that commit is gone (`RESTORE_COMMIT_GONE`), it changes nothing; if the name or path is taken
 again, it refuses like `tree create`.
@@ -178,8 +173,7 @@ error is a `google.rpc.Status`:
 | 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
 | 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
 | 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                         |
-| 5    | `REPORT_NOT_FOUND`      | No such cleanup report. Run `mori gc` for a new one.                           |
-| 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc apply`.                    |
+| 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc --apply`.                  |
 | 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.         |
 | 6    | `PATH_EXISTS`           | Something mori didn't make is at the path. Leave it; tell the person.          |
 | 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.     |
@@ -188,7 +182,7 @@ error is a `google.rpc.Status`:
 | 9    | `NOT_TREE_OWNER`        | Someone else's tree. Leave it; tell the person if it looks abandoned.          |
 | 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.       |
 | 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                |
-| 9    | `CONFIRMATION_NEEDED`   | `mori gc apply` needs `--yes`: only when the person asked for it.              |
+| 9    | `CONFIRMATION_NEEDED`   | `mori gc --apply` needs `--yes`: only when the person asked for it.            |
 | 9    | `RESTORE_COMMIT_GONE`   | The removed tree's commit is gone; it can't come back. Tell the person.        |
 | 9    | `NOT_INITIALIZED`       | mori isn't set up. Run `mori init` if the task allows, else ask.               |
 | 9    | `ROOT_MISMATCH`         | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |

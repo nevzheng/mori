@@ -1,5 +1,5 @@
-Feature: CUJ 6 - clean up safely: applying a report
-  `mori gc apply` removes a confirmed batch of the trees a report lists to remove. It checks each
+Feature: CUJ 6 - clean up safely: removing what the report finds
+  `mori gc --apply --yes` removes a batch of the trees the report finds removable. It checks each
   tree again first and keeps any that changed; each removal pins the tree's commit and goes into
   the journal.
 
@@ -14,10 +14,9 @@ Feature: CUJ 6 - clean up safely: applying a report
     And pushes it to the remote as "claude/fix-login"
     And I have run "mori ls"
     And the remote deletes "claude/fix-login" after a squash merge
-    And I have made a cleanup report
 
   Scenario: A confirmed batch is removed, pinned and journalled
-    When I apply the report with "--yes"
+    When I run "mori gc --apply --yes"
     Then it succeeds
     And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
     And the clone has no workspace "claude-fix-login"
@@ -25,23 +24,19 @@ Feature: CUJ 6 - clean up safely: applying a report
     And the journal has an entry for "claude-fix-login" whose commit is pinned
 
   Scenario: Nothing is removed without confirmation
-    When I apply the report without confirming
+    When I run "mori gc --apply"
     Then it fails with status FAILED_PRECONDITION and reason "CONFIRMATION_NEEDED"
     And "<home>/mori/trees/widget/claude-fix-login" exists
 
   Scenario: A dry run removes nothing
-    When I apply the report with "--dry-run"
+    When I run "mori gc --apply --dry-run"
     Then it succeeds
     And the output says "claude-fix-login" would be removed
     And "<home>/mori/trees/widget/claude-fix-login" exists
 
   Scenario: A tree edited since the report is kept
     Given someone edits "claude-fix-login" without running jj
-    When I apply the report with "--yes"
+    When I run "mori gc --apply --yes"
     Then it succeeds
     And the output says "claude-fix-login" was kept because it has unsaved work
     And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
-
-  Scenario: An unknown report is refused
-    When I run "mori gc apply gc-0-00000000 --yes"
-    Then it fails with status NOT_FOUND and reason "REPORT_NOT_FOUND"

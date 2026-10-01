@@ -58,19 +58,36 @@ enum Command {
         no_colocate: bool,
     },
 
-    /// Report which trees may be removed and whether each is safe to remove, and save the report
-    /// for `mori gc apply`. Changes no tree.
-    #[command(args_conflicts_with_subcommands = true)]
+    /// Report which trees may be removed and whether each is safe to remove. With --apply --yes,
+    /// also remove a batch of them: each is checked again first, and each removal is journalled,
+    /// so `mori restore` can undo it.
     Gc {
-        #[command(subcommand)]
-        apply: Option<GcCommand>,
-
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
 
         /// Don't fetch or ask GitHub; use only what the clones already know.
         #[arg(long)]
         offline: bool,
+
+        /// Also remove the trees the report finds removable (needs --yes).
+        #[arg(long)]
+        apply: bool,
+
+        /// Confirm the removal.
+        #[arg(long, requires = "apply")]
+        yes: bool,
+
+        /// With --apply: only these trees (repeat for more).
+        #[arg(long = "only", requires = "apply")]
+        names: Vec<String>,
+
+        /// With --apply: the most trees to remove (default 10).
+        #[arg(long, requires = "apply")]
+        max: Option<u32>,
+
+        /// With --apply: check everything and remove nothing.
+        #[arg(long, requires = "apply")]
+        dry_run: bool,
     },
 
     /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
@@ -80,10 +97,10 @@ enum Command {
         repo: Option<String>,
     },
 
-    /// Bring back a tree `mori gc apply` removed, from its journal entry: on its pinned commit, at
+    /// Bring back a tree `mori gc --apply` removed, from its journal entry: on its pinned commit, at
     /// its old path, under its old record.
     Restore {
-        /// The journal entry, from `mori gc apply`.
+        /// The journal entry, from `mori gc --apply`.
         entry: String,
     },
 
@@ -97,36 +114,6 @@ enum Command {
     Tree {
         #[command(subcommand)]
         command: TreeCommand,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum GcCommand {
-    /// Remove a batch of the trees a saved report lists to remove. Each is checked again first
-    /// and skipped if anything changed; each removal is journalled, so `mori restore` can undo it.
-    Apply {
-        /// The report, from `mori gc`.
-        report: String,
-
-        /// Only these trees (repeat for more).
-        #[arg(long = "only")]
-        names: Vec<String>,
-
-        /// The most trees to remove in this batch (default 10).
-        #[arg(long)]
-        max: Option<u32>,
-
-        /// Confirm the batch. Without it, nothing is removed.
-        #[arg(long)]
-        yes: bool,
-
-        /// Check everything and remove nothing.
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Don't fetch or ask GitHub while checking again.
-        #[arg(long)]
-        offline: bool,
     },
 }
 
@@ -219,33 +206,27 @@ fn main() -> ExitCode {
             command: SkillsCommand::Sync { dry_run },
         } => respond(json, skills::sync(dry_run), output::skills_text),
         Command::Gc {
-            apply:
-                Some(GcCommand::Apply {
-                    report,
-                    names,
-                    max,
-                    yes,
-                    dry_run,
-                    offline,
-                }),
-            ..
-        } => respond(
-            json,
-            gc_apply::run(&gc_apply::ApplyArgs {
-                report_id: report,
-                names,
-                max,
-                yes,
-                dry_run,
-                offline,
-            }),
-            output::gc_apply_text,
-        ),
-        Command::Gc {
-            apply: None,
             repo,
             offline,
-        } => respond(json, gc::run(repo.as_deref(), offline), output::gc_text),
+            apply,
+            yes,
+            names,
+            max,
+            dry_run,
+        } => respond(
+            json,
+            gc::run(&gc::GcArgs {
+                repo,
+                offline,
+                apply: apply.then_some(gc::Apply {
+                    yes,
+                    names,
+                    max,
+                    dry_run,
+                }),
+            }),
+            output::gc_text,
+        ),
         Command::Restore { entry } => respond(json, restore::run(&entry), output::restore_text),
         Command::Ls { repo } => respond(json, ls::run(repo.as_deref()), output::ls_text),
         Command::Tree {

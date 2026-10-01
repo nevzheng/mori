@@ -1,105 +1,31 @@
-//! `mori gc apply`: remove a confirmed batch from a saved report, checking each tree again first.
+//! `mori gc --apply`: remove one tree from a confirmed batch, checking it again first.
 //!
 //! Per tree: snapshot, judge again with the report's own rules, and act only if it still may go
 //! and is safe. Removing pins the working-copy commit (`refs/mori/removed/<entry>`), forgets the
 //! workspace, deletes the directory, drops the record and journals it, in that order.
 
-use std::collections::BTreeSet;
-use std::io::ErrorKind;
-
-use mori_api::v1alpha1::{
-    GcApplyItem, GcApplyResponse, gc_apply_item::Outcome, gc_item::Class as ItemClass,
-};
+use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
 use mori_core::clone::{CloneUrl, clone_path};
-use mori_core::error::{CleanupError, ErrorDetails};
+use mori_core::error::ErrorDetails;
 use mori_core::forest::Workspaces;
-use mori_jj::JjCli;
 use mori_store::StoreError;
 use mori_store::database::Database;
-use mori_store::gc::{JournalBookmark, JournalEntry, ReportItem, new_id, now};
+use mori_store::gc::{JournalBookmark, JournalEntry, new_id, now};
 use mori_store::records::{RepoRecord, TreeRecord};
 
 use crate::gc::{self, Context};
-use crate::state::{self, boxed};
-
-/// The default batch size.
-const DEFAULT_MAX: u32 = 10;
-
-/// What `mori gc apply` was asked for.
-pub struct ApplyArgs {
-    pub report_id: String,
-    pub names: Vec<String>,
-    pub max: Option<u32>,
-    pub yes: bool,
-    pub dry_run: bool,
-    pub offline: bool,
-}
-
-/// Runs `mori gc apply`.
-pub fn run(args: &ApplyArgs) -> Result<GcApplyResponse, Box<dyn ErrorDetails>> {
-    let paths = state::paths()?;
-    let mut db = state::open_database(&paths)?;
-    let jj = JjCli::from_path();
-    let gh = (!args.offline).then(gc::gh);
-    let report =
-        mori_store::gc::load_report(&paths, &args.report_id).map_err(|error| match error {
-            StoreError::Io { source, .. } if source.kind() == ErrorKind::NotFound => {
-                boxed(CleanupError::ReportNotFound {
-                    id: args.report_id.clone(),
-                })
-            }
-            other => boxed(other),
-        })?;
-    let max = usize::try_from(args.max.filter(|max| *max > 0).unwrap_or(DEFAULT_MAX))
-        .unwrap_or(usize::MAX);
-    let batch: Vec<&ReportItem> = report
-        .items
-        .iter()
-        .filter(|item| item.class == gc::class_name(ItemClass::Remove))
-        .filter(|item| args.names.is_empty() || args.names.contains(&item.name))
-        .take(max)
-        .collect();
-    if !args.yes && !args.dry_run && !batch.is_empty() {
-        return Err(boxed(CleanupError::NotConfirmed { count: batch.len() }));
-    }
-    let context = Context {
-        paths: &paths,
-        jj: &jj,
-        gh: gh.as_ref(),
-        now: now(),
-    };
-    let mut fetched = BTreeSet::new();
-    let mut items = Vec::new();
-    for item in batch {
-        let offline = args.offline || !fetched.insert(item.repo.clone());
-        let (outcome, reason, entry_id) =
-            apply_one(&context, &mut db, &report.id, item, offline, args.dry_run)?;
-        items.push(GcApplyItem {
-            repo: item.repo.clone(),
-            name: item.name.clone(),
-            outcome: outcome.into(),
-            reason,
-            entry_id,
-        });
-    }
-    Ok(GcApplyResponse {
-        report_id: report.id,
-        items,
-        validate_only: args.dry_run,
-    })
-}
+use crate::state::boxed;
 
 /// Checks one tree again and, if it still may go and is safe, removes it.
-fn apply_one(
+pub fn apply_one(
     context: &Context,
     db: &mut Database,
-    report_id: &str,
-    item: &ReportItem,
-    offline: bool,
+    repo_name: &str,
+    tree_name: &str,
     dry_run: bool,
 ) -> Result<(Outcome, String, String), Box<dyn ErrorDetails>> {
     let changed = |why: &str| Ok((Outcome::SkippedChanged, why.to_owned(), String::new()));
-    let Some(repo) = db.repo(&item.repo).map_err(boxed)? else {
+    let Some(repo) = db.repo(repo_name).map_err(boxed)? else {
         return changed("GONE");
     };
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
@@ -108,7 +34,7 @@ fn apply_one(
         .trees(&repo.id)
         .map_err(boxed)?
         .into_iter()
-        .find(|tree| tree.name == item.name)
+        .find(|tree| tree.name == tree_name)
     else {
         return changed("GONE");
     };
@@ -134,7 +60,7 @@ fn apply_one(
         }
         context.jj.snapshot(&workspace.root).map_err(boxed)?;
     }
-    let judged = gc::report_repo(context, db, &repo, offline)?
+    let judged = gc::report_repo(context, db, &repo, true)?
         .into_iter()
         .find(|judged| judged.name == record.name);
     let Some(judged) = judged else {
@@ -149,15 +75,7 @@ fn apply_one(
         return Ok((Outcome::WouldRemove, judged.reason, String::new()));
     }
     let entry_id = new_id("j");
-    let entry = remove(
-        context,
-        db,
-        &repo,
-        &record,
-        workspace.is_some(),
-        &entry_id,
-        report_id,
-    )?;
+    let entry = remove(context, db, &repo, &record, workspace.is_some(), &entry_id)?;
     mori_store::gc::append_journal(context.paths, &entry).map_err(boxed)?;
     Ok((Outcome::Removed, judged.reason, entry_id))
 }
@@ -170,7 +88,6 @@ fn remove(
     record: &TreeRecord,
     has_workspace: bool,
     entry_id: &str,
-    report_id: &str,
 ) -> Result<JournalEntry, Box<dyn ErrorDetails>> {
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
     let clone = clone_path(context.paths, &id);
@@ -214,7 +131,6 @@ fn remove(
     Ok(JournalEntry {
         id: entry_id.to_owned(),
         removed_at: now(),
-        report_id: Some(report_id.to_owned()),
         repo: repo.remote.clone(),
         tree_id: record.id.clone(),
         name: record.name.clone(),

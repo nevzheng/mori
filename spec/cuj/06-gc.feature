@@ -1,6 +1,6 @@
 Feature: CUJ 6 - clean up safely: the report
-  `mori gc` sorts every tree into remove, blocked, keep or never, with the reason and the facts,
-  and saves the report for `mori gc apply`. It changes no tree.
+  `mori gc` sorts every tree into remove, blocked, keep or never, with the reason and the facts.
+  Without --apply it changes no tree.
 
   Background:
     Given a temporary HOME with XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME inside it
@@ -24,7 +24,6 @@ Feature: CUJ 6 - clean up safely: the report
     And the report has "claude-lead" as "never" because "PINNED"
     And the report has "default" as "never" because "BASE"
     And "<home>/mori/trees/widget/claude-fix-login" exists
-    And the report is saved
 
   Scenario: Work newer than what landed is blocked
     Given someone commits work in "claude-fix-login"

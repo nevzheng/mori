@@ -24,16 +24,9 @@ def report_has(mori: Mori, name: str, cls: str, reason: str) -> None:
     assert_that((items[name]["class"], items[name]["reason"]), equal_to((CLASSES[cls], reason)))
 
 
-@then("the report is saved")
-def report_saved(mori: Mori, placeholders: Placeholders) -> None:
-    report_id = json.loads(mori.last.stdout)["reportId"]
-    saved = placeholders.path(f"$XDG_STATE_HOME/mori/reports/{report_id}.json")
-    assert_that(json.loads(saved.read_text())["id"], equal_to(report_id))
-
-
 @then("the output says how to apply the report")
 def says_how_to_apply(mori: Mori) -> None:
-    assert_that(mori.last.stdout, contains_string("mori gc apply gc-"))
+    assert_that(mori.last.stdout, contains_string("`mori gc --apply --yes`"))
 
 
 # Applying a report
@@ -41,26 +34,8 @@ def says_how_to_apply(mori: Mori) -> None:
 
 @pytest.fixture
 def cleanup() -> dict[str, str]:
-    """The scenario's cleanup report ID, once made."""
+    """The journal entry of the scenario's removal, once made."""
     return {}
-
-
-@given("I have made a cleanup report")
-def made_report(mori: Mori, cleanup: dict[str, str]) -> None:
-    result = mori.run("mori gc --json")
-    if result.returncode != 0:
-        pytest.fail(f"setup: mori gc exited {result.returncode}\n{result.stderr}")
-    cleanup["id"] = json.loads(result.stdout)["reportId"]
-
-
-@when("I apply the report without confirming")
-def apply_unconfirmed(mori: Mori, cleanup: dict[str, str]) -> None:
-    mori.run(f"mori gc apply {cleanup['id']}")
-
-
-@when(parsers.parse('I apply the report with "{flags}"'))
-def apply_report(mori: Mori, cleanup: dict[str, str], flags: str) -> None:
-    mori.run(f"mori gc apply {cleanup['id']} {flags}".strip())
 
 
 @then(parsers.parse('the journal has an entry for "{name}" whose commit is pinned'))
@@ -80,28 +55,36 @@ def journal_pins(env: dict[str, str], placeholders: Placeholders, name: str) -> 
     assert_that(pinned.stdout.strip(), equal_to(entry["commit_id"]))
 
 
+def line_for(mori: Mori, name: str) -> str:
+    lines = [line for line in mori.last.stdout.splitlines() if f" {name} " in f"{line} "]
+    assert lines, f"no line for {name!r} in:\n{mori.last.stdout}"
+    return lines[0]
+
+
 @then(parsers.parse('the output says "{name}" would be removed'))
 def says_would_remove(mori: Mori, name: str) -> None:
-    assert_that(mori.last.stdout, contains_string(f"{name}: would remove"))
+    assert_that(line_for(mori, name), contains_string("would remove"))
 
 
 @then(parsers.parse('the output says "{name}" was kept because it has unsaved work'))
 def says_kept_unsaved(mori: Mori, name: str) -> None:
-    assert_that(
-        mori.last.stdout, contains_string(f"{name}: kept: it has work only this machine has")
-    )
+    line = line_for(mori, name)
+    assert_that(line, contains_string("kept: it has work only this machine has"))
+    assert line.strip().startswith("blocked"), line
 
 
 # Restoring
 
 
-@given("I have applied the report")
-def applied(mori: Mori, cleanup: dict[str, str]) -> None:
-    result = mori.run(f"mori gc apply {cleanup['id']} --yes --json")
+@given(parsers.parse('I have removed it with "{command}"'))
+def removed_with(mori: Mori, cleanup: dict[str, str], command: str) -> None:
+    result = mori.run(f"{command} --json")
     if result.returncode != 0:
-        pytest.fail(f"setup: mori gc apply exited {result.returncode}\n{result.stderr}")
+        pytest.fail(f"setup: {command} exited {result.returncode}\n{result.stderr}")
     removed = [
-        item for item in json.loads(result.stdout)["items"] if item["outcome"] == "OUTCOME_REMOVED"
+        item
+        for item in json.loads(result.stdout)["items"]
+        if item.get("outcome") == "OUTCOME_REMOVED"
     ]
     assert removed, result.stdout
     cleanup["entry"] = removed[0]["entryId"]

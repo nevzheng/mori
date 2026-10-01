@@ -8,9 +8,9 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
-    CloneResponse, CreateTreeResponse, GcApplyResponse, GcResponse, InitResponse,
-    ListTreesResponse, RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow,
-    skill_file::Action, tree_row::Status,
+    CloneResponse, CreateTreeResponse, GcResponse, InitResponse, ListTreesResponse,
+    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, skill_file::Action,
+    tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -290,19 +290,32 @@ pub fn skills_text(response: &SyncSkillsResponse) -> String {
     text
 }
 
-/// The text `gc` prints: every tree with its class and reason, then what to do next.
+/// The text `gc` prints: every tree with its class and reason (and, with --apply, what happened
+/// to it), then what to do next.
 pub fn gc_text(response: &GcResponse) -> String {
+    use mori_api::v1alpha1::gc_item::Outcome;
     let mut text = String::new();
-    let _ = writeln!(text, "Cleanup report {}:", response.report_id);
+    let applied = response
+        .items
+        .iter()
+        .any(|item| item.outcome() != Outcome::Unspecified);
+    let _ = writeln!(text, "Cleanup:");
     let rows: Vec<[String; 4]> = response
         .items
         .iter()
         .map(|item| {
+            let what = match item.outcome() {
+                Outcome::Removed => format!("removed; undo: mori restore {}", item.entry_id),
+                Outcome::WouldRemove => "would remove".to_owned(),
+                Outcome::SkippedUnsaved => "kept: it has work only this machine has".to_owned(),
+                Outcome::SkippedChanged => "kept: changed since it was judged".to_owned(),
+                Outcome::Unspecified => item.facts.clone(),
+            };
             [
                 crate::gc::class_name(item.class()).to_owned(),
                 format!("{} {}", item.repo, item.name),
                 item.reason.clone(),
-                item.facts.clone(),
+                what,
             ]
         })
         .collect();
@@ -320,51 +333,20 @@ pub fn gc_text(response: &GcResponse) -> String {
             .collect();
         let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
     }
-    let counts = crate::gc::counts(&response.items);
-    let removable = counts.get("remove").copied().unwrap_or(0);
-    let _ = if removable == 0 {
+    let removable = crate::gc::counts(&response.items)
+        .get("remove")
+        .copied()
+        .unwrap_or(0);
+    let _ = if applied {
+        Ok(())
+    } else if removable == 0 {
         writeln!(text, "Nothing to remove.")
     } else {
         writeln!(
             text,
-            "{removable} tree(s) can go: `mori gc apply {} --yes` removes them, checking each again first.",
-            response.report_id
+            "{removable} tree(s) can go: `mori gc --apply --yes` removes them, checking each again first."
         )
     };
-    text
-}
-
-/// The text `gc apply` prints: each tree in the batch and what happened to it.
-pub fn gc_apply_text(response: &GcApplyResponse) -> String {
-    use mori_api::v1alpha1::gc_apply_item::Outcome;
-    let mut text = String::new();
-    let _ = writeln!(
-        text,
-        "{} {}:",
-        if response.validate_only {
-            "Would apply cleanup report"
-        } else {
-            "Applied cleanup report"
-        },
-        response.report_id
-    );
-    if response.items.is_empty() {
-        let _ = writeln!(text, "  nothing to remove");
-    }
-    for item in &response.items {
-        let what = match item.outcome() {
-            Outcome::Removed => format!(
-                "removed ({}); undo: mori restore {}",
-                item.reason, item.entry_id
-            ),
-            Outcome::WouldRemove => format!("would remove ({})", item.reason),
-            Outcome::SkippedUnsaved => "kept: it has work only this machine has".to_owned(),
-            Outcome::SkippedChanged | Outcome::Unspecified => {
-                format!("kept: changed since the report ({})", item.reason)
-            }
-        };
-        let _ = writeln!(text, "  {} {}: {what}", item.repo, item.name);
-    }
     text
 }
 
