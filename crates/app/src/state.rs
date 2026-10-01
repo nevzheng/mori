@@ -1,6 +1,7 @@
 //! mori's own state, as every command after `init` needs it: the paths, the database and the
 //! `[trees]` policy from `config.toml`.
 
+use mori_core::clone::{CloneUrl, RepoId, resolve_repo};
 use mori_core::config::Config;
 use mori_core::disk::DiskPolicy;
 use mori_core::error::{ConfigError, ErrorDetails, RootSource};
@@ -80,6 +81,19 @@ pub fn remove_tree_dir(path: &std::path::Path) -> Result<(), Box<dyn ErrorDetail
         }
         _ => Ok(()),
     }
+}
+
+/// The repo `arg` names: any form `mori clone` accepts, or the short name of a repo mori
+/// manages.
+pub fn repo_id(db: &Database, arg: &str) -> Result<RepoId, Box<dyn ErrorDetails>> {
+    let managed: Vec<RepoId> = db
+        .repos()
+        .map_err(boxed)?
+        .iter()
+        .filter_map(|repo| CloneUrl::parse(&repo.remote).ok())
+        .map(|url| url.repo)
+        .collect();
+    resolve_repo(arg, &managed).map_err(boxed)
 }
 
 /// Boxes an error for the edges to render.

@@ -3,7 +3,7 @@
 //! the way `mori gc --apply` removes one: pinned and journalled, so `mori restore` brings it back.
 
 use mori_api::v1alpha1::{RemoveTreeResponse, Tree};
-use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
+use mori_core::clone::{BASE_TREE_NAME, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::paths::Paths;
 use mori_core::tree::{Lifetime, Role};
@@ -36,13 +36,13 @@ pub fn run<V: Backend, F: Forge>(
     app: &App<V, F>,
     args: RemoveArgs,
 ) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>> {
-    let repo_id = CloneUrl::parse(&args.repo).map_err(boxed)?.repo;
     let request = Request {
         name: args.name,
         pinned_ok: args.pinned,
     };
     let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
+    let repo_id = state::repo_id(&db, &args.repo)?;
     let vcs = &app.vcs;
     let repo = db
         .repo(&repo_id.to_string())

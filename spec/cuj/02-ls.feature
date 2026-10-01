@@ -75,3 +75,20 @@ Feature: CUJ 2 - see the forest
     Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
     When I run "mori ls"
     Then no file or directory was created or modified
+
+  Scenario: A repo can be named by its short name
+    Given I have run "mori tree create widget --agent claude --task fix-login"
+    When I run "mori ls acme/widget --json"
+    Then it succeeds
+    And the forest shows "claude-fix-login" as claude's task "fix-login", lifetime "task-done"
+
+  Scenario: A short name that fits two repos is refused with both
+    Given "github.com/other/widget" is a repo on the remote
+    And I have run "mori clone github.com/other/widget"
+    When I run "mori ls widget"
+    Then it fails with status INVALID_ARGUMENT and reason "REPO_AMBIGUOUS"
+
+  Scenario: A name mori doesn't manage says so
+    When I run "mori ls nothing"
+    Then it fails with status NOT_FOUND and reason "REPO_NOT_MANAGED"
+

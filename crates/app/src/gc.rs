@@ -62,7 +62,7 @@ pub fn run<V: Backend, F: Forge>(
     let mut db = state::open_database(&paths)?;
     let mut repos = db.repos().map_err(boxed)?;
     if let Some(repo) = &args.repo {
-        let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
+        let wanted = state::repo_id(&db, repo)?.to_string();
         repos.retain(|record| record.remote == wanted);
         if repos.is_empty() {
             return Err(boxed(RepoError::NotManaged { repo: wanted }));

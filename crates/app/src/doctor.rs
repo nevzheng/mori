@@ -139,7 +139,7 @@ fn gather<V: Backend, F: Forge>(
 ) -> Result<Facts, Box<dyn ErrorDetails>> {
     let mut records = db.repos().map_err(boxed)?;
     if let Some(repo) = repo {
-        let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
+        let wanted = state::repo_id(db, repo)?.to_string();
         records.retain(|record| record.remote == wanted);
         if records.is_empty() {
             return Err(boxed(RepoError::NotManaged { repo: wanted }));

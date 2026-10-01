@@ -5,7 +5,7 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 use mori_api::v1alpha1::{CreateTreeResponse, Tree};
-use mori_core::clone::{CloneUrl, RepoId, clone_path};
+use mori_core::clone::{RepoId, clone_path};
 use mori_core::error::{ErrorDetails, TreeError};
 use mori_core::paths::Paths;
 use mori_core::tree::Lifetime;
@@ -40,10 +40,10 @@ pub fn create<V: Backend, F: Forge>(
     app: &App<V, F>,
     args: CreateArgs,
 ) -> Result<CreateTreeResponse, Box<dyn ErrorDetails>> {
-    let repo = CloneUrl::parse(&args.repo).map_err(boxed)?.repo;
     let owner = owner(&app.host, args.agent)?;
     let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
+    let repo = state::repo_id(&db, &args.repo)?;
     let policy = state::tree_policy(&paths)?;
     let (repo_id, observed) = observe(&paths, &db, &app.vcs, &repo)?;
     let request = Request {
