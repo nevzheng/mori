@@ -2825,6 +2825,12 @@ impl serde::Serialize for RemoveTreeResponse {
         if self.validate_only {
             len += 1;
         }
+        if !self.journal_entry.is_empty() {
+            len += 1;
+        }
+        if self.directory_gone {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("mori.v1alpha1.RemoveTreeResponse", len)?;
         if let Some(v) = self.tree.as_ref() {
@@ -2838,6 +2844,12 @@ impl serde::Serialize for RemoveTreeResponse {
         }
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        if !self.journal_entry.is_empty() {
+            struct_ser.serialize_field("journalEntry", &self.journal_entry)?;
+        }
+        if self.directory_gone {
+            struct_ser.serialize_field("directoryGone", &self.directory_gone)?;
         }
         struct_ser.end()
     }
@@ -2856,6 +2868,10 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
             "directoryRemoved",
             "validate_only",
             "validateOnly",
+            "journal_entry",
+            "journalEntry",
+            "directory_gone",
+            "directoryGone",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -2864,6 +2880,8 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
             WorkspaceForgotten,
             DirectoryRemoved,
             ValidateOnly,
+            JournalEntry,
+            DirectoryGone,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2896,6 +2914,8 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
                                 Ok(GeneratedField::DirectoryRemoved)
                             }
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "journalEntry" | "journal_entry" => Ok(GeneratedField::JournalEntry),
+                            "directoryGone" | "directory_gone" => Ok(GeneratedField::DirectoryGone),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2919,6 +2939,8 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
                 let mut workspace_forgotten__ = None;
                 let mut directory_removed__ = None;
                 let mut validate_only__ = None;
+                let mut journal_entry__ = None;
+                let mut directory_gone__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -2947,6 +2969,18 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::JournalEntry => {
+                            if journal_entry__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("journalEntry"));
+                            }
+                            journal_entry__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::DirectoryGone => {
+                            if directory_gone__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("directoryGone"));
+                            }
+                            directory_gone__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(RemoveTreeResponse {
@@ -2954,6 +2988,8 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeResponse {
                     workspace_forgotten: workspace_forgotten__.unwrap_or_default(),
                     directory_removed: directory_removed__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    journal_entry: journal_entry__.unwrap_or_default(),
+                    directory_gone: directory_gone__.unwrap_or_default(),
                 })
             }
         }

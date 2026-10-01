@@ -138,6 +138,9 @@ merge). Then it forgets the workspace, deletes the directory and drops the recor
   abandon it). Never delete the directory yourself to get around it.
 - It never removes the clone itself or a workspace mori didn't make. If mori's record has no
   workspace any more (`missing` in `mori ls`), it drops the record and leaves the directory.
+- If the tree's directory was deleted by hand, nothing can be checked any more: mori pins the
+  tree's last commit, forgets it and journals it, and prints the `mori restore <entry>` that
+  brings it back.
 
 ### `mori gc [repo]`
 

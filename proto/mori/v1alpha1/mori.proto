@@ -340,6 +340,14 @@ message RemoveTreeResponse {
 
   // Echoes the request: true if nothing was actually removed.
   bool validate_only = 4;
+
+  // The journal entry, set only for a tree whose directory was already deleted by hand: its last
+  // commit is pinned, and `mori restore <journal_entry>` brings it back.
+  string journal_entry = 5;
+
+  // True if its directory was already deleted by hand, so its last commit is (or, in a dry run,
+  // would be) pinned and journalled rather than checked.
+  bool directory_gone = 6;
 }
 
 // Request for `SyncSkills`.

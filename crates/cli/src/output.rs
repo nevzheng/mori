@@ -258,17 +258,33 @@ pub fn tree_remove_text(response: &RemoveTreeResponse) -> String {
         return text;
     };
     // Writing to a String can't fail.
-    let _ = if response.validate_only {
-        writeln!(
+    let _ = match (response.validate_only, response.directory_gone) {
+        (true, false) => writeln!(
             text,
             "Would remove tree {} (dry run): it is safe to remove.",
             tree.name
-        )
-    } else {
-        writeln!(text, "Removed tree {}:", tree.name)
+        ),
+        (true, true) => writeln!(
+            text,
+            "Would remove tree {} (dry run): its directory was deleted, so its last commit would \
+             be pinned for `mori restore`.",
+            tree.name
+        ),
+        (false, _) => writeln!(text, "Removed tree {}:", tree.name),
     };
     if !response.validate_only {
-        if response.directory_removed {
+        if response.directory_gone {
+            let _ = writeln!(
+                text,
+                "  its directory {} was already deleted; pinned its last commit",
+                tree.path
+            );
+            let _ = writeln!(
+                text,
+                "  bring it back with `mori restore {}`",
+                response.journal_entry
+            );
+        } else if response.directory_removed {
             let _ = writeln!(text, "  deleted {}", tree.path);
         } else {
             let _ = writeln!(

@@ -45,6 +45,16 @@ Feature: CUJ 8 - trees as git worktrees
     And the clone has no git worktree "claude-fix-login"
     And mori has no record of the tree "claude-fix-login"
 
+  Scenario: A git tree deleted by hand keeps its work, and restore brings it back
+    Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And someone commits work with git in "claude-fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    And I have removed it with "mori tree remove github.com/acme/widget claude-fix-login"
+    When I restore the removed tree
+    Then it succeeds
+    And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
+    And the clone has a git worktree "claude-fix-login"
+
   Scenario: gc removes a landed git tree, and restore brings it back
     Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
     And someone commits work with git in "claude-fix-login"

@@ -3,7 +3,9 @@ Feature: CUJ 4 - an agent finishes and removes its tree
   machine: no edits and no change missing from the remote, or work that landed. Anyone may remove
   any task tree that is safe to remove. It snapshots the tree first, so recent edits count, even
   in a tree whose working copy another workspace rebased (which leaves it stale). It never removes
-  the clone itself or a workspace mori didn't make.
+  the clone itself or a workspace mori didn't make. A tree whose directory was deleted by hand can
+  no longer be checked, so its last commit is pinned and journalled instead, and `mori restore`
+  brings it back.
 
   Background:
     Given a temporary HOME with XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME inside it
@@ -103,6 +105,15 @@ Feature: CUJ 4 - an agent finishes and removes its tree
     Then it succeeds
     And mori has no record of the tree "claude-fix-login"
     And "<home>/mori/trees/widget/claude-fix-login" exists
+
+  Scenario: A tree deleted by hand keeps its work, and restore brings it back
+    Given someone commits work in "claude-fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    And I have removed it with "mori tree remove github.com/acme/widget claude-fix-login"
+    When I restore the removed tree
+    Then it succeeds
+    And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
+    And the clone has a workspace "claude-fix-login"
 
   Scenario: Dry run removes nothing
     When I run "mori tree remove --dry-run github.com/acme/widget claude-fix-login"

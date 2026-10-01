@@ -1,17 +1,22 @@
 //! `mori tree remove`: check the tree is safe to remove, then forget its workspace, delete its
-//! directory and drop its record, in that order.
+//! directory and drop its record, in that order. A tree whose directory was deleted by hand goes
+//! the way `mori gc --apply` removes one: pinned and journalled, so `mori restore` brings it back.
 
 use mori_api::v1alpha1::{RemoveTreeResponse, Tree};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
+use mori_core::paths::Paths;
 use mori_core::tree::{Lifetime, Role};
 use mori_core::tree_remove::{Observed, Recorded, RemovePlan, Request, plan};
 use mori_core::vcs::Forge;
-use mori_store::records::TreeRecord;
+use mori_store::database::Database;
+use mori_store::gc::new_id;
+use mori_store::records::{RepoRecord, TreeRecord};
 
-use crate::landing;
+use crate::gc::Context;
 use crate::state::{self, boxed};
 use crate::{App, Backend};
+use crate::{gc_apply, landing};
 
 /// What `mori tree remove` was asked for.
 pub struct RemoveArgs {
@@ -64,11 +69,20 @@ pub fn run<V: Backend, F: Forge>(
             paths.trees().join(&repo.dir_name).join(&record.name)
         },
     });
-    let has_workspace = vcs
+    let workspace = vcs
         .list(&clone)
         .map_err(boxed)?
-        .iter()
-        .any(|workspace| workspace.name == request.name);
+        .into_iter()
+        .find(|workspace| workspace.name == request.name);
+    // Nothing can be read or snapshotted in a directory that is gone: neither where mori put it
+    // nor where the VCS says it is (jj reports no root once it is deleted).
+    let dir_gone = workspace.as_ref().is_some_and(|workspace| {
+        !workspace.root.exists()
+            && recorded
+                .as_ref()
+                .is_some_and(|recorded| !recorded.path.exists())
+    });
+    let has_workspace = workspace.is_some() && !dir_gone;
     // Work that landed (a recorded bookmark squash-merged and deleted on the remote) counts as
     // saved, as well as work on the remote. Recording the bookmarks seen now keeps that knowable
     // after the remote deletes them.
@@ -105,6 +119,7 @@ pub fn run<V: Backend, F: Forge>(
     let mut observed = Observed {
         recorded,
         state: read_state()?,
+        dir_gone,
     };
     plan(&request, &observed).map_err(boxed)?;
     if let (Some(recorded), true) = (&observed.recorded, has_workspace) {
@@ -115,14 +130,52 @@ pub fn run<V: Backend, F: Forge>(
     let mut response = RemoveTreeResponse {
         tree: record.map(|record| tree_message(&repo.remote, &plan, record)),
         validate_only: args.dry_run,
+        directory_gone: plan.pin,
         ..RemoveTreeResponse::default()
     };
     if args.dry_run {
         return Ok(response);
     }
+    if plan.pin {
+        pin_and_remove(app, &paths, &mut db, &repo, &plan, &mut response)?;
+        return Ok(response);
+    }
     remove(vcs, &clone, &plan, &mut response)?;
     db.delete_tree(&repo.id, &plan.name).map_err(boxed)?;
     Ok(response)
+}
+
+/// Removes a tree whose directory is gone as `mori gc --apply` would: pins its last commit, forgets
+/// the workspace, drops the record and journals it.
+fn pin_and_remove<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    paths: &Paths,
+    db: &mut Database,
+    repo: &RepoRecord,
+    plan: &RemovePlan,
+    response: &mut RemoveTreeResponse,
+) -> Result<(), Box<dyn ErrorDetails>> {
+    let context = Context {
+        paths,
+        vcs: &app.vcs,
+        forge: None,
+        now: app.host.now,
+        lru_max: None,
+    };
+    let Some(record) = db
+        .trees(&repo.id)
+        .map_err(boxed)?
+        .into_iter()
+        .find(|tree| tree.name == plan.name)
+    else {
+        return Ok(());
+    };
+    let entry_id = new_id("j");
+    let entry = gc_apply::remove(&context, db, repo, &record, true, &entry_id)?;
+    mori_store::gc::append_journal(paths, &entry).map_err(boxed)?;
+    response.workspace_forgotten = true;
+    response.journal_entry = entry_id;
+    Ok(())
 }
 
 /// Forgets the workspace, then deletes the directory. A missing tree's directory is left alone:
