@@ -11,9 +11,9 @@ use mori_api::v1alpha1::{GcItem, GcResponse, gc_item::Class as ItemClass};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::forest::{Entry, Workspaces, reconcile};
-use mori_core::gc::{Class, Facts, Reason, classify, over_cap};
+use mori_core::gc::{Class, Facts, Reason, classify};
 use mori_core::paths::Paths;
-use mori_core::tree::{Lifetime, Role, TreePolicy};
+use mori_core::tree::{Lifetime, Role};
 use mori_github::GhCli;
 use mori_jj::JjCli;
 use mori_store::database::Database;
@@ -32,7 +32,6 @@ pub fn gh() -> GhCli {
 pub fn run(repo: Option<&str>, offline: bool) -> Result<GcResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths()?;
     let mut db = state::open_database(&paths)?;
-    let policy = state::tree_policy(&paths)?;
     let jj = JjCli::from_path();
     let gh = (!offline).then(gh);
     let mut repos = db.repos().map_err(boxed)?;
@@ -50,7 +49,6 @@ pub fn run(repo: Option<&str>, offline: bool) -> Result<GcResponse, Box<dyn Erro
             paths: &paths,
             jj: &jj,
             gh: gh.as_ref(),
-            policy: &policy,
             now,
         };
         items.extend(report_repo(&context, &mut db, repo, offline)?);
@@ -81,7 +79,6 @@ pub struct Context<'a> {
     pub paths: &'a Paths,
     pub jj: &'a JjCli,
     pub gh: Option<&'a GhCli>,
-    pub policy: &'a TreePolicy,
     pub now: u64,
 }
 
@@ -115,7 +112,7 @@ pub fn report_repo(
             .iter()
             .any(|workspace| workspace.name == record.name)
         {
-            landing::observe(db, context.jj, None, &tree_ref(&id, &clone, record), &[])?;
+            landing::observe(db, context.jj, None, &tree_ref(&id, &clone, record))?;
         }
     }
     if !offline && clone.exists() {
@@ -126,16 +123,9 @@ pub fn report_repo(
     for entry in reconcile(records, workspaces, |record| record.name.as_str()) {
         rows.push(row(context, db, repo, &id, &clone, entry)?);
     }
-    let idle: Vec<(String, Option<u64>)> = rows
-        .iter()
-        .filter(|row| matches!(row.facts.recorded, Some((Role::Task, _))))
-        .map(|row| (row.name.clone(), row.facts.idle_seconds))
-        .collect();
-    let beyond = over_cap(&idle, context.policy.lru.max);
     Ok(rows
         .into_iter()
-        .map(|mut row| {
-            row.facts.over_cap = beyond.contains(&row.name);
+        .map(|row| {
             let (class, reason) = classify(&row.facts);
             GcItem {
                 repo: repo.remote.clone(),
@@ -177,7 +167,6 @@ fn row(
                 state: None,
                 landed: None,
                 idle_seconds: None,
-                over_cap: false,
             },
             landed_count: 0,
         },
@@ -189,19 +178,13 @@ fn row(
                 state: None,
                 landed: None,
                 idle_seconds: None,
-                over_cap: false,
             },
             landed_count: 0,
         },
         Entry::Tree { record, workspace } => {
             let (landed, commits) = if is_task(&record) {
-                let landing = landing::observe(
-                    db,
-                    context.jj,
-                    context.gh,
-                    &tree_ref(id, clone, &record),
-                    &context.policy.landed.when,
-                )?;
+                let landing =
+                    landing::observe(db, context.jj, context.gh, &tree_ref(id, clone, &record))?;
                 (landing.landed, landing.commits)
             } else {
                 (None, Vec::new())
@@ -223,7 +206,6 @@ fn row(
                     state: Some(state),
                     landed,
                     idle_seconds,
-                    over_cap: false,
                 },
                 landed_count: commits.len(),
             }
@@ -270,7 +252,6 @@ fn describe(row: &Row, reason: Reason) -> String {
             "no change for {} days",
             days(row.facts.idle_seconds.unwrap_or_default())
         ),
-        Reason::OverCap => "beyond the repo's lru cap".to_owned(),
         Reason::NotYet => "its lifetime doesn't let it go yet".to_owned(),
         Reason::Unknown => "can't tell yet (offline, no gh, or no change time)".to_owned(),
         Reason::Unsaved => {

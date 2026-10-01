@@ -39,7 +39,6 @@ pub struct ApplyArgs {
 pub fn run(args: &ApplyArgs) -> Result<GcApplyResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths()?;
     let mut db = state::open_database(&paths)?;
-    let policy = state::tree_policy(&paths)?;
     let jj = JjCli::from_path();
     let gh = (!args.offline).then(gc::gh);
     let report =
@@ -67,7 +66,6 @@ pub fn run(args: &ApplyArgs) -> Result<GcApplyResponse, Box<dyn ErrorDetails>> {
         paths: &paths,
         jj: &jj,
         gh: gh.as_ref(),
-        policy: &policy,
         now: now(),
     };
     let mut fetched = BTreeSet::new();

@@ -95,7 +95,7 @@ top of trunk, recorded with its owner, task and lifetime. Work in that directory
   unless your harness sets `MORI_AGENT`; without either, the owner is the person's login name.
 - **`--task <slug>`**: lowercase letters, digits and hyphens, e.g. `fix-login`. The tree's name is
   `<owner>-<task>` by default (the `[trees] name` template in `config.toml` can change it).
-- **`--lifetime`**: `pinned`, `task-done` (the default), `lru`, or `ttl:<n>d`. A tree only becomes
+- **`--lifetime`**: `pinned`, `task-done` (the default), or `ttl:<n>d`. A tree only becomes
   a cleanup candidate by its lifetime; nothing is removed without the safety checks.
 - **`--from <revset>`**: where the new change starts; `trunk()` by default.
 - **`--dry-run`** shows the name, path and lifetime, and creates nothing.
@@ -129,7 +129,7 @@ Reports which trees may be removed and whether each is safe to, and saves the re
 no tree (it only fetches remote bookmarks; `--offline` skips that and GitHub). Each tree gets a
 class and a reason:
 
-- **remove**: its lifetime lets it go and nothing would be lost (`LANDED`, `IDLE`, `OVER_CAP`, or
+- **remove**: its lifetime lets it go and nothing would be lost (`LANDED`, `IDLE`, or
   `MISSING` when only a stale record is left).
 - **blocked** (`UNSAVED`): it may go, but has edits or unpushed work. Push it or ask the person.
 - **keep**: not yet (`NOT_YET`), or it can't be told (`UNKNOWN`: offline, or no `gh` login).

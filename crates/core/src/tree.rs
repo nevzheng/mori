@@ -39,12 +39,11 @@ impl Role {
 pub enum Lifetime {
     /// Never.
     Pinned,
-    /// When the remote says its work landed (see [`Landed`]).
+    /// When the remote says its work landed: its pull request merged, or a bookmark it pushed was
+    /// deleted from the remote. Never by ancestry: a squash merge puts a new commit on trunk.
     TaskDone,
     /// When it hasn't been used for this long.
     Ttl(Duration),
-    /// When its repo is over a cap and it is among the least recently used.
-    Lru,
 }
 
 const HOUR: u64 = 60 * 60;
@@ -54,17 +53,13 @@ impl FromStr for Lifetime {
     type Err = String;
 
     /// Parses the form used in `config.toml`, flags and the database: `pinned`, `task-done`,
-    /// `lru`, or `ttl:<n>d` / `ttl:<n>h`.
+    /// or `ttl:<n>d` / `ttl:<n>h`.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let invalid = || {
-            format!(
-                "invalid lifetime {text:?}: use pinned, task-done, lru, or ttl:<n>d or ttl:<n>h"
-            )
-        };
+        let invalid =
+            || format!("invalid lifetime {text:?}: use pinned, task-done, or ttl:<n>d or ttl:<n>h");
         match text {
             "pinned" => Ok(Self::Pinned),
             "task-done" => Ok(Self::TaskDone),
-            "lru" => Ok(Self::Lru),
             _ => {
                 let span = text.strip_prefix("ttl:").ok_or_else(invalid)?;
                 let (count, unit) = span.split_at(span.len().saturating_sub(1));
@@ -96,24 +91,12 @@ impl fmt::Display for Lifetime {
         match self {
             Self::Pinned => f.write_str("pinned"),
             Self::TaskDone => f.write_str("task-done"),
-            Self::Lru => f.write_str("lru"),
             Self::Ttl(span) if span.as_secs() % DAY == 0 => {
                 write!(f, "ttl:{}d", span.as_secs() / DAY)
             }
             Self::Ttl(span) => write!(f, "ttl:{}h", span.as_secs() / HOUR),
         }
     }
-}
-
-/// A remote fact that means a task's work landed. Ancestry is never one: a squash merge puts a new
-/// commit on trunk, so a landed branch never looks merged.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Landed {
-    /// The pull request was merged.
-    PrMerged,
-    /// A bookmark that was pushed is gone from the remote.
-    PushedBookmarkDeleted,
 }
 
 /// A tree name template, such as `{owner}-{task}`.
@@ -205,10 +188,6 @@ pub struct TreePolicy {
     pub name: NameTemplate,
     /// Default lifetimes.
     pub lifetime: LifetimeDefaults,
-    /// What counts as landed for [`Lifetime::TaskDone`].
-    pub landed: LandedPolicy,
-    /// The cap for [`Lifetime::Lru`].
-    pub lru: LruPolicy,
 }
 
 impl TreePolicy {
@@ -240,31 +219,6 @@ impl Default for LifetimeDefaults {
     }
 }
 
-/// `[trees.lru]`.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct LruPolicy {
-    /// How many task trees a repo keeps before its least recently changed `lru` trees become
-    /// cleanup candidates. Unset: `lru` trees are never candidates.
-    pub max: Option<u32>,
-}
-
-/// `[trees.landed]`.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct LandedPolicy {
-    /// Any of these means landed.
-    pub when: Vec<Landed>,
-}
-
-impl Default for LandedPolicy {
-    fn default() -> Self {
-        Self {
-            when: vec![Landed::PrMerged, Landed::PushedBookmarkDeleted],
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,7 +226,7 @@ mod tests {
 
     #[test]
     fn lifetimes_round_trip_through_their_text_form() {
-        for text in ["pinned", "task-done", "lru", "ttl:14d", "ttl:36h"] {
+        for text in ["pinned", "task-done", "ttl:14d", "ttl:36h"] {
             let lifetime: Lifetime = text.parse().unwrap();
 
             assert_eq!(lifetime.to_string(), text);
@@ -301,6 +255,7 @@ mod tests {
             "ttl:-1d",
             "ttl:99999999999999999999d",
             "Pinned",
+            "lru",
         ] {
             assert!(text.parse::<Lifetime>().is_err(), "for {text:?}");
         }
@@ -359,7 +314,7 @@ mod tests {
         let policy = TreePolicy::default();
 
         assert_eq!(
-            policy.lifetime(Role::Base, Some(Lifetime::Lru)),
+            policy.lifetime(Role::Base, Some(Lifetime::TaskDone)),
             Lifetime::Pinned
         );
     }

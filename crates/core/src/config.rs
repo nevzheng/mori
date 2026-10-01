@@ -72,7 +72,6 @@ impl Config {
 mod tests {
     use super::*;
     use crate::error::ErrorDetails;
-    use crate::tree::Landed;
 
     const PATH: &str = "/home/acme/.config/mori/config.toml";
 
@@ -112,7 +111,9 @@ mod tests {
             "schema = 1\nroot = \"/r\"\n[trees]\nname = \"{owner}/{task}\"",
             "schema = 1\nroot = \"/r\"\n[trees.lifetime]\ntask = \"forever\"",
             "schema = 1\nroot = \"/r\"\n[trees.lifetime]\nbase = \"lru\"",
-            "schema = 1\nroot = \"/r\"\n[trees.landed]\nwhen = [\"merged-by-ancestry\"]",
+            "schema = 1\nroot = \"/r\"\n[trees.landed]\nwhen = [\"pr-merged\"]",
+            "schema = 1\nroot = \"/r\"\n[trees.lru]\nmax = 5",
+            "schema = 1\nroot = \"/r\"\n[trees.lifetime]\ntask = \"lru\"",
         ] {
             let error = Config::parse(text, Path::new(PATH)).unwrap_err();
 
@@ -132,11 +133,6 @@ mod tests {
             [trees.lifetime]
             task = "ttl:14d"
 
-            [trees.landed]
-            when = ["pr-merged"]
-
-            [trees.lru]
-            max = 5
         "#;
 
         let trees = Config::parse(text, Path::new(PATH)).unwrap().trees;
@@ -146,7 +142,5 @@ mod tests {
             "fix-login"
         );
         assert_eq!(trees.lifetime.task.to_string(), "ttl:14d");
-        assert_eq!(trees.landed.when, [Landed::PrMerged]);
-        assert_eq!(trees.lru.max, Some(5));
     }
 }

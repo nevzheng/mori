@@ -10,7 +10,7 @@ use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::forest::{Entry, Workspace, Workspaces, reconcile};
 use mori_core::paths::Paths;
-use mori_core::tree::{Landed, Role};
+use mori_core::tree::Role;
 use mori_jj::JjCli;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
@@ -22,7 +22,6 @@ use crate::state::{self, boxed};
 pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths()?;
     let mut db = state::open_database(&paths)?;
-    let policy = state::tree_policy(&paths)?.landed.when;
     let jj = JjCli::from_path();
     let mut records = db.repos().map_err(boxed)?;
     if let Some(repo) = repo {
@@ -35,7 +34,7 @@ pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails
     let managed: BTreeSet<String> = records.iter().map(|repo| repo.remote.clone()).collect();
     let repos = records
         .iter()
-        .map(|repo| list_repo(&paths, &mut db, &jj, &policy, repo))
+        .map(|repo| list_repo(&paths, &mut db, &jj, repo))
         .collect::<Result<_, _>>()?;
     let unmanaged_repos = if repo.is_some() {
         Vec::new()
@@ -59,7 +58,6 @@ fn list_repo(
     paths: &Paths,
     db: &mut Database,
     jj: &JjCli,
-    policy: &[Landed],
     repo: &RepoRecord,
 ) -> Result<RepoTrees, Box<dyn ErrorDetails>> {
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
@@ -88,7 +86,6 @@ fn list_repo(
                         id: &record.id,
                         name: &workspace.name,
                     },
-                    policy,
                 )?
                 .commits
             }
