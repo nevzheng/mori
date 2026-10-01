@@ -55,10 +55,13 @@ Measure, show, and let gc act on a size target:
   times last), until the total reaches the target; the last pick may overshoot it. Missing trees
   free nothing and aren't picked. Without `--apply` it shows the plan; with `--apply --yes` it
   carries it out. Removed trees are journalled and restorable as always.
-- **Nudges toward shared caches.** A repo that builds with Bazel (`MODULE.bazel` or `WORKSPACE`)
-  with no `--disk_cache` or `--remote_cache` in any bazelrc it reads, or with Cargo (`Cargo.toml`)
-  and no `rustc-wrapper` or `RUSTC_WRAPPER`, gets a doctor finding `NO_SHARED_CACHE` (info) and a
-  one-line tip after `mori clone`, both linking the tips page. The low-disk warning names `gc
+- **Nudges toward shared caches.** Only where it can be read with certainty: a repo that builds
+  with Bazel (`MODULE.bazel` or `WORKSPACE`) with no `--disk_cache` or `--remote_cache` in any
+  bazelrc it reads; with Cargo (`Cargo.toml`) and no `rustc-wrapper` or `RUSTC_WRAPPER`; or with a
+  `package-lock.json` or `yarn.lock` (pnpm shares one store across trees). It gets a doctor
+  finding `NO_SHARED_CACHE` (info) and a one-line tip after `mori clone`, both linking the tips
+  page. C/C++ (ccache) and Gradle (its build cache) can be configured too many ways to check
+  reliably, so they get tips on the page and no check. The low-disk warning names `gc
   --free` and the page too. mori only reads these files; it never edits them.
 - **Opt-in limits.** `[disk]` in `config.toml` can set tree counts and disk budgets, none set by
   default. Each limit only warns and suggests the `gc --free` that fixes it. `[trees.lru] max`
