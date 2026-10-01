@@ -1,12 +1,19 @@
 [package]
 name = "mori-git"
-description = "mori's git backend: gix for reads, the git CLI for writes."
+description = "mori's git backend: detached git worktrees, through the git CLI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[dependencies]
+mori-core = { path = "../core" }
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true
