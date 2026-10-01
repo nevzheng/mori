@@ -3,17 +3,25 @@
 use mori_api::v1alpha1::{RestoreResponse, Tree};
 use mori_core::clone::{CloneUrl, clone_path};
 use mori_core::error::{CleanupError, ErrorDetails, RepoError, TreeError};
-use mori_core::forest::Workspaces;
-use mori_jj::JjCli;
+use mori_core::vcs::Forge;
 use mori_store::records::NewTree;
 
 use crate::state::{self, boxed};
+use crate::{App, Backend};
 
 /// Runs `mori restore`.
-pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
-    let paths = state::paths()?;
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn run<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    entry_id: &str,
+) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
+    let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
-    let jj = JjCli::from_path();
+    let vcs = &app.vcs;
     let entry = mori_store::gc::read_journal(&paths)
         .map_err(boxed)?
         .into_iter()
@@ -43,7 +51,7 @@ pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
     {
         return Err(boxed(TreeError::TreeExists { name: entry.name }));
     }
-    if jj
+    if vcs
         .list(&clone)
         .map_err(boxed)?
         .iter()
@@ -54,7 +62,7 @@ pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
     if path.symlink_metadata().is_ok() {
         return Err(boxed(TreeError::PathExists { path }));
     }
-    if !jj.commit_exists(&clone, &entry.commit_id).map_err(boxed)? {
+    if !vcs.commit_exists(&clone, &entry.commit_id).map_err(boxed)? {
         return Err(boxed(CleanupError::CommitGone {
             id: entry.id,
             commit: entry.commit_id,
@@ -68,7 +76,7 @@ pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
             })
         })?;
     }
-    jj.add_workspace_at(&clone, &entry.name, &path, &entry.commit_id)
+    vcs.add_tree_at(&clone, &entry.name, &path, &entry.commit_id)
         .map_err(boxed)?;
     let restored = db
         .restore_tree(

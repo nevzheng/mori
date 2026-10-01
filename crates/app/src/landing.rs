@@ -6,10 +6,10 @@ use std::path::Path;
 use mori_core::clone::RepoId;
 use mori_core::error::ErrorDetails;
 use mori_core::gc::{Landing, SeenBookmark, landing};
-use mori_github::{GhCli, Merged};
-use mori_jj::JjCli;
+use mori_core::vcs::{Forge, Merged};
 use mori_store::database::Database;
 
+use crate::Backend;
 use crate::state::boxed;
 
 /// Which recorded tree, and where.
@@ -42,21 +42,21 @@ pub struct Seen {
 /// which of them landed. With `gh`, it also asks whether their pull requests merged.
 pub fn observe(
     db: &mut Database,
-    jj: &JjCli,
-    gh: Option<&GhCli>,
+    vcs: &impl Backend,
+    forge: Option<&dyn Forge>,
     tree: &TreeRef,
 ) -> Result<Landing, Box<dyn ErrorDetails>> {
-    observe_each(db, jj, gh, tree).map(|(landing, _)| landing)
+    observe_each(db, vcs, forge, tree).map(|(landing, _)| landing)
 }
 
 /// Like [`observe`], and also says what is known about each recorded bookmark.
 pub fn observe_each(
     db: &mut Database,
-    jj: &JjCli,
-    gh: Option<&GhCli>,
+    vcs: &impl Backend,
+    forge: Option<&dyn Forge>,
     tree: &TreeRef,
 ) -> Result<(Landing, Vec<Seen>), Box<dyn ErrorDetails>> {
-    let current = jj.pushed_bookmarks(tree.clone, tree.name).map_err(boxed)?;
+    let current = vcs.pushed_bookmarks(tree.clone, tree.name).map_err(boxed)?;
     for bookmark in &current {
         db.record_tree_bookmark(
             tree.id,
@@ -72,11 +72,14 @@ pub fn observe_each(
         let on_remote = current
             .iter()
             .any(|now| now.remote == recorded.remote && now.name == recorded.bookmark);
-        let pr_merged = gh.and_then(|gh| match gh.pr_merged(tree.repo, &recorded.bookmark) {
-            Merged::Yes => Some(true),
-            Merged::No => Some(false),
-            Merged::Unknown => None,
-        });
+        let pr_merged =
+            forge.and_then(
+                |forge| match forge.pr_merged(tree.repo, &recorded.bookmark) {
+                    Merged::Yes => Some(true),
+                    Merged::No => Some(false),
+                    Merged::Unknown => None,
+                },
+            );
         let fact = SeenBookmark {
             commit_id: recorded.commit_id.clone(),
             on_remote,

@@ -9,21 +9,29 @@ use mori_api::v1alpha1::{
 };
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
-use mori_core::forest::{Entry, Workspace, Workspaces, reconcile};
+use mori_core::forest::{Entry, Workspace, reconcile};
 use mori_core::paths::Paths;
 use mori_core::tree::Role;
-use mori_jj::JjCli;
+use mori_core::vcs::Forge;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
 
 use crate::landing;
 use crate::state::{self, boxed};
+use crate::{App, Backend};
 
 /// Runs `ls` for every repo mori manages, or only `repo`.
-pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
-    let paths = state::paths()?;
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn run<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    repo: Option<&str>,
+) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
+    let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
-    let jj = JjCli::from_path();
     let mut records = db.repos().map_err(boxed)?;
     if let Some(repo) = repo {
         let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
@@ -35,7 +43,7 @@ pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails
     let managed: BTreeSet<String> = records.iter().map(|repo| repo.remote.clone()).collect();
     let repos = records
         .iter()
-        .map(|repo| list_repo(&paths, &mut db, &jj, repo))
+        .map(|repo| list_repo(&paths, &mut db, &app.vcs, repo))
         .collect::<Result<_, _>>()?;
     let unmanaged_repos = if repo.is_some() {
         Vec::new()
@@ -58,7 +66,7 @@ pub fn run(repo: Option<&str>) -> Result<ListTreesResponse, Box<dyn ErrorDetails
 fn list_repo(
     paths: &Paths,
     db: &mut Database,
-    jj: &JjCli,
+    vcs: &impl Backend,
     repo: &RepoRecord,
 ) -> Result<RepoTrees, Box<dyn ErrorDetails>> {
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
@@ -66,7 +74,7 @@ fn list_repo(
     let records = db.trees(&repo.id).map_err(boxed)?;
     // A clone that is gone is a mismatch like any other: its trees are all missing.
     let workspaces = if clone.exists() {
-        jj.list(&clone).map_err(boxed)?
+        vcs.list(&clone).map_err(boxed)?
     } else {
         Vec::new()
     };
@@ -79,7 +87,7 @@ fn list_repo(
             Entry::Tree { record, workspace } if Role::of(&record.name) == Role::Task => {
                 let (landing, seen) = landing::observe_each(
                     db,
-                    jj,
+                    vcs,
                     None,
                     &landing::TreeRef {
                         repo: &id,
@@ -92,7 +100,7 @@ fn list_repo(
             }
             _ => (Vec::new(), Vec::new()),
         };
-        let mut tree = row(paths, jj, repo, &clone, entry, &landed)?;
+        let mut tree = row(paths, vcs, repo, &clone, entry, &landed)?;
         tree.bookmarks = seen
             .into_iter()
             .map(|seen| PushedBookmark {
@@ -114,14 +122,14 @@ fn list_repo(
 
 fn row(
     paths: &Paths,
-    jj: &JjCli,
+    vcs: &impl Backend,
     repo: &RepoRecord,
     clone: &std::path::Path,
     entry: Entry<TreeRecord>,
     landed: &[String],
 ) -> Result<TreeRow, Box<dyn ErrorDetails>> {
     let state = |workspace: &Workspace| {
-        jj.state_covering(clone, &workspace.name, landed)
+        vcs.state_covering(clone, &workspace.name, landed)
             .map(|state| TreeState {
                 change: state.change,
                 changed: state.changed,

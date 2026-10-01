@@ -313,7 +313,7 @@ pub fn gc_text(response: &GcResponse) -> String {
                 Outcome::Unspecified => item.facts.clone(),
             };
             [
-                crate::gc::class_name(item.class()).to_owned(),
+                mori_app::gc::class_name(item.class()).to_owned(),
                 format!("{} {}", item.repo, item.name),
                 item.reason.clone(),
                 what,
@@ -334,7 +334,7 @@ pub fn gc_text(response: &GcResponse) -> String {
             .collect();
         let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
     }
-    let removable = crate::gc::counts(&response.items)
+    let removable = mori_app::gc::counts(&response.items)
         .get("remove")
         .copied()
         .unwrap_or(0);

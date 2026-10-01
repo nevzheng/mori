@@ -3,24 +3,16 @@
 //! Every failure is a `google.rpc.Status`, and the exit code is its canonical code's number: 0 for
 //! success, 3 for bad arguments, 9 for a failed precondition, and so on.
 
-mod clone;
-mod gc;
-mod gc_apply;
-mod init;
-mod landing;
-mod ls;
 mod output;
-mod restore;
-mod skills;
-mod state;
-mod tree;
-mod tree_remove;
 
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use mori_app::{App, Host, clone, gc, init, ls, restore, skills, tree, tree_remove};
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
+use mori_github::GhCli;
+use mori_jj::JjCli;
 
 /// mori looks after a forest of repos and worktrees, for you and your agents.
 #[derive(Debug, Parser)]
@@ -183,24 +175,32 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return output::usage_error(&error),
     };
+    let app = real_app();
     if matches!(cli.command, Command::Init { .. } | Command::Ls { .. }) {
-        skills::stale_hint();
+        skills::stale_hint(&app.host);
     }
+    dispatch(&app, cli)
+}
+
+/// Runs the parsed command and prints its result.
+fn dispatch(app: &App<JjCli, GhCli>, cli: Cli) -> ExitCode {
     let json = cli.json;
     match cli.command {
-        Command::Init { dry_run } => respond(json, init::run(dry_run), output::init_text),
+        Command::Init { dry_run } => {
+            respond(json, init::run(&app.host, dry_run), output::init_text)
+        }
         Command::Clone {
             url,
             dry_run,
             no_colocate,
         } => respond(
             json,
-            clone::run(&url, dry_run, no_colocate),
+            clone::run(app, &url, dry_run, no_colocate),
             output::clone_text,
         ),
         Command::Skills {
             command: SkillsCommand::Sync { dry_run },
-        } => respond(json, skills::sync(dry_run), output::skills_text),
+        } => respond(json, skills::sync(&app.host, dry_run), output::skills_text),
         Command::Gc {
             repo,
             offline,
@@ -211,20 +211,25 @@ fn main() -> ExitCode {
             dry_run,
         } => respond(
             json,
-            gc::run(&gc::GcArgs {
-                repo,
-                offline,
-                apply: apply.then_some(gc::Apply {
-                    yes,
-                    names,
-                    max,
-                    dry_run,
-                }),
-            }),
+            gc::run(
+                app,
+                &gc::GcArgs {
+                    repo,
+                    offline,
+                    apply: apply.then_some(gc::Apply {
+                        yes,
+                        names,
+                        max,
+                        dry_run,
+                    }),
+                },
+            ),
             output::gc_text,
         ),
-        Command::Restore { entry } => respond(json, restore::run(&entry), output::restore_text),
-        Command::Ls { repo } => respond(json, ls::run(repo.as_deref()), output::ls_text),
+        Command::Restore { entry } => {
+            respond(json, restore::run(app, &entry), output::restore_text)
+        }
+        Command::Ls { repo } => respond(json, ls::run(app, repo.as_deref()), output::ls_text),
         Command::Tree {
             command:
                 TreeCommand::Create {
@@ -237,14 +242,17 @@ fn main() -> ExitCode {
                 },
         } => respond(
             json,
-            tree::create(tree::CreateArgs {
-                repo,
-                task,
-                agent,
-                lifetime,
-                from,
-                dry_run,
-            }),
+            tree::create(
+                app,
+                tree::CreateArgs {
+                    repo,
+                    task,
+                    agent,
+                    lifetime,
+                    from,
+                    dry_run,
+                },
+            ),
             output::tree_create_text,
         ),
         Command::Tree {
@@ -257,15 +265,28 @@ fn main() -> ExitCode {
                 },
         } => respond(
             json,
-            tree_remove::run(tree_remove::RemoveArgs {
-                repo,
-                name,
-                pinned,
-                dry_run,
-            }),
+            tree_remove::run(
+                app,
+                tree_remove::RemoveArgs {
+                    repo,
+                    name,
+                    pinned,
+                    dry_run,
+                },
+            ),
             output::tree_remove_text,
         ),
     }
+}
+
+/// The app for this process: its environment and clock, jj on `PATH`, and `gh` (or `$MORI_GH`,
+/// which lets tests stand in for it).
+fn real_app() -> App<JjCli, GhCli> {
+    App::new(
+        Host::from_process(),
+        JjCli::from_path(),
+        std::env::var_os("MORI_GH").map_or_else(GhCli::from_path, GhCli::new),
+    )
 }
 
 /// Prints a command's result: its response as JSON or text, or its error.

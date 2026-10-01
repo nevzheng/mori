@@ -16,10 +16,10 @@ rust_binary(
     visibility = ["//visibility:public"],  # the Python e2e tests depend on it
     deps = all_crate_deps(normal = True) + [
         "//crates/api:mori_api",
+        "//crates/app:mori_app",
         "//crates/core:mori_core",
         "//crates/github:mori_github",
         "//crates/jj:mori_jj",
-        "//crates/store:mori_store",
     ],
 )
 

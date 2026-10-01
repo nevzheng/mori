@@ -516,15 +516,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "mori-app"
+version = "0.0.0"
+dependencies = [
+ "mori-api",
+ "mori-core",
+ "mori-store",
+ "tempfile",
+]
+
+[[package]]
 name = "mori-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
  "mori-api",
+ "mori-app",
  "mori-core",
  "mori-github",
  "mori-jj",
- "mori-store",
  "serde",
  "serde_json",
  "tempfile",
