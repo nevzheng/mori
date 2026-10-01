@@ -38,6 +38,21 @@ def push_work(env: dict[str, str], placeholders: Placeholders, bookmark: str) ->
     jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
 
 
+@given(parsers.parse('someone describes work in "{name}" without committing it'))
+def describe_work(env: dict[str, str], placeholders: Placeholders, name: str) -> None:
+    # `jj describe` leaves the described change as the working copy.
+    tree = placeholders.path(f"{TREES}/{name}")
+    (tree / "login.rs").write_text("fn login() {}\n")
+    jj(env, "--repository", str(tree), "describe", "--message", "login")
+
+
+@given(parsers.parse('pushes the working copy to the remote as "{bookmark}"'))
+def push_working_copy(env: dict[str, str], placeholders: Placeholders, bookmark: str) -> None:
+    tree = str(placeholders.path(f"{TREES}/claude-fix-login"))
+    jj(env, "--repository", tree, "bookmark", "create", bookmark, "--revision", "@")
+    jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
+
+
 @given(parsers.parse('the remote deletes "{bookmark}" after a squash merge'))
 def remote_deletes(env: dict[str, str], placeholders: Placeholders, bookmark: str) -> None:
     # The squashed commit lands on trunk elsewhere; what the tree sees is its bookmark vanishing.
