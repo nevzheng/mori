@@ -15,10 +15,12 @@ suite on jj and git, but nothing more: there is no soak time and no compatibilit
 
 **release** starts at v0.1.0. A version is tagged only after head has been used day to day for a
 week without lost work or stuck trees. Each release attaches prebuilt binaries for macOS (Apple
-silicon and Intel) and Linux, plus a changelog.
+silicon and Intel) and Linux, plus a changelog. Versions are `0.MINOR.PATCH`: a minor version
+may break things, a patch only fixes them. Tags follow readiness, not a schedule.
 
-There is no separate dogfood channel. Dogfooding means running head on real work and reporting
-what goes wrong.
+There is no nightly, beta or dogfood channel: head already is the nightly, and dogfooding means
+running head on real work and reporting what goes wrong. More channels can come once mori has
+users outside its own development.
 
 ## Requirements
 
