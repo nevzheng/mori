@@ -276,15 +276,11 @@ fn tree_ref<'a>(id: &'a RepoId, clone: &'a std::path::Path, record: &'a TreeReco
 }
 
 pub fn is_task(record: &TreeRecord) -> bool {
-    record.role == Role::Task.as_str()
+    Role::of(&record.name) == Role::Task
 }
 
 fn role(record: &TreeRecord) -> Role {
-    if record.role == Role::Base.as_str() {
-        Role::Base
-    } else {
-        Role::Task
-    }
+    Role::of(&record.name)
 }
 
 /// An unreadable stored lifetime counts as pinned: the choice that never removes.

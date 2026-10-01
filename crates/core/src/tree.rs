@@ -22,12 +22,14 @@ pub enum Role {
 }
 
 impl Role {
-    /// The name stored in the database.
+    /// The role of the recorded tree named `name`. It isn't stored: the base tree is the clone's
+    /// own workspace, [`crate::clone::BASE_TREE_NAME`], and every other tree is a task tree.
     #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Base => "base",
-            Self::Task => "task",
+    pub fn of(name: &str) -> Self {
+        if name == crate::clone::BASE_TREE_NAME {
+            Self::Base
+        } else {
+            Self::Task
         }
     }
 }
@@ -325,6 +327,12 @@ mod tests {
     fn names_have_a_length_limit() {
         assert!(validate_name(&"a".repeat(MAX_NAME_LEN)).is_ok());
         assert!(validate_name(&"a".repeat(MAX_NAME_LEN + 1)).is_err());
+    }
+
+    #[test]
+    fn the_role_comes_from_the_name() {
+        assert_eq!(Role::of("default"), Role::Base);
+        assert_eq!(Role::of("claude-fix-login"), Role::Task);
     }
 
     #[test]

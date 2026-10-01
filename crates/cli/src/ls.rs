@@ -76,7 +76,7 @@ fn list_repo(
         // unpushed; looking also records the bookmarks it pushed, for when the remote deletes
         // them.
         let (landed, seen) = match &entry {
-            Entry::Tree { record, workspace } if record.role == Role::Task.as_str() => {
+            Entry::Tree { record, workspace } if Role::of(&record.name) == Role::Task => {
                 let (landing, seen) = landing::observe_each(
                     db,
                     jj,
@@ -173,7 +173,6 @@ fn recorded_tree(repo: &RepoRecord, record: TreeRecord, path: String) -> Tree {
         repo: repo.remote.clone(),
         name: record.name,
         path,
-        role: record.role,
         owner: record.owner,
         task: record.task.unwrap_or_default(),
         lifetime: record.lifetime,

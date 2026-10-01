@@ -12,8 +12,9 @@
 
 > **Changed after acceptance (2026-10-01):** after a review of the whole command surface, the
 > `[trees.landed]` setting was dropped: both landing rules (pull request merged, pushed bookmark
-> deleted) always apply. The `lru` lifetime and `[trees.lru] max` stay. The text below is the design
-> as accepted.
+> deleted) always apply. The `lru` lifetime and `[trees.lru] max` stay. Trees no longer store a role
+> (schema v4): the base tree is the clone's own workspace, `default`, and every other recorded tree
+> is a task tree. The text below is the design as accepted.
 
 ## Q1. What are you trying to do?
 

@@ -144,8 +144,9 @@ message Tree {
   // Absolute path of the tree.
   string path = 4;
 
-  // "base" (the clone itself) or "task".
-  string role = 5;
+  // The role was dropped: the base tree is the clone's own workspace, "default".
+  reserved 5;
+  reserved "role";
 
   // Who the tree is for: an agent such as "claude", or a person's login name.
   string owner = 6;

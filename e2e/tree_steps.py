@@ -103,9 +103,9 @@ def records_tree(
     database = placeholders.path("$XDG_STATE_HOME/mori/mori.db")
     with sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True) as db:
         row = db.execute(
-            "SELECT role, owner, task, lifetime FROM trees WHERE name = ?", (name,)
+            "SELECT owner, task, lifetime FROM trees WHERE name = ?", (name,)
         ).fetchone()
-    assert_that(row, equal_to(("task", owner, task, lifetime)))
+    assert_that(row, equal_to((owner, task, lifetime)))
 
 
 # What mori says

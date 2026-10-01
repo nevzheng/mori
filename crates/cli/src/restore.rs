@@ -76,7 +76,6 @@ pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
             &entry.tree_id,
             &NewTree {
                 name: &entry.name,
-                role: "task",
                 owner: &entry.owner,
                 task: entry.task.as_deref(),
                 lifetime: &entry.lifetime,
@@ -104,7 +103,6 @@ pub fn run(entry_id: &str) -> Result<RestoreResponse, Box<dyn ErrorDetails>> {
             repo: entry.repo,
             name: restored.name,
             path: path.display().to_string(),
-            role: restored.role,
             owner: restored.owner,
             task: restored.task.unwrap_or_default(),
             lifetime: restored.lifetime,

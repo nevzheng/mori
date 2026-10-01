@@ -8,7 +8,7 @@ use mori_core::clone::{
 };
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::paths::Paths;
-use mori_core::tree::{Lifetime, Role};
+use mori_core::tree::Lifetime;
 use mori_core::tree_create::default_owner;
 use mori_jj::JjCli;
 use mori_store::StoreError;
@@ -82,7 +82,6 @@ fn record(db: &mut Database, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetail
         },
         &NewTree {
             name: BASE_TREE_NAME,
-            role: Role::Base.as_str(),
             owner: &owner,
             task: None,
             lifetime: &lifetime,

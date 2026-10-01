@@ -3167,9 +3167,6 @@ impl serde::Serialize for Tree {
         if !self.path.is_empty() {
             len += 1;
         }
-        if !self.role.is_empty() {
-            len += 1;
-        }
         if !self.owner.is_empty() {
             len += 1;
         }
@@ -3192,9 +3189,6 @@ impl serde::Serialize for Tree {
         if !self.path.is_empty() {
             struct_ser.serialize_field("path", &self.path)?;
         }
-        if !self.role.is_empty() {
-            struct_ser.serialize_field("role", &self.role)?;
-        }
         if !self.owner.is_empty() {
             struct_ser.serialize_field("owner", &self.owner)?;
         }
@@ -3213,9 +3207,7 @@ impl<'de> serde::Deserialize<'de> for Tree {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "id", "repo", "name", "path", "role", "owner", "task", "lifetime",
-        ];
+        const FIELDS: &[&str] = &["id", "repo", "name", "path", "owner", "task", "lifetime"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -3223,7 +3215,6 @@ impl<'de> serde::Deserialize<'de> for Tree {
             Repo,
             Name,
             Path,
-            Role,
             Owner,
             Task,
             Lifetime,
@@ -3255,7 +3246,6 @@ impl<'de> serde::Deserialize<'de> for Tree {
                             "repo" => Ok(GeneratedField::Repo),
                             "name" => Ok(GeneratedField::Name),
                             "path" => Ok(GeneratedField::Path),
-                            "role" => Ok(GeneratedField::Role),
                             "owner" => Ok(GeneratedField::Owner),
                             "task" => Ok(GeneratedField::Task),
                             "lifetime" => Ok(GeneratedField::Lifetime),
@@ -3282,7 +3272,6 @@ impl<'de> serde::Deserialize<'de> for Tree {
                 let mut repo__ = None;
                 let mut name__ = None;
                 let mut path__ = None;
-                let mut role__ = None;
                 let mut owner__ = None;
                 let mut task__ = None;
                 let mut lifetime__ = None;
@@ -3312,12 +3301,6 @@ impl<'de> serde::Deserialize<'de> for Tree {
                             }
                             path__ = Some(map_.next_value()?);
                         }
-                        GeneratedField::Role => {
-                            if role__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("role"));
-                            }
-                            role__ = Some(map_.next_value()?);
-                        }
                         GeneratedField::Owner => {
                             if owner__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("owner"));
@@ -3343,7 +3326,6 @@ impl<'de> serde::Deserialize<'de> for Tree {
                     repo: repo__.unwrap_or_default(),
                     name: name__.unwrap_or_default(),
                     path: path__.unwrap_or_default(),
-                    role: role__.unwrap_or_default(),
                     owner: owner__.unwrap_or_default(),
                     task: task__.unwrap_or_default(),
                     lifetime: lifetime__.unwrap_or_default(),
