@@ -9,11 +9,13 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs, finding::Severity,
-    skill_file::Action, tree_row::Status,
+    RemoveTreeResponse, RepoTrees, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs,
+    finding::Severity, skill_file::Action, tree_row::Status,
 };
 use mori_core::disk::{Space, format_size};
 use mori_core::error::{Code, ErrorDetails};
+
+use crate::look::{self, Role};
 use serde_json::{Map, Value, json};
 
 /// `path` with the home directory shown as `~`, for text output; JSON keeps paths absolute.
@@ -201,6 +203,64 @@ fn warnings_text(text: &mut String, warnings: &[String]) {
     }
 }
 
+/// One repo's table for `ls`: a header line, then a row per tree.
+fn ls_repo(text: &mut String, repo: &RepoTrees, sized: bool, reused: &dyn Fn(&TreeRow) -> bool) {
+    let vcs = match repo.vcs() {
+        Vcs::Git => "  git",
+        Vcs::Jj => "  jj",
+        Vcs::Unspecified => "",
+    };
+    let size = if sized {
+        format!(
+            "  {}",
+            format_size(repo.trees.iter().map(|row| row.size_bytes).sum())
+        )
+    } else {
+        String::new()
+    };
+    let _ = writeln!(
+        text,
+        "{}{vcs}{size}  {}",
+        look::paint(Role::Name, &repo.repo),
+        look::paint(Role::Quiet, &tilde(&repo.path))
+    );
+    let mut header: Vec<String> = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"]
+        .map(str::to_owned)
+        .to_vec();
+    if sized {
+        header.push("SIZE".to_owned());
+    }
+    let mut cells: Vec<Vec<String>> = repo
+        .trees
+        .iter()
+        .map(|row| {
+            let mut cells = ls_row(row).to_vec();
+            if sized {
+                cells.push(size_cell(row, reused(row)));
+            }
+            cells
+        })
+        .collect();
+    // STATUS only matters when something is off.
+    if cells.iter().all(|row| row[1] == "tree") {
+        header.remove(1);
+        for row in &mut cells {
+            row.remove(1);
+        }
+    }
+    let work = header.iter().position(|column| column == "WORK");
+    table_with(text, &header, &cells, |column, cell| match (column, cell) {
+        (0, _) => Some(Role::Name),
+        (_, "missing") => Some(Role::Problem),
+        (_, "foreign") => Some(Role::Quiet),
+        (c, "clean") if Some(c) == work => Some(Role::Ok),
+        (c, "-") if Some(c) == work => Some(Role::Quiet),
+        (c, _) if Some(c) == work => Some(Role::Warn),
+        _ => None,
+    });
+    let _ = writeln!(text);
+}
+
 /// The text `ls` prints: a table of trees per repo, then the clones mori didn't make.
 pub fn ls_text(response: &ListTreesResponse) -> String {
     let mut text = String::new();
@@ -220,46 +280,7 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
     let reused =
         |row: &TreeRow| !row.size_measured_at.is_empty() && row.size_measured_at.as_str() < newest;
     for repo in &response.repos {
-        let vcs = match repo.vcs() {
-            Vcs::Git => "  git",
-            Vcs::Jj => "  jj",
-            Vcs::Unspecified => "",
-        };
-        let size = if sized {
-            format!(
-                "  {}",
-                format_size(repo.trees.iter().map(|row| row.size_bytes).sum())
-            )
-        } else {
-            String::new()
-        };
-        let _ = writeln!(text, "{}{vcs}{size}  {}", repo.repo, tilde(&repo.path));
-        let mut header: Vec<String> = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"]
-            .map(str::to_owned)
-            .to_vec();
-        if sized {
-            header.push("SIZE".to_owned());
-        }
-        let mut cells: Vec<Vec<String>> = repo
-            .trees
-            .iter()
-            .map(|row| {
-                let mut cells = ls_row(row).to_vec();
-                if sized {
-                    cells.push(size_cell(row, reused(row)));
-                }
-                cells
-            })
-            .collect();
-        // STATUS only matters when something is off.
-        if cells.iter().all(|row| row[1] == "tree") {
-            header.remove(1);
-            for row in &mut cells {
-                row.remove(1);
-            }
-        }
-        table(&mut text, &header, &cells);
-        let _ = writeln!(text);
+        ls_repo(&mut text, repo, sized, &reused);
     }
     if !response.unmanaged_repos.is_empty() {
         let _ = writeln!(text, "Clones mori didn't make (left alone):");
@@ -318,6 +339,17 @@ fn space_text(free: u64, total: u64) -> String {
 
 /// Appends an indented table with aligned columns, under `header` unless it is empty.
 fn table(text: &mut String, header: &[String], rows: &[Vec<String>]) {
+    table_with(text, header, rows, |_, _| None);
+}
+
+/// Columns padded to their widest cell, with a grey header and each cell painted in the role
+/// `role_of(column, cell)` gives. Padding comes first, so colour codes never upset the columns.
+fn table_with(
+    text: &mut String,
+    header: &[String],
+    rows: &[Vec<String>],
+    role_of: impl Fn(usize, &str) -> Option<Role>,
+) {
     let mut widths: Vec<usize> = header.iter().map(String::len).collect();
     for row in rows {
         widths.resize(widths.len().max(row.len()), 0);
@@ -325,14 +357,33 @@ fn table(text: &mut String, header: &[String], rows: &[Vec<String>]) {
             *width = (*width).max(cell.len());
         }
     }
-    let header = (!header.is_empty()).then_some(header);
-    for row in header.into_iter().chain(rows.iter().map(Vec::as_slice)) {
+    let line = |row: &[String], paint: &dyn Fn(usize, &str, String) -> String| {
+        let last = row.len().saturating_sub(1);
         let cells: Vec<String> = row
             .iter()
             .zip(&widths)
-            .map(|(cell, width)| format!("{cell:width$}"))
+            .enumerate()
+            .map(|(column, (cell, width))| {
+                let padded = if column == last {
+                    cell.clone()
+                } else {
+                    format!("{cell:width$}")
+                };
+                paint(column, cell, padded)
+            })
             .collect();
-        let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
+        cells.join("  ").trim_end().to_owned()
+    };
+    if !header.is_empty() {
+        let plain = line(header, &|_, _, padded| padded);
+        let _ = writeln!(text, "  {}", look::paint(Role::Quiet, &plain));
+    }
+    for row in rows {
+        let painted = line(row, &|column, cell, padded| match role_of(column, cell) {
+            Some(role) => look::paint(role, &padded),
+            None => padded,
+        });
+        let _ = writeln!(text, "  {painted}");
     }
 }
 
@@ -390,6 +441,108 @@ fn ls_row(row: &TreeRow) -> [String; 6] {
         or_dash(tree.lifetime),
         work,
     ]
+}
+
+/// The forest at a glance, for `mori` with no command: each repo with its trees as branches, and
+/// a mark for whether each tree's work is safe.
+pub fn forest_text(response: &ListTreesResponse) -> String {
+    let mut text = String::new();
+    let root = response
+        .repos
+        .first()
+        .and_then(|repo| repo.path.split("/repos/").next())
+        .map_or_else(|| "~/mori".to_owned(), tilde);
+    let mark = if look::glyphs() { " 森" } else { "" };
+    let _ = writeln!(
+        text,
+        "{}{mark}  {}",
+        look::paint(Role::Name, "mori"),
+        look::paint(Role::Quiet, &root)
+    );
+    if response.repos.is_empty() {
+        let _ = writeln!(text, "No repos yet: `mori clone <repo>` adds one.");
+        return text;
+    }
+    for (index, repo) in response.repos.iter().enumerate() {
+        let last_repo = index + 1 == response.repos.len();
+        let vcs = match repo.vcs() {
+            Vcs::Git => "git",
+            Vcs::Jj => "jj",
+            Vcs::Unspecified => "",
+        };
+        let _ = writeln!(
+            text,
+            "{} {}  {}",
+            look::branch(last_repo),
+            look::paint(Role::Name, &repo.repo),
+            look::paint(Role::Quiet, vcs)
+        );
+        let width = repo
+            .trees
+            .iter()
+            .filter_map(|row| row.tree.as_ref().map(|tree| tree.name.len()))
+            .max()
+            .unwrap_or(0);
+        let rows: Vec<[String; 6]> = repo.trees.iter().map(ls_row).collect();
+        let state_width = rows
+            .iter()
+            .map(|[_, status, _, _, _, work]| {
+                let what = if status == "tree" {
+                    work.len()
+                } else {
+                    status.len() + 2 + work.len()
+                };
+                look::mark(Role::Warn).chars().count().max(2) + 1 + what
+            })
+            .max()
+            .unwrap_or(0);
+        for (tree_index, row) in rows.into_iter().enumerate() {
+            let last_tree = tree_index + 1 == repo.trees.len();
+            let [name, status, owner, task, lifetime, work] = row;
+            let role = match (status.as_str(), work.as_str()) {
+                ("missing", _) => Role::Problem,
+                ("foreign", _) => Role::Quiet,
+                (_, "clean") => Role::Ok,
+                _ => Role::Warn,
+            };
+            let what = if status == "tree" {
+                work
+            } else {
+                format!("{status}, {work}")
+            };
+            let task = if task == "-" {
+                "(base)".to_owned()
+            } else {
+                task
+            };
+            let _ = writeln!(
+                text,
+                "{} {} {}  {}  {owner} · {task} · {lifetime}",
+                look::trunk(last_repo),
+                look::branch(last_tree),
+                look::paint(Role::Name, &format!("{name:width$}")),
+                look::paint(
+                    role,
+                    &pad(&format!("{} {what}", look::mark(role)), state_width)
+                ),
+            );
+        }
+    }
+    let _ = writeln!(
+        text,
+        "{}",
+        look::paint(
+            Role::Quiet,
+            "`mori ls` for the table, `mori doctor` to check, `mori gc` to clean up."
+        )
+    );
+    text
+}
+
+/// `text` padded with spaces to `width` characters (not bytes: marks may be multi-byte).
+fn pad(text: &str, width: usize) -> String {
+    let len = text.chars().count();
+    format!("{text}{}", " ".repeat(width.saturating_sub(len)))
 }
 
 /// The text `tree remove` prints.
@@ -516,7 +669,16 @@ pub fn gc_text(response: &GcResponse) -> String {
         if rows.is_empty() {
             continue;
         }
-        let _ = writeln!(text, "{title} ({})", rows.len());
+        let role = match class {
+            Class::Remove => Role::Ok,
+            Class::Blocked => Role::Warn,
+            _ => Role::Quiet,
+        };
+        let _ = writeln!(
+            text,
+            "{}",
+            look::paint(role, &format!("{title} ({})", rows.len()))
+        );
         table(&mut text, &[], &rows);
     }
     let never = response
@@ -597,12 +759,18 @@ pub fn doctor_text(response: &DoctorResponse) -> String {
         let _ = writeln!(text);
     }
     for finding in &response.findings {
-        let severity = match finding.severity() {
-            Severity::Problem => "problem",
-            Severity::Warn => "warn",
-            Severity::Info | Severity::Unspecified => "info",
+        let (severity, role) = match finding.severity() {
+            Severity::Problem => ("problem", Role::Problem),
+            Severity::Warn => ("warn", Role::Warn),
+            Severity::Info | Severity::Unspecified => ("info", Role::Quiet),
         };
-        let _ = writeln!(text, "{severity:<8} {}  {}", finding.code, finding.subject);
+        let _ = writeln!(
+            text,
+            "{} {}  {}",
+            look::paint(role, &format!("{severity:<8}")),
+            finding.code,
+            finding.subject
+        );
         let _ = writeln!(text, "         {}", finding.message);
         let _ = writeln!(text, "         fix: {}", finding.fix);
     }
@@ -641,16 +809,16 @@ fn report(
     }
     // For people: what happened, what to do, then the reason for searching and scripts. The
     // details (metadata) are in the JSON form.
-    let mut text = format!("error: {message}\n");
+    let mut text = format!("{} {message}\n", look::paint_err(Role::Problem, "error:"));
     if let Some(hint) = hint {
-        let _ = writeln!(text, "hint: {hint}");
+        let _ = writeln!(text, "{} {hint}", look::paint_err(Role::Warn, "hint:"));
     }
-    let _ = writeln!(
-        text,
+    let detail = format!(
         "  {reason} ({domain}), {} exit {}",
         code.name(),
         code.number()
     );
+    let _ = writeln!(text, "{}", look::paint_err(Role::Quiet, &detail));
     print_or_fail(&mut std::io::stderr().lock(), &text, exit(code))
 }
 

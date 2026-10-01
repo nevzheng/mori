@@ -88,8 +88,8 @@ exit 0 when they find problems; their findings say so.
 ## Colour and glyphs
 
 Only when stdout is a terminal, `NO_COLOR` is unset, `TERM` isn't `dumb`, and `--json` isn't
-given; `--color auto|always|never` overrides. The palette has four roles, from the site's
-Everforest colours:
+given; `--color auto|always|never` overrides. The palette has four roles. mori uses the
+terminal's own ANSI colours, so it follows the person's theme; on the site they are Everforest's:
 
 | Role    | Colour             | For                                       |
 | ------- | ------------------ | ----------------------------------------- |

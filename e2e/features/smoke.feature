@@ -13,3 +13,14 @@ Feature: Harness smoke test
   Scenario: Unknown arguments are a usage error
     When I run "mori plant a-tree"
     Then it fails with exit code 3
+
+  Scenario: mori alone in a pipe prints the help
+    When I run "mori"
+    Then it fails with exit code 3
+    And stdout matches "(?s)mori looks after a forest.*Usage: mori.*"
+
+  Scenario: Colour never reaches a pipe or JSON
+    When I run "mori --color auto --help"
+    Then it succeeds
+    And stdout has no colour codes
+

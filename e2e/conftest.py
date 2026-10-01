@@ -150,6 +150,11 @@ def fails_with_status(mori: Mori, status: str, reason: str) -> None:
     )
 
 
+@then("stdout has no colour codes")
+def no_colour(mori: Mori) -> None:
+    assert "\x1b[" not in mori.last.stdout, repr(mori.last.stdout[:200])
+
+
 @then(parsers.parse('stdout matches "{pattern}"'))
 def stdout_matches(mori: Mori, pattern: str) -> None:
     assert_that(mori.last.stdout.strip(), matches_regex(pattern))
