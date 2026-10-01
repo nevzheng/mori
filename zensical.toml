@@ -12,6 +12,7 @@ extra_css = ["stylesheets/everforest.css"]
 nav = [
   { "Home" = "index.md" },
   { "Install and channels" = "install.md" },
+  { "Disk usage tips" = "disk-usage.md" },
   { "Shared caches" = "shared-caches.md" },
   { "Contributing" = "contributing.md" },
   { "Brand" = "brand.md" },

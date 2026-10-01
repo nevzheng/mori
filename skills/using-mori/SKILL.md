@@ -49,7 +49,8 @@ in the repo or a tree: see [Shared caches](https://nevzheng.github.io/mori/share
 build is slow in every new tree, or the disk is filling, tell the person and point them there;
 don't change their config yourself. `mori clone` and `mori doctor` warn when they can tell for sure
 that a cache is missing: `NO_SHARED_CACHE` for Bazel or Cargo, `CACHE_NOT_SHARED_ACROSS_TREES` for
-ccache without `base_dir`. Pass the warning and its fix on to the person.
+ccache without `base_dir`. Pass the warning and its fix on to the person. When the disk is low, the
+`disk-usage` skill says what to do.
 
 ## The layout
 
