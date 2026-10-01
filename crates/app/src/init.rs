@@ -5,14 +5,20 @@ use std::path::PathBuf;
 use mori_api::v1alpha1::{CreatedPath, InitResponse, UnmanagedRepo, created_path::Kind};
 use mori_core::error::ErrorDetails;
 use mori_core::init::{InitPlan, Step, plan};
-use mori_core::paths::{Env, Paths};
+use mori_core::paths::Paths;
 use mori_core::skills::Mode;
 
-use crate::skills;
+use crate::state::boxed;
+use crate::{Host, skills};
 
-/// Runs `init` against the real environment and disk.
-pub fn run(dry_run: bool) -> Result<InitResponse, Box<dyn ErrorDetails>> {
-    let paths = Paths::resolve(&Env::from_vars(|name| std::env::var_os(name))).map_err(boxed)?;
+/// Runs `init` against the host's environment and the disk.
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn run(host: &Host, dry_run: bool) -> Result<InitResponse, Box<dyn ErrorDetails>> {
+    let paths = Paths::resolve(&host.env).map_err(boxed)?;
     let observed = mori_store::init::observe(&paths).map_err(boxed)?;
     let plan = plan(&paths, &observed).map_err(boxed)?;
     if !dry_run {
@@ -53,8 +59,4 @@ fn response(plan: &InitPlan, skills: &[(PathBuf, bool)], dry_run: bool) -> InitR
             })
             .collect(),
     }
-}
-
-fn boxed(error: impl ErrorDetails + 'static) -> Box<dyn ErrorDetails> {
-    Box::new(error)
 }

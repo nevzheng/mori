@@ -1,0 +1,29 @@
+load("@crates//:defs.bzl", "all_crate_deps")
+load("@rules_rust//cargo:extract_cargo_lints.bzl", "extract_cargo_lints")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+extract_cargo_lints(
+    name = "lints",
+    manifest = "Cargo.toml",
+    workspace = "//:Cargo.toml",
+)
+
+rust_library(
+    name = "mori_app",
+    srcs = glob(["src/**/*.rs"]),
+    lint_config = ":lints",
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True) + [
+        "//crates/api:mori_api",
+        "//crates/core:mori_core",
+        "//crates/store:mori_store",
+    ],
+)
+
+rust_test(
+    name = "mori_app_test",
+    size = "small",
+    crate = ":mori_app",
+    lint_config = ":lints",
+    deps = all_crate_deps(normal_dev = True),
+)

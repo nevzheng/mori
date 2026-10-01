@@ -3,14 +3,16 @@
 
 use mori_core::config::Config;
 use mori_core::error::{ConfigError, ErrorDetails, RootSource};
-use mori_core::paths::{Env, Paths};
+use mori_core::paths::Paths;
 use mori_core::tree::TreePolicy;
 use mori_store::StoreError;
 use mori_store::database::Database;
 
-/// The paths for this run, from the real environment.
-pub fn paths() -> Result<Paths, Box<dyn ErrorDetails>> {
-    Paths::resolve(&Env::from_vars(|name| std::env::var_os(name))).map_err(boxed)
+use crate::Host;
+
+/// The paths for this run, from the host's environment.
+pub fn paths(host: &Host) -> Result<Paths, Box<dyn ErrorDetails>> {
+    Paths::resolve(&host.env).map_err(boxed)
 }
 
 /// Opens the database `mori init` made, checking that it records this run's root.

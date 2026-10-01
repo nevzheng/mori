@@ -7,18 +7,18 @@
 use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
 use mori_core::clone::{CloneUrl, clone_path};
 use mori_core::error::ErrorDetails;
-use mori_core::forest::Workspaces;
 use mori_store::StoreError;
 use mori_store::database::Database;
-use mori_store::gc::{JournalBookmark, JournalEntry, new_id, now};
+use mori_store::gc::{JournalBookmark, JournalEntry, new_id};
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::Backend;
 use crate::gc::{self, Context};
 use crate::state::boxed;
 
 /// Checks one tree again and, if it still may go and is safe, removes it.
-pub fn apply_one(
-    context: &Context,
+pub fn apply_one<V: Backend>(
+    context: &Context<V>,
     db: &mut Database,
     repo_name: &str,
     tree_name: &str,
@@ -45,7 +45,7 @@ pub fn apply_one(
         .join(&record.name);
     let workspace = if clone.exists() {
         context
-            .jj
+            .vcs
             .list(&clone)
             .map_err(boxed)?
             .into_iter()
@@ -58,7 +58,7 @@ pub fn apply_one(
         if !same_path(&workspace.root, &expected) {
             return changed("MOVED");
         }
-        context.jj.snapshot(&workspace.root).map_err(boxed)?;
+        context.vcs.snapshot(&workspace.root).map_err(boxed)?;
     }
     let judged = gc::report_repo(context, db, &repo, true)?
         .into_iter()
@@ -81,8 +81,8 @@ pub fn apply_one(
 }
 
 /// Pins, forgets, deletes and drops one tree, and returns its journal entry.
-fn remove(
-    context: &Context,
+fn remove<V: Backend>(
+    context: &Context<V>,
     db: &mut Database,
     repo: &RepoRecord,
     record: &TreeRecord,
@@ -108,14 +108,14 @@ fn remove(
         .collect();
     let (commit_id, pin) = if has_workspace {
         let commit = context
-            .jj
+            .vcs
             .working_copy_commit(&clone, &record.name)
             .map_err(boxed)?;
         let pin = format!("refs/mori/removed/{entry_id}");
-        context.jj.pin(&clone, &pin, &commit).map_err(boxed)?;
+        context.vcs.pin(&clone, &pin, &commit).map_err(boxed)?;
         context
-            .jj
-            .forget_workspace(&clone, &record.name)
+            .vcs
+            .forget_tree(&clone, &record.name)
             .map_err(boxed)?;
         std::fs::remove_dir_all(&path).map_err(|source| {
             boxed(StoreError::Io {
@@ -130,7 +130,7 @@ fn remove(
     db.delete_tree(&repo.id, &record.name).map_err(boxed)?;
     Ok(JournalEntry {
         id: entry_id.to_owned(),
-        removed_at: now(),
+        removed_at: context.now,
         repo: repo.remote.clone(),
         tree_id: record.id.clone(),
         name: record.name.clone(),

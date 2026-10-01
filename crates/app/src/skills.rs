@@ -7,6 +7,7 @@ use mori_core::error::{ConfigError, ErrorDetails};
 use mori_core::paths::Paths;
 use mori_core::skills::{Action, Mode, RepoContext, Step};
 
+use crate::Host;
 use crate::state::{self, boxed};
 
 /// What a skills run did (or would do), in the order it happens.
@@ -20,7 +21,11 @@ pub struct Outcome {
 }
 
 /// Plans the skills in `mode` and, unless `dry_run`, writes them.
-pub fn run(paths: &Paths, mode: Mode, dry_run: bool) -> Result<Outcome, Box<dyn ErrorDetails>> {
+pub(crate) fn run(
+    paths: &Paths,
+    mode: Mode,
+    dry_run: bool,
+) -> Result<Outcome, Box<dyn ErrorDetails>> {
     let kept_legacy = if dry_run {
         Vec::new()
     } else {
@@ -95,8 +100,13 @@ fn created(paths: &Paths, steps: &[Step]) -> Vec<(PathBuf, bool)> {
 }
 
 /// Runs `mori skills sync`.
-pub fn sync(dry_run: bool) -> Result<SyncSkillsResponse, Box<dyn ErrorDetails>> {
-    let paths = state::paths()?;
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn sync(host: &Host, dry_run: bool) -> Result<SyncSkillsResponse, Box<dyn ErrorDetails>> {
+    let paths = state::paths(host)?;
     if paths.database.symlink_metadata().is_err() {
         return Err(boxed(ConfigError::NotInitialized {
             database: paths.database.clone(),
@@ -129,8 +139,8 @@ pub fn sync(dry_run: bool) -> Result<SyncSkillsResponse, Box<dyn ErrorDetails>> 
 
 /// A one-line hint when the root's skills came from a different mori than this one. Printed to
 /// stderr by `init` and `ls`, never part of their JSON.
-pub fn stale_hint() {
-    let Ok(paths) = state::paths() else {
+pub fn stale_hint(host: &Host) {
+    let Ok(paths) = state::paths(host) else {
         return;
     };
     if let Some(installed) = mori_store::skills::installed_version(&paths)
@@ -144,7 +154,10 @@ pub fn stale_hint() {
 }
 
 /// After a clone: the repo's context folder, and the indexes listing it. Returns the folder.
-pub fn after_clone(paths: &Paths, repo: &RepoContext) -> Result<PathBuf, Box<dyn ErrorDetails>> {
+pub(crate) fn after_clone(
+    paths: &Paths,
+    repo: &RepoContext,
+) -> Result<PathBuf, Box<dyn ErrorDetails>> {
     mori_store::skills::ensure_repo_context(paths, repo).map_err(boxed)?;
     let observed = mori_store::skills::observe(paths).map_err(boxed)?;
     let steps = mori_store::skills::index_plan(&observed, &repo_contexts(paths)?);

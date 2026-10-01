@@ -11,24 +11,18 @@ use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
 use mori_api::v1alpha1::{GcItem, GcResponse};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
 use mori_core::error::{CleanupError, ErrorDetails, RepoError};
-use mori_core::forest::{Entry, Workspaces, reconcile};
+use mori_core::forest::{Entry, reconcile};
 use mori_core::gc::{Class, Facts, Reason, classify, over_cap};
 use mori_core::paths::Paths;
 use mori_core::tree::{Lifetime, Role};
-use mori_github::GhCli;
-use mori_jj::JjCli;
+use mori_core::vcs::Forge;
 use mori_store::database::Database;
-use mori_store::gc::now;
 use mori_store::records::{RepoRecord, TreeRecord};
 
 use crate::gc_apply;
 use crate::landing::{self, TreeRef};
 use crate::state::{self, boxed};
-
-/// The `gh` to use: `$MORI_GH` if set, else `gh` on `PATH`.
-pub fn gh() -> GhCli {
-    std::env::var_os("MORI_GH").map_or_else(GhCli::from_path, GhCli::new)
-}
+use crate::{App, Backend};
 
 /// What `mori gc` was asked for.
 pub struct GcArgs {
@@ -50,11 +44,17 @@ pub struct Apply {
 const DEFAULT_MAX: u32 = 10;
 
 /// Runs `mori gc`: the report, and with `--apply` a confirmed batch of removals.
-pub fn run(args: &GcArgs) -> Result<GcResponse, Box<dyn ErrorDetails>> {
-    let paths = state::paths()?;
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn run<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    args: &GcArgs,
+) -> Result<GcResponse, Box<dyn ErrorDetails>> {
+    let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
-    let jj = JjCli::from_path();
-    let gh = (!args.offline).then(gh);
     let mut repos = db.repos().map_err(boxed)?;
     if let Some(repo) = &args.repo {
         let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
@@ -66,9 +66,9 @@ pub fn run(args: &GcArgs) -> Result<GcResponse, Box<dyn ErrorDetails>> {
     let lru_max = state::tree_policy(&paths)?.lru.max;
     let context = Context {
         paths: &paths,
-        jj: &jj,
-        gh: gh.as_ref(),
-        now: now(),
+        vcs: &app.vcs,
+        forge: (!args.offline).then_some(&app.forge as &dyn Forge),
+        now: app.host.now,
         lru_max,
     };
     let mut items = Vec::new();
@@ -115,10 +115,10 @@ pub fn run(args: &GcArgs) -> Result<GcResponse, Box<dyn ErrorDetails>> {
 }
 
 /// What judging a repo's trees needs.
-pub struct Context<'a> {
+pub(crate) struct Context<'a, V> {
     pub paths: &'a Paths,
-    pub jj: &'a JjCli,
-    pub gh: Option<&'a GhCli>,
+    pub vcs: &'a V,
+    pub forge: Option<&'a dyn Forge>,
     pub now: u64,
     /// `[trees.lru] max`.
     pub lru_max: Option<u32>,
@@ -134,8 +134,8 @@ struct Row {
 
 /// Judges every tree of `repo`, fetching first unless `offline`. Reads only, apart from the
 /// fetch and recording the bookmarks it sees.
-pub fn report_repo(
-    context: &Context,
+pub(crate) fn report_repo<V: Backend>(
+    context: &Context<V>,
     db: &mut Database,
     repo: &RepoRecord,
     offline: bool,
@@ -144,7 +144,7 @@ pub fn report_repo(
     let clone = clone_path(context.paths, &id);
     let records = db.trees(&repo.id).map_err(boxed)?;
     let workspaces = if clone.exists() {
-        context.jj.list(&clone).map_err(boxed)?
+        context.vcs.list(&clone).map_err(boxed)?
     } else {
         Vec::new()
     };
@@ -154,12 +154,12 @@ pub fn report_repo(
             .iter()
             .any(|workspace| workspace.name == record.name)
         {
-            landing::observe(db, context.jj, None, &tree_ref(&id, &clone, record))?;
+            landing::observe(db, context.vcs, None, &tree_ref(&id, &clone, record))?;
         }
     }
     if !offline && clone.exists() {
         // A failed fetch leaves the clone's view as it was; the report still works from it.
-        let _ = context.jj.fetch(&clone);
+        let _ = context.vcs.fetch(&clone);
     }
     let mut rows = Vec::new();
     for entry in reconcile(records, workspaces, |record| record.name.as_str()) {
@@ -189,8 +189,8 @@ pub fn report_repo(
         .collect())
 }
 
-fn row(
-    context: &Context,
+fn row<V: Backend>(
+    context: &Context<V>,
     db: &mut Database,
     repo: &RepoRecord,
     id: &RepoId,
@@ -235,18 +235,22 @@ fn row(
         },
         Entry::Tree { record, workspace } => {
             let (landed, commits) = if is_task(&record) {
-                let landing =
-                    landing::observe(db, context.jj, context.gh, &tree_ref(id, clone, &record))?;
+                let landing = landing::observe(
+                    db,
+                    context.vcs,
+                    context.forge,
+                    &tree_ref(id, clone, &record),
+                )?;
                 (landing.landed, landing.commits)
             } else {
                 (None, Vec::new())
             };
             let state = context
-                .jj
+                .vcs
                 .state_covering(clone, &workspace.name, &commits)
                 .map_err(boxed)?;
             let idle_seconds = context
-                .jj
+                .vcs
                 .last_change(clone, &workspace.name)
                 .ok()
                 .map(|changed| context.now.saturating_sub(changed));
@@ -275,7 +279,7 @@ fn tree_ref<'a>(id: &'a RepoId, clone: &'a std::path::Path, record: &'a TreeReco
     }
 }
 
-pub fn is_task(record: &TreeRecord) -> bool {
+pub(crate) fn is_task(record: &TreeRecord) -> bool {
     Role::of(&record.name) == Role::Task
 }
 
@@ -284,7 +288,7 @@ fn role(record: &TreeRecord) -> Role {
 }
 
 /// An unreadable stored lifetime counts as pinned: the choice that never removes.
-pub fn lifetime(record: &TreeRecord) -> Lifetime {
+pub(crate) fn lifetime(record: &TreeRecord) -> Lifetime {
     record.lifetime.parse().unwrap_or(Lifetime::Pinned)
 }
 
@@ -336,6 +340,7 @@ fn item_class(class: Class) -> ItemClass {
 }
 
 /// The class's name in reports and text.
+#[must_use]
 pub fn class_name(class: ItemClass) -> &'static str {
     match class {
         ItemClass::Remove => "remove",
@@ -346,6 +351,7 @@ pub fn class_name(class: ItemClass) -> &'static str {
 }
 
 /// Counts the items per class, for the summary line.
+#[must_use]
 pub fn counts(items: &[GcItem]) -> BTreeMap<&'static str, usize> {
     let mut counts = BTreeMap::new();
     for item in items {

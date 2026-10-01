@@ -7,16 +7,16 @@ use std::path::Path;
 use mori_api::v1alpha1::{CreateTreeResponse, Tree};
 use mori_core::clone::{CloneUrl, RepoId, clone_path};
 use mori_core::error::{ErrorDetails, TreeError};
-use mori_core::forest::Workspaces;
 use mori_core::paths::Paths;
 use mori_core::tree::Lifetime;
 use mori_core::tree_create::{DEFAULT_FROM, Observed, Request, TreePlan, default_owner, plan};
-use mori_jj::JjCli;
 use mori_store::StoreError;
 use mori_store::database::Database;
 use mori_store::records::NewTree;
 
 use crate::state::{self, boxed};
+use crate::{App, Backend, Host};
+use mori_core::vcs::Forge;
 
 /// What `mori tree create` was asked for.
 pub struct CreateArgs {
@@ -28,15 +28,22 @@ pub struct CreateArgs {
     pub dry_run: bool,
 }
 
-/// Runs `tree create` against the real environment, disk and `jj` on `PATH`.
-pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetails>> {
+/// Runs `tree create`: the VCS adds the tree, then a best-effort record of it.
+///
+/// # Errors
+///
+/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
+/// reason.
+pub fn create<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    args: CreateArgs,
+) -> Result<CreateTreeResponse, Box<dyn ErrorDetails>> {
     let repo = CloneUrl::parse(&args.repo).map_err(boxed)?.repo;
-    let owner = owner(args.agent)?;
-    let paths = state::paths()?;
+    let owner = owner(&app.host, args.agent)?;
+    let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
     let policy = state::tree_policy(&paths)?;
-    let jj = JjCli::from_path();
-    let (repo_id, observed) = observe(&paths, &db, &jj, &repo)?;
+    let (repo_id, observed) = observe(&paths, &db, &app.vcs, &repo)?;
     let request = Request {
         repo,
         task: args.task,
@@ -56,7 +63,8 @@ pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetai
                 })
             })?;
         }
-        jj.add_workspace(&clone, &plan.name, &plan.path, &plan.from)
+        app.vcs
+            .add_tree(&clone, &plan.name, &plan.path, &plan.from)
             .map_err(boxed)?;
         id = record(&mut db, repo_id.as_deref().unwrap_or_default(), &plan)?;
     }
@@ -64,14 +72,11 @@ pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetai
 }
 
 /// Who is acting: `--agent` if given, else `$MORI_AGENT`, else the login name.
-pub fn owner(agent: Option<String>) -> Result<String, Box<dyn ErrorDetails>> {
+pub(crate) fn owner(host: &Host, agent: Option<String>) -> Result<String, Box<dyn ErrorDetails>> {
     // An agent's harness can set MORI_AGENT once, so the agent can't forget --agent.
-    let from_env = std::env::var("MORI_AGENT")
-        .ok()
-        .filter(|agent| !agent.trim().is_empty());
-    match agent.or(from_env) {
+    match agent.or_else(|| host.agent.clone()) {
         Some(agent) => Ok(agent),
-        None => default_owner(std::env::var("USER").ok().as_deref()).map_err(boxed),
+        None => default_owner(host.user.as_deref()).map_err(boxed),
     }
 }
 
@@ -79,7 +84,7 @@ pub fn owner(agent: Option<String>) -> Result<String, Box<dyn ErrorDetails>> {
 fn observe(
     paths: &Paths,
     db: &Database,
-    jj: &JjCli,
+    vcs: &impl Backend,
     repo_id: &RepoId,
 ) -> Result<(Option<String>, Observed), Box<dyn ErrorDetails>> {
     let Some(repo) = db.repo(&repo_id.to_string()).map_err(boxed)? else {
@@ -91,7 +96,7 @@ fn observe(
         .into_iter()
         .map(|tree| tree.name)
         .collect();
-    let workspaces = jj
+    let workspaces = vcs
         .list(&clone_path(paths, repo_id))
         .map_err(boxed)?
         .into_iter()
