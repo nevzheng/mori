@@ -13,7 +13,7 @@ Feature: CUJ 0 - set up mori
     And "$XDG_CONFIG_HOME/mori/config.toml" records the root "<home>/mori"
     And "$XDG_STATE_HOME/mori/" exists with mode 0700
     And the database exists with mode 0600 and records the root "<home>/mori"
-    And the output lists every path it created
+    And the output sums up what it set up and what to do next
 
   Scenario: MORI_ROOT chooses the root
     Given MORI_ROOT is "<home>/elsewhere/mori"

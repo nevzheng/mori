@@ -16,6 +16,20 @@ use mori_core::disk::{Space, format_size};
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
 
+/// `path` with the home directory shown as `~`, for text output; JSON keeps paths absolute.
+fn tilde(path: &str) -> String {
+    let Some(home) = std::env::var_os("HOME").filter(|home| !home.is_empty()) else {
+        return path.to_owned();
+    };
+    let home = home.to_string_lossy();
+    let home = home.trim_end_matches('/');
+    match path.strip_prefix(home) {
+        Some("") => "~".to_owned(),
+        Some(rest) if rest.starts_with('/') => format!("~{rest}"),
+        _ => path.to_owned(),
+    }
+}
+
 /// The domain of errors from the command line itself.
 const CLI_DOMAIN: &str = "cli.mori";
 
@@ -50,6 +64,7 @@ pub fn failure(json: bool, error: &dyn ErrorDetails) -> ExitCode {
         json,
         error.code(),
         &error.to_string(),
+        error.hint().as_deref(),
         error.reason(),
         error.domain(),
         metadata,
@@ -72,6 +87,7 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
             true,
             Code::InvalidArgument,
             first_line.trim_start_matches("error: "),
+            None,
             "INVALID_USAGE",
             CLI_DOMAIN,
             Map::new(),
@@ -85,26 +101,42 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
 /// The text `init` prints.
 pub fn init_text(response: &InitResponse) -> String {
     let mut text = String::new();
-    let root = &response.root;
+    let root = tilde(&response.root);
+    let skills = response
+        .created
+        .iter()
+        .filter(|created| created.path.ends_with("/SKILL.md"))
+        .count();
     // Writing to a String can't fail.
     let _ = match (response.already_initialized, response.validate_only) {
         (true, _) => writeln!(text, "mori is already set up at {root}"),
-        (false, true) => writeln!(text, "Would set up mori at {root} (dry run):"),
-        (false, false) => writeln!(text, "Set up mori at {root}:"),
+        (false, true) => writeln!(
+            text,
+            "Would set up mori at {root} (dry run). It would create:"
+        ),
+        (false, false) => writeln!(
+            text,
+            "Set up mori at {root}: {} new files and directories, {skills} skills.",
+            response.created.len()
+        ),
     };
-    let verb = if response.validate_only {
-        "would create"
-    } else {
-        "created"
-    };
-    for created in &response.created {
-        let _ = writeln!(text, "  {verb} {}", created.path);
+    // A dry run is a preview, so it lists everything; a real run sums it up (`--json` lists it).
+    if response.validate_only {
+        for created in &response.created {
+            let _ = writeln!(text, "  {}", tilde(&created.path));
+        }
     }
     if !response.unmanaged_repos.is_empty() {
         let _ = writeln!(text, "Clones mori didn't make (left alone):");
         for repo in &response.unmanaged_repos {
-            let _ = writeln!(text, "  {}  {}", repo.repo, repo.path);
+            let _ = writeln!(text, "  {}  {}", repo.repo, tilde(&repo.path));
         }
+    }
+    if !response.validate_only && !response.already_initialized {
+        let _ = writeln!(
+            text,
+            "Next: `mori clone <repo>`, and point your agent at {root}/llms.txt."
+        );
     }
     text
 }
@@ -112,7 +144,7 @@ pub fn init_text(response: &InitResponse) -> String {
 /// The text `clone` prints.
 pub fn clone_text(response: &CloneResponse) -> String {
     let mut text = String::new();
-    let (repo, path) = (&response.repo, &response.path);
+    let (repo, path) = (&response.repo, tilde(&response.path));
     let kind = if response.vcs() == Vcs::Git {
         "git; trees are git worktrees"
     } else if response.colocated {
@@ -129,7 +161,7 @@ pub fn clone_text(response: &CloneResponse) -> String {
     let _ = writeln!(text, "  from {} ({kind})", response.fetch_url);
     let _ = writeln!(text, "  base tree: default (pinned; the clone itself)");
     let _ = writeln!(text, "  task trees: trees/{}/", response.tree_dir);
-    let _ = writeln!(text, "  context: {}/", response.context_dir);
+    let _ = writeln!(text, "  context: {}/", tilde(&response.context_dir));
     warnings_text(&mut text, &response.warnings);
     text
 }
@@ -146,7 +178,7 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     } else {
         writeln!(text, "Created tree {}:", tree.name)
     };
-    let _ = writeln!(text, "  path: {}", tree.path);
+    let _ = writeln!(text, "  path: {}", tilde(&tree.path));
     let _ = writeln!(text, "  repo: {}", tree.repo);
     let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
@@ -189,26 +221,26 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
         |row: &TreeRow| !row.size_measured_at.is_empty() && row.size_measured_at.as_str() < newest;
     for repo in &response.repos {
         let vcs = match repo.vcs() {
-            Vcs::Git => " (git)",
-            Vcs::Jj => " (jj)",
+            Vcs::Git => "  git",
+            Vcs::Jj => "  jj",
             Vcs::Unspecified => "",
         };
         let size = if sized {
             format!(
-                " {}",
+                "  {}",
                 format_size(repo.trees.iter().map(|row| row.size_bytes).sum())
             )
         } else {
             String::new()
         };
-        let _ = writeln!(text, "{}{vcs}{size}  {}", repo.repo, repo.path);
+        let _ = writeln!(text, "{}{vcs}{size}  {}", repo.repo, tilde(&repo.path));
         let mut header: Vec<String> = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"]
             .map(str::to_owned)
             .to_vec();
         if sized {
             header.push("SIZE".to_owned());
         }
-        let cells: Vec<Vec<String>> = repo
+        let mut cells: Vec<Vec<String>> = repo
             .trees
             .iter()
             .map(|row| {
@@ -219,21 +251,30 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
                 cells
             })
             .collect();
+        // STATUS only matters when something is off.
+        if cells.iter().all(|row| row[1] == "tree") {
+            header.remove(1);
+            for row in &mut cells {
+                row.remove(1);
+            }
+        }
         table(&mut text, &header, &cells);
         let _ = writeln!(text);
     }
     if !response.unmanaged_repos.is_empty() {
         let _ = writeln!(text, "Clones mori didn't make (left alone):");
         for repo in &response.unmanaged_repos {
-            let _ = writeln!(text, "  {}  {}", repo.repo, repo.path);
+            let _ = writeln!(text, "  {}  {}", repo.repo, tilde(&repo.path));
         }
         let _ = writeln!(text);
     }
-    // git reads working trees live; jj's view is as of its last snapshot.
+    // git reads working trees live; jj's view is as of its last snapshot, and a described
+    // working-copy change reads as edited until it is finished.
     if response.repos.iter().any(|repo| repo.vcs() != Vcs::Git) {
         let _ = writeln!(
             text,
-            "WORK in jj trees is as of jj's last snapshot in each tree."
+            "WORK in jj trees is as of jj's last snapshot. \"edited\" means the working copy\n\
+             has changes: `jj commit` (or `jj new`) finishes them."
         );
     }
     if rows().any(|row| row.size_partial) {
@@ -377,7 +418,7 @@ pub fn tree_remove_text(response: &RemoveTreeResponse) -> String {
             let _ = writeln!(
                 text,
                 "  its directory {} was already deleted; pinned its last commit",
-                tree.path
+                tilde(&tree.path)
             );
             let _ = writeln!(
                 text,
@@ -385,12 +426,12 @@ pub fn tree_remove_text(response: &RemoveTreeResponse) -> String {
                 response.journal_entry
             );
         } else if response.directory_removed {
-            let _ = writeln!(text, "  deleted {}", tree.path);
+            let _ = writeln!(text, "  deleted {}", tilde(&tree.path));
         } else {
             let _ = writeln!(
                 text,
                 "  its workspace was already gone; left {} in place",
-                tree.path
+                tilde(&tree.path)
             );
         }
         let _ = writeln!(text, "  dropped its record");
@@ -420,54 +461,75 @@ pub fn skills_text(response: &SyncSkillsResponse) -> String {
             (Action::SkippedNotOurs, _) => "left alone (mori didn't write it)",
             (Action::Unchanged | Action::Unspecified, _) => "up to date",
         };
-        let _ = writeln!(text, "  {what}: {}", file.path);
+        let _ = writeln!(text, "  {what}: {}", tilde(&file.path));
     }
     text
 }
 
-/// The text `gc` prints: every tree with its class and reason (and, with --apply, what happened
-/// to it), then what to do next.
+/// One tree's row in the `gc` text: name, size, reason, and what happened or why.
+fn gc_row(item: &mori_api::v1alpha1::GcItem) -> Vec<String> {
+    use mori_api::v1alpha1::gc_item::{Kind, Outcome};
+    let what = match item.outcome() {
+        Outcome::Removed => format!("removed; undo: mori restore {}", item.entry_id),
+        Outcome::WouldRemove => "would remove".to_owned(),
+        Outcome::SkippedUnsaved => "kept: it has work only this machine has".to_owned(),
+        Outcome::SkippedChanged => "kept: changed since it was judged".to_owned(),
+        Outcome::Unspecified => item.facts.clone(),
+    };
+    let size = if item.size_bytes > 0 {
+        format_size(item.size_bytes)
+    } else {
+        "-".to_owned()
+    };
+    let name = if item.kind() == Kind::BazelLeftover {
+        format!("{} {} (Bazel output)", item.repo, item.name)
+            .trim_start()
+            .to_owned()
+    } else {
+        format!("{} {}", item.repo, item.name)
+    };
+    vec![name, size, item.reason.clone(), what]
+}
+
+/// The text `gc` prints: the trees grouped by what can happen to them (with --apply, what did),
+/// then what to do next. Trees that never go (clones, pinned trees) are only counted.
 pub fn gc_text(response: &GcResponse) -> String {
-    use mori_api::v1alpha1::gc_item::{Class, Kind, Outcome};
+    use mori_api::v1alpha1::gc_item::{Class, Outcome};
     let mut text = String::new();
     let applied = response.validate_only
         || response
             .items
             .iter()
             .any(|item| !matches!(item.outcome(), Outcome::Unspecified | Outcome::WouldRemove));
-    let _ = writeln!(text, "Cleanup:");
-    let rows: Vec<Vec<String>> = response
+    let groups = [
+        (Class::Remove, "Can go"),
+        (Class::Blocked, "Blocked: work only this machine has"),
+        (Class::Keep, "Not yet"),
+    ];
+    for (class, title) in groups {
+        let rows: Vec<Vec<String>> = response
+            .items
+            .iter()
+            .filter(|item| item.class() == class)
+            .map(gc_row)
+            .collect();
+        if rows.is_empty() {
+            continue;
+        }
+        let _ = writeln!(text, "{title} ({})", rows.len());
+        table(&mut text, &[], &rows);
+    }
+    let never = response
         .items
         .iter()
-        .map(|item| {
-            let what = match item.outcome() {
-                Outcome::Removed => format!("removed; undo: mori restore {}", item.entry_id),
-                Outcome::WouldRemove => "would remove".to_owned(),
-                Outcome::SkippedUnsaved => "kept: it has work only this machine has".to_owned(),
-                Outcome::SkippedChanged => "kept: changed since it was judged".to_owned(),
-                Outcome::Unspecified => item.facts.clone(),
-            };
-            let size = if item.size_bytes > 0 {
-                format_size(item.size_bytes)
-            } else {
-                "-".to_owned()
-            };
-            vec![
-                mori_app::gc::class_name(item.class()).to_owned(),
-                if item.kind() == Kind::BazelLeftover {
-                    format!("{} {} (Bazel output)", item.repo, item.name)
-                        .trim_start()
-                        .to_owned()
-                } else {
-                    format!("{} {}", item.repo, item.name)
-                },
-                size,
-                item.reason.clone(),
-                what,
-            ]
-        })
-        .collect();
-    table(&mut text, &[], &rows);
+        .filter(|item| item.class() == Class::Never)
+        .count();
+    if never > 0 {
+        let _ = writeln!(
+            text,
+            "{never} never go: clones, pinned trees and workspaces mori didn't make."
+        );
+    }
     let sum = |keep: &dyn Fn(&mori_api::v1alpha1::GcItem) -> bool| -> (usize, u64) {
         response
             .items
@@ -510,7 +572,7 @@ pub fn restore_text(response: &RestoreResponse) -> String {
     let mut text = String::new();
     if let Some(tree) = &response.tree {
         let _ = writeln!(text, "Restored tree {}:", tree.name);
-        let _ = writeln!(text, "  path: {}", tree.path);
+        let _ = writeln!(text, "  path: {}", tilde(&tree.path));
         let _ = writeln!(text, "  on commit: {}", response.commit_id);
         let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     }
@@ -552,6 +614,7 @@ fn report(
     json: bool,
     code: Code,
     message: &str,
+    hint: Option<&str>,
     reason: &str,
     domain: &str,
     metadata: Map<String, Value>,
@@ -576,11 +639,18 @@ fn report(
             exit(code),
         );
     }
-    let mut text = format!("error: {message}\n  status: {}\n", code.name());
-    let _ = writeln!(text, "  reason: {reason} ({domain})");
-    for (key, value) in &metadata {
-        let _ = writeln!(text, "  {key}: {}", value.as_str().unwrap_or_default());
+    // For people: what happened, what to do, then the reason for searching and scripts. The
+    // details (metadata) are in the JSON form.
+    let mut text = format!("error: {message}\n");
+    if let Some(hint) = hint {
+        let _ = writeln!(text, "hint: {hint}");
     }
+    let _ = writeln!(
+        text,
+        "  {reason} ({domain}), {} exit {}",
+        code.name(),
+        code.number()
+    );
     print_or_fail(&mut std::io::stderr().lock(), &text, exit(code))
 }
 

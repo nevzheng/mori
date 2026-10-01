@@ -230,6 +230,13 @@ impl<J: ErrorDetails, G: ErrorDetails> ErrorDetails for RoutedError<J, G> {
             Self::Git(error) => error.metadata(),
         }
     }
+
+    fn hint(&self) -> Option<String> {
+        match self {
+            Self::Jj(error) => error.hint(),
+            Self::Git(error) => error.hint(),
+        }
+    }
 }
 
 #[cfg(test)]

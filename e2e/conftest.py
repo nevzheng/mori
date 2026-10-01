@@ -146,7 +146,7 @@ def fails_with_status(mori: Mori, status: str, reason: str) -> None:
     assert_that(mori.last.returncode, equal_to(CANONICAL_CODES[status]))
     assert_that(
         mori.last.stderr,
-        all_of(contains_string(f"status: {status}"), contains_string(f"reason: {reason} (")),
+        all_of(contains_string(f" {status} exit "), contains_string(f"  {reason} (")),
     )
 
 

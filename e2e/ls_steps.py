@@ -114,7 +114,8 @@ def text_row(mori: Mori, name: str, owner: str, task: str, lifetime: str) -> Non
     lines = [line.split() for line in mori.last.stdout.splitlines()]
     matching = [cells for cells in lines if cells and cells[0] == name]
     assert matching, f"no row for {name!r} in:\n{mori.last.stdout}"
-    assert_that(matching[0][1:5], equal_to(["tree", owner, task, lifetime]))
+    # The STATUS column is left out when every row is a plain tree.
+    assert_that(matching[0][1:4], equal_to([owner, task, lifetime]))
 
 
 @then(parsers.parse('the forest shows "{name}" pushed "{bookmark}", on the remote, not landed'))
