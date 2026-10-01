@@ -65,3 +65,42 @@ Feature: CUJ 9 - check the root
     And the directory of "claude-fix-login" was deleted by hand
     When I run "mori doctor"
     Then mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
+
+  Scenario: --fix forgets a tree deleted by hand, and restore brings it back
+    Given I have run "mori clone github.com/acme/widget"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And someone commits work in "claude-fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    And I have fixed it with "mori doctor --fix --yes"
+    When I restore the removed tree
+    Then it succeeds
+    And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
+    And the clone has a workspace "claude-fix-login"
+
+  Scenario: --fix needs a confirmation
+    Given I have run "mori clone github.com/acme/widget"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    When I run "mori doctor --fix"
+    Then it fails with status FAILED_PRECONDITION and reason "CONFIRMATION_NEEDED"
+    And mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
+
+  Scenario: --fix --dry-run repairs nothing
+    Given I have run "mori clone github.com/acme/widget"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    When I run "mori doctor --fix --dry-run"
+    Then stdout matches "(?s)Would fix TREE_DIR_GONE  github.com/acme/widget claude-fix-login.*"
+    And mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
+
+  Scenario: --fix repairs a deleted git worktree and a missing context folder
+    Given I have run "mori clone --vcs git github.com/acme/widget"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And the directory of "claude-fix-login" was deleted by hand
+    And the directory "<home>/mori/context/projects/widget" was deleted by hand
+    When I run "mori doctor --fix --yes"
+    Then it succeeds
+    And the clone has no git worktree "claude-fix-login"
+    And mori has no record of the tree "claude-fix-login"
+    And "<home>/mori/context/projects/widget/README.md" exists
+

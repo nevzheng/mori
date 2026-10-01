@@ -243,9 +243,17 @@ impl Vcs for GitCli {
     }
 
     /// `HEAD`: mori only asks for trees with no edits, so it holds all of the tree's work.
+    /// When the directory is gone, git still records the worktree's `HEAD`; that is the commit.
     fn working_copy_commit(&self, clone: &Path, name: &str) -> Result<String, GitError> {
         let root = self.root(clone, name)?;
-        Ok(self.run(&root, &["rev-parse", "HEAD"])?.trim().to_owned())
+        if root.exists() {
+            return Ok(self.run(&root, &["rev-parse", "HEAD"])?.trim().to_owned());
+        }
+        let stdout = self.run(clone, &["worktree", "list", "--porcelain", "-z"])?;
+        match worktree_head(&stdout, &root) {
+            Some(head) => Ok(head),
+            None => Err(GitError::OutputInvalid { output: stdout }),
+        }
     }
 
     /// Remote branches that hold the tree's own work (its commits not in trunk): those whose tip
@@ -365,6 +373,20 @@ fn parse_worktree_list(stdout: &str) -> Result<Vec<Workspace>, GitError> {
         workspaces.push(Workspace { name, root });
     }
     Ok(workspaces)
+}
+
+/// The `HEAD` that `git worktree list --porcelain -z` records for the worktree at `root`.
+fn worktree_head(stdout: &str, root: &Path) -> Option<String> {
+    let mut lines = stdout.split('\0');
+    while let Some(line) = lines.next() {
+        if line.strip_prefix("worktree ").map(Path::new) == Some(root) {
+            return lines
+                .next()
+                .and_then(|head| head.strip_prefix("HEAD "))
+                .map(str::to_owned);
+        }
+    }
+    None
 }
 
 /// Parses `for-each-ref` lines of `<remote>/<branch>`, the commit, and the symref target (set
