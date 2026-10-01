@@ -357,8 +357,10 @@ message RemoveTreeRequest {
   // The tree's name, e.g. "claude-fix-login".
   string name = 2;
 
-  // Who is asking; must be the tree's owner. Defaults to the login name.
-  string agent = 3;
+  // Was `agent`, for an owner check mori no longer makes: anyone may remove a tree when its work
+  // is safe.
+  reserved 3;
+  reserved "agent";
 
   // Allow removing a pinned tree.
   bool pinned = 4;

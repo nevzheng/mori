@@ -548,19 +548,6 @@ pub fn doctor_text(response: &DoctorResponse) -> String {
     text
 }
 
-/// Whether `doctor` found any problem, which makes it exit non-zero.
-pub fn doctor_has_problems(response: &DoctorResponse) -> bool {
-    response
-        .findings
-        .iter()
-        .any(|finding| finding.severity() == Severity::Problem)
-}
-
-/// The exit code when `doctor` found problems: `FAILED_PRECONDITION`, as for a refusal.
-pub fn doctor_problems_exit() -> ExitCode {
-    exit(Code::FailedPrecondition)
-}
-
 fn report(
     json: bool,
     code: Code,

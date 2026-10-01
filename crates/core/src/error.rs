@@ -537,3 +537,46 @@ impl ErrorDetails for CleanupError {
         }
     }
 }
+
+/// Errors from `mori doctor` (domain `doctor.mori`).
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DoctorError {
+    /// Repairing needs the person's confirmation, and it wasn't given.
+    #[error(
+        "this would repair {count} finding(s); confirm with --yes, or see them first with --dry-run"
+    )]
+    NotConfirmed {
+        /// How many findings `--fix` would repair.
+        count: usize,
+    },
+}
+
+impl DoctorError {
+    /// The AIP-193 `ErrorInfo.domain`.
+    pub const DOMAIN: &'static str = "doctor.mori";
+}
+
+impl ErrorDetails for DoctorError {
+    fn code(&self) -> Code {
+        match self {
+            Self::NotConfirmed { .. } => Code::FailedPrecondition,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
+        match self {
+            Self::NotConfirmed { .. } => "CONFIRMATION_NEEDED",
+        }
+    }
+
+    fn domain(&self) -> &'static str {
+        Self::DOMAIN
+    }
+
+    fn metadata(&self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::NotConfirmed { count } => vec![("count", count.to_string())],
+        }
+    }
+}

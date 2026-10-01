@@ -156,7 +156,7 @@ pub fn stale_hint(host: &Host) {
     {
         eprintln!(
             "note: the skills in {} are from mori {installed}; run `mori skills sync` to update them",
-            paths.root.join("skills").display()
+            paths.root.join("context/skills").display()
         );
     }
 }

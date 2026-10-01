@@ -29,6 +29,7 @@ Don't run `gt`. Commits are signed when pushed.
   sit behind traits defined in core and implemented by the adapter crates.
 - No `unwrap`, `expect`, `panic!` or `todo!` outside tests. Lints are workspace-wide; don't silence
   them without a reason in the code.
+- Commands, flags, output, errors and help follow the [CLI style guide](docs/cli-style.md).
 - Errors follow Google AIP-193: each domain error has a canonical code and a stable
   `UPPER_SNAKE_CASE` reason.
 - Tests follow the pyramid: most are unit tests of the core, then integration tests against

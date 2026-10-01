@@ -3287,9 +3287,6 @@ impl serde::Serialize for RemoveTreeRequest {
         if !self.name.is_empty() {
             len += 1;
         }
-        if !self.agent.is_empty() {
-            len += 1;
-        }
         if self.pinned {
             len += 1;
         }
@@ -3302,9 +3299,6 @@ impl serde::Serialize for RemoveTreeRequest {
         }
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
-        }
-        if !self.agent.is_empty() {
-            struct_ser.serialize_field("agent", &self.agent)?;
         }
         if self.pinned {
             struct_ser.serialize_field("pinned", &self.pinned)?;
@@ -3321,20 +3315,12 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "repo",
-            "name",
-            "agent",
-            "pinned",
-            "validate_only",
-            "validateOnly",
-        ];
+        const FIELDS: &[&str] = &["repo", "name", "pinned", "validate_only", "validateOnly"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repo,
             Name,
-            Agent,
             Pinned,
             ValidateOnly,
         }
@@ -3363,7 +3349,6 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
                         match value {
                             "repo" => Ok(GeneratedField::Repo),
                             "name" => Ok(GeneratedField::Name),
-                            "agent" => Ok(GeneratedField::Agent),
                             "pinned" => Ok(GeneratedField::Pinned),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -3387,7 +3372,6 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
             {
                 let mut repo__ = None;
                 let mut name__ = None;
-                let mut agent__ = None;
                 let mut pinned__ = None;
                 let mut validate_only__ = None;
                 while let Some(k) = map_.next_key()? {
@@ -3403,12 +3387,6 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
                                 return Err(serde::de::Error::duplicate_field("name"));
                             }
                             name__ = Some(map_.next_value()?);
-                        }
-                        GeneratedField::Agent => {
-                            if agent__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("agent"));
-                            }
-                            agent__ = Some(map_.next_value()?);
                         }
                         GeneratedField::Pinned => {
                             if pinned__.is_some() {
@@ -3427,7 +3405,6 @@ impl<'de> serde::Deserialize<'de> for RemoveTreeRequest {
                 Ok(RemoveTreeRequest {
                     repo: repo__.unwrap_or_default(),
                     name: name__.unwrap_or_default(),
-                    agent: agent__.unwrap_or_default(),
                     pinned: pinned__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
                 })

@@ -200,7 +200,8 @@ again, it refuses like `tree create`.
 
 Checks the root, every clone and every tree against the VCS and the disk, and lists each problem
 with the command that fixes it. It only reads, so run it whenever a jj or git command fails in a
-mori tree, or before handing out work. It exits 9 if it finds a problem.
+mori tree, or before handing out work. Findings don't change its exit code (0); check
+`findings` for any with severity `problem`.
 
 - Each finding has a code (`TREE_DIR_GONE`, `WORKSPACE_GONE`, `CONFLICTED_BOOKMARK`,
   `BACKEND_CHANGED`, `NO_SHARED_CACHE`, …), a severity (`problem`, `warn`, `info`), what it is

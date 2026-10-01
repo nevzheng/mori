@@ -10,7 +10,7 @@ use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::doctor::{
     Code, Facts, Finding, Known, RepoFacts, Severity, Subject, TreeFacts, check, summary,
 };
-use mori_core::error::{CleanupError, ErrorDetails, RepoError};
+use mori_core::error::{DoctorError, ErrorDetails, RepoError};
 use mori_core::forest::{Entry, reconcile};
 use mori_core::paths::Paths;
 use mori_core::skills::Mode;
@@ -40,7 +40,7 @@ pub struct Fix {
 ///
 /// # Errors
 ///
-/// [`CleanupError::NotConfirmed`] for `--fix` without `--yes`, or a failure of the disk, the
+/// [`DoctorError::NotConfirmed`] for `--fix` without `--yes`, or a failure of the disk, the
 /// database or an adapter, with its code and reason.
 pub fn run<V: Backend, F: Forge>(
     app: &App<V, F>,
@@ -55,7 +55,7 @@ pub fn run<V: Backend, F: Forge>(
     if let Some(fix) = fix {
         let fixable: Vec<&Finding> = findings.iter().filter(|f| f.auto_fixable()).collect();
         if !fix.yes && !fix.dry_run && !fixable.is_empty() {
-            return Err(boxed(CleanupError::NotConfirmed {
+            return Err(boxed(DoctorError::NotConfirmed {
                 count: fixable.len(),
             }));
         }
