@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, skill_file::Action,
+    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs, skill_file::Action,
     tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
@@ -112,7 +112,9 @@ pub fn init_text(response: &InitResponse) -> String {
 pub fn clone_text(response: &CloneResponse) -> String {
     let mut text = String::new();
     let (repo, path) = (&response.repo, &response.path);
-    let kind = if response.colocated {
+    let kind = if response.vcs() == Vcs::Git {
+        "git; trees are git worktrees"
+    } else if response.colocated {
         "jj, colocated with git"
     } else {
         "jj only"

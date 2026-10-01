@@ -15,6 +15,9 @@ impl serde::Serialize for CloneRequest {
         if self.jj_only {
             len += 1;
         }
+        if self.vcs != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CloneRequest", len)?;
         if !self.url.is_empty() {
             struct_ser.serialize_field("url", &self.url)?;
@@ -25,6 +28,11 @@ impl serde::Serialize for CloneRequest {
         if self.jj_only {
             struct_ser.serialize_field("jjOnly", &self.jj_only)?;
         }
+        if self.vcs != 0 {
+            let v = Vcs::try_from(self.vcs)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
+            struct_ser.serialize_field("vcs", &v)?;
+        }
         struct_ser.end()
     }
 }
@@ -34,13 +42,21 @@ impl<'de> serde::Deserialize<'de> for CloneRequest {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["url", "validate_only", "validateOnly", "jj_only", "jjOnly"];
+        const FIELDS: &[&str] = &[
+            "url",
+            "validate_only",
+            "validateOnly",
+            "jj_only",
+            "jjOnly",
+            "vcs",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Url,
             ValidateOnly,
             JjOnly,
+            Vcs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -68,6 +84,7 @@ impl<'de> serde::Deserialize<'de> for CloneRequest {
                             "url" => Ok(GeneratedField::Url),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             "jjOnly" | "jj_only" => Ok(GeneratedField::JjOnly),
+                            "vcs" => Ok(GeneratedField::Vcs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -90,6 +107,7 @@ impl<'de> serde::Deserialize<'de> for CloneRequest {
                 let mut url__ = None;
                 let mut validate_only__ = None;
                 let mut jj_only__ = None;
+                let mut vcs__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Url => {
@@ -110,12 +128,19 @@ impl<'de> serde::Deserialize<'de> for CloneRequest {
                             }
                             jj_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Vcs => {
+                            if vcs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vcs"));
+                            }
+                            vcs__ = Some(map_.next_value::<Vcs>()? as i32);
+                        }
                     }
                 }
                 Ok(CloneRequest {
                     url: url__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
                     jj_only: jj_only__.unwrap_or_default(),
+                    vcs: vcs__.unwrap_or_default(),
                 })
             }
         }
@@ -151,6 +176,9 @@ impl serde::Serialize for CloneResponse {
         if !self.context_dir.is_empty() {
             len += 1;
         }
+        if self.vcs != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CloneResponse", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -173,6 +201,11 @@ impl serde::Serialize for CloneResponse {
         if !self.context_dir.is_empty() {
             struct_ser.serialize_field("contextDir", &self.context_dir)?;
         }
+        if self.vcs != 0 {
+            let v = Vcs::try_from(self.vcs)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
+            struct_ser.serialize_field("vcs", &v)?;
+        }
         struct_ser.end()
     }
 }
@@ -194,6 +227,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             "validateOnly",
             "context_dir",
             "contextDir",
+            "vcs",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -205,6 +239,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             TreeDir,
             ValidateOnly,
             ContextDir,
+            Vcs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -236,6 +271,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             "treeDir" | "tree_dir" => Ok(GeneratedField::TreeDir),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
+                            "vcs" => Ok(GeneratedField::Vcs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -262,6 +298,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                 let mut tree_dir__ = None;
                 let mut validate_only__ = None;
                 let mut context_dir__ = None;
+                let mut vcs__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -306,6 +343,12 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             }
                             context_dir__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Vcs => {
+                            if vcs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vcs"));
+                            }
+                            vcs__ = Some(map_.next_value::<Vcs>()? as i32);
+                        }
                     }
                 }
                 Ok(CloneResponse {
@@ -316,6 +359,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                     tree_dir: tree_dir__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
                     context_dir: context_dir__.unwrap_or_default(),
+                    vcs: vcs__.unwrap_or_default(),
                 })
             }
         }
@@ -2459,6 +2503,9 @@ impl serde::Serialize for RepoTrees {
         if !self.trees.is_empty() {
             len += 1;
         }
+        if self.vcs != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.RepoTrees", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -2469,6 +2516,11 @@ impl serde::Serialize for RepoTrees {
         if !self.trees.is_empty() {
             struct_ser.serialize_field("trees", &self.trees)?;
         }
+        if self.vcs != 0 {
+            let v = Vcs::try_from(self.vcs)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
+            struct_ser.serialize_field("vcs", &v)?;
+        }
         struct_ser.end()
     }
 }
@@ -2478,13 +2530,14 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["repo", "path", "trees"];
+        const FIELDS: &[&str] = &["repo", "path", "trees", "vcs"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repo,
             Path,
             Trees,
+            Vcs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2512,6 +2565,7 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                             "repo" => Ok(GeneratedField::Repo),
                             "path" => Ok(GeneratedField::Path),
                             "trees" => Ok(GeneratedField::Trees),
+                            "vcs" => Ok(GeneratedField::Vcs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2534,6 +2588,7 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                 let mut repo__ = None;
                 let mut path__ = None;
                 let mut trees__ = None;
+                let mut vcs__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -2554,12 +2609,19 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                             }
                             trees__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Vcs => {
+                            if vcs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("vcs"));
+                            }
+                            vcs__ = Some(map_.next_value::<Vcs>()? as i32);
+                        }
                     }
                 }
                 Ok(RepoTrees {
                     repo: repo__.unwrap_or_default(),
                     path: path__.unwrap_or_default(),
                     trees: trees__.unwrap_or_default(),
+                    vcs: vcs__.unwrap_or_default(),
                 })
             }
         }
@@ -3806,5 +3868,75 @@ impl<'de> serde::Deserialize<'de> for UnmanagedRepo {
             }
         }
         deserializer.deserialize_struct("mori.v1alpha1.UnmanagedRepo", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for Vcs {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "VCS_UNSPECIFIED",
+            Self::Jj => "VCS_JJ",
+            Self::Git => "VCS_GIT",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for Vcs {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["VCS_UNSPECIFIED", "VCS_JJ", "VCS_GIT"];
+
+        struct GeneratedVisitor;
+
+        impl serde::de::Visitor<'_> for GeneratedVisitor {
+            type Value = Vcs;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "VCS_UNSPECIFIED" => Ok(Vcs::Unspecified),
+                    "VCS_JJ" => Ok(Vcs::Jj),
+                    "VCS_GIT" => Ok(Vcs::Git),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
     }
 }

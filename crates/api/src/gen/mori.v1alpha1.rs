@@ -91,8 +91,12 @@ pub struct CloneRequest {
     #[prost(bool, tag = "2")]
     pub validate_only: bool,
     /// Make a jj-only clone. By default the clone is colocated: a jj repo and a git repo at once.
+    /// Only for jj clones.
     #[prost(bool, tag = "3")]
     pub jj_only: bool,
+    /// Which VCS the clone and its trees use. Unspecified: `\[vcs\] default` in config.toml, else jj.
+    #[prost(enumeration = "Vcs", tag = "4")]
+    pub vcs: i32,
 }
 /// Response for `Clone`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -119,6 +123,9 @@ pub struct CloneResponse {
     /// every agent. Created with the clone.
     #[prost(string, tag = "7")]
     pub context_dir: ::prost::alloc::string::String,
+    /// The VCS the clone uses.
+    #[prost(enumeration = "Vcs", tag = "8")]
+    pub vcs: i32,
 }
 /// A tree mori created.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -209,6 +216,9 @@ pub struct RepoTrees {
     /// Every tree mori recorded and every workspace the VCS reports, sorted by name.
     #[prost(message, repeated, tag = "3")]
     pub trees: ::prost::alloc::vec::Vec<TreeRow>,
+    /// The VCS the clone uses, read from the clone.
+    #[prost(enumeration = "Vcs", tag = "4")]
+    pub vcs: i32,
 }
 /// One tree, as mori recorded it and as the VCS reports it.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -575,4 +585,37 @@ pub struct RestoreResponse {
     /// The commit it was restored on.
     #[prost(string, tag = "2")]
     pub commit_id: ::prost::alloc::string::String,
+}
+/// The VCS a clone and its trees use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum Vcs {
+    /// Not set.
+    Unspecified = 0,
+    /// jj: trees are jj workspaces.
+    Jj = 1,
+    /// git: trees are detached git worktrees.
+    Git = 2,
+}
+impl Vcs {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "VCS_UNSPECIFIED",
+            Self::Jj => "VCS_JJ",
+            Self::Git => "VCS_GIT",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "VCS_UNSPECIFIED" => Some(Self::Unspecified),
+            "VCS_JJ" => Some(Self::Jj),
+            "VCS_GIT" => Some(Self::Git),
+            _ => None,
+        }
+    }
 }

@@ -41,6 +41,23 @@ Feature: CUJ 1 - add a repo
     Then it succeeds
     And the clone is a jj repo without git
 
+  Scenario: The config can make git the default
+    Given config.toml sets the default vcs to "git"
+    When I run "mori clone github.com/acme/widget"
+    Then it succeeds
+    And the clone is a git repo without jj
+
+  Scenario: --vcs overrides the configured default
+    Given config.toml sets the default vcs to "git"
+    When I run "mori clone --vcs jj github.com/acme/widget"
+    Then it succeeds
+    And the clone is a jj repo colocated with git
+
+  Scenario: A git clone can't be jj-only
+    When I run "mori clone --vcs git --no-colocate github.com/acme/widget"
+    Then it fails with status INVALID_ARGUMENT and reason "COLOCATE_NEEDS_JJ"
+    And nothing exists at "<home>/mori/repos/github.com/acme/widget"
+
   Scenario: A repo mori already has is refused
     Given I have run "mori clone github.com/acme/widget"
     When I run "mori clone git@github.com:acme/widget.git"

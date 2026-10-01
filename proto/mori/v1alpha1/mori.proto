@@ -106,7 +106,21 @@ message CloneRequest {
   bool validate_only = 2;
 
   // Make a jj-only clone. By default the clone is colocated: a jj repo and a git repo at once.
+  // Only for jj clones.
   bool jj_only = 3;
+
+  // Which VCS the clone and its trees use. Unspecified: `[vcs] default` in config.toml, else jj.
+  Vcs vcs = 4;
+}
+
+// The VCS a clone and its trees use.
+enum Vcs {
+  // Not set.
+  VCS_UNSPECIFIED = 0;
+  // jj: trees are jj workspaces.
+  VCS_JJ = 1;
+  // git: trees are detached git worktrees.
+  VCS_GIT = 2;
 }
 
 // Response for `Clone`.
@@ -132,6 +146,9 @@ message CloneResponse {
   // The repo's context folder, `context/projects/<tree_dir>/`: notes and context for it, for people and
   // every agent. Created with the clone.
   string context_dir = 7;
+
+  // The VCS the clone uses.
+  Vcs vcs = 8;
 }
 
 // A tree mori created.
@@ -220,6 +237,9 @@ message RepoTrees {
 
   // Every tree mori recorded and every workspace the VCS reports, sorted by name.
   repeated TreeRow trees = 3;
+
+  // The VCS the clone uses, read from the clone.
+  Vcs vcs = 4;
 }
 
 // One tree, as mori recorded it and as the VCS reports it.

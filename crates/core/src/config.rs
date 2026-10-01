@@ -1,5 +1,5 @@
 //! `config.toml`. It records only what differs from the built-in defaults: the root, and any
-//! `[trees]` policy someone wrote by hand.
+//! `[trees]` and `[vcs]` policy someone wrote by hand.
 
 use std::path::{Path, PathBuf};
 
@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::error::ConfigError;
 use crate::tree::TreePolicy;
+use crate::vcs::VcsPolicy;
 
 /// The config schema this version of mori reads and writes.
 pub const SCHEMA: u32 = 1;
@@ -22,6 +23,9 @@ pub struct Config {
     /// How trees are named and how long they live. Optional; every key has a default.
     #[serde(default)]
     pub trees: TreePolicy,
+    /// Which VCS new clones use. Optional; jj by default.
+    #[serde(default)]
+    pub vcs: VcsPolicy,
 }
 
 impl Config {
@@ -87,6 +91,7 @@ mod tests {
                 schema: SCHEMA,
                 root: PathBuf::from("/home/acme/mori"),
                 trees: TreePolicy::default(),
+                vcs: VcsPolicy::default(),
             }
         );
     }
@@ -145,5 +150,18 @@ mod tests {
         );
         assert_eq!(trees.lifetime.task.to_string(), "ttl:14d");
         assert_eq!(trees.lru.max, Some(5));
+    }
+
+    #[test]
+    fn the_vcs_default_is_jj_and_can_be_git() {
+        let path = Path::new(PATH);
+        let base = "schema = 1\nroot = \"/home/acme/mori\"\n";
+
+        let unset = Config::parse(base, path).unwrap();
+        let git = Config::parse(&format!("{base}[vcs]\ndefault = \"git\"\n"), path).unwrap();
+
+        assert_eq!(unset.vcs.default, crate::vcs::VcsKind::Jj);
+        assert_eq!(git.vcs.default, crate::vcs::VcsKind::Git);
+        assert!(Config::parse(&format!("{base}[vcs]\ndefault = \"hg\"\n"), path).is_err());
     }
 }

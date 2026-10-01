@@ -5,6 +5,7 @@ use mori_core::config::Config;
 use mori_core::error::{ConfigError, ErrorDetails, RootSource};
 use mori_core::paths::Paths;
 use mori_core::tree::TreePolicy;
+use mori_core::vcs::VcsKind;
 use mori_store::StoreError;
 use mori_store::database::Database;
 
@@ -36,15 +37,29 @@ pub fn open_database(paths: &Paths) -> Result<Database, Box<dyn ErrorDetails>> {
 
 /// The `[trees]` policy from `config.toml`: every key has a default.
 pub fn tree_policy(paths: &Paths) -> Result<TreePolicy, Box<dyn ErrorDetails>> {
+    Ok(config(paths)?.trees)
+}
+
+/// The VCS a new clone uses: `requested` if given, else `[vcs] default`, else jj.
+pub fn clone_vcs(
+    paths: &Paths,
+    requested: Option<VcsKind>,
+) -> Result<VcsKind, Box<dyn ErrorDetails>> {
+    match requested {
+        Some(vcs) => Ok(vcs),
+        None => Ok(config(paths)?.vcs.default),
+    }
+}
+
+/// `config.toml`, parsed.
+fn config(paths: &Paths) -> Result<Config, Box<dyn ErrorDetails>> {
     let text = std::fs::read_to_string(&paths.config_file).map_err(|source| {
         boxed(StoreError::Io {
             path: paths.config_file.clone(),
             source,
         })
     })?;
-    Ok(Config::parse(&text, &paths.config_file)
-        .map_err(boxed)?
-        .trees)
+    Config::parse(&text, &paths.config_file).map_err(boxed)
 }
 
 /// Deletes a forgotten tree's directory. Already gone counts as done: some backends delete it

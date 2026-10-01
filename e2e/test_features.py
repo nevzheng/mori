@@ -11,6 +11,7 @@ scenarios(
     "../spec/cuj/06-gc.feature",
     "../spec/cuj/06-gc-apply.feature",
     "../spec/cuj/07-restore.feature",
+    "../spec/cuj/08-git-backend.feature",
     "../spec/cuj/skills.feature",
     "features/smoke.feature",
 )

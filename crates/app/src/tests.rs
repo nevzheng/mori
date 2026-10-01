@@ -290,7 +290,7 @@ impl Fixture {
         };
         let app = App::new(host, FakeVcs::default(), NoForge);
         init::run(&app.host, false).map_err(to_std)?;
-        clone::run(&app, REPO, false, false).map_err(to_std)?;
+        clone::run(&app, REPO, false, false, None).map_err(to_std)?;
         Ok(Self { home, app })
     }
 

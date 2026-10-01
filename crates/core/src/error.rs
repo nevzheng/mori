@@ -406,6 +406,10 @@ pub enum RepoError {
         /// The repo.
         repo: String,
     },
+
+    /// A jj-only clone was asked for with the git backend.
+    #[error("--no-colocate makes a jj-only clone; a git clone is always git")]
+    ColocateNeedsJj,
 }
 
 impl RepoError {
@@ -416,7 +420,7 @@ impl RepoError {
 impl ErrorDetails for RepoError {
     fn code(&self) -> Code {
         match self {
-            Self::UrlInvalid { .. } => Code::InvalidArgument,
+            Self::UrlInvalid { .. } | Self::ColocateNeedsJj => Code::InvalidArgument,
             Self::NotManaged { .. } => Code::NotFound,
             Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
             Self::TreeDirTaken { .. } => Code::FailedPrecondition,
@@ -432,6 +436,7 @@ impl ErrorDetails for RepoError {
             Self::PathExists { .. } => "PATH_EXISTS",
             Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
             Self::NotRecorded { .. } => "CLONE_NOT_RECORDED",
+            Self::ColocateNeedsJj => "COLOCATE_NEEDS_JJ",
         }
     }
 
@@ -448,6 +453,7 @@ impl ErrorDetails for RepoError {
             Self::PathExists { repo, path } | Self::NotRecorded { repo, path, .. } => {
                 vec![("repo", repo.clone()), ("path", path.display().to_string())]
             }
+            Self::ColocateNeedsJj => vec![],
         }
     }
 }

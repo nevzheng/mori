@@ -76,6 +76,14 @@ pub trait Backend: Vcs<Error: ErrorDetails + 'static> {
     ) -> Result<(), Self::Error>;
 }
 
+/// The API's name for `kind`.
+fn api_vcs(kind: VcsKind) -> mori_api::v1alpha1::Vcs {
+    match kind {
+        VcsKind::Jj => mori_api::v1alpha1::Vcs::Jj,
+        VcsKind::Git => mori_api::v1alpha1::Vcs::Git,
+    }
+}
+
 /// Everything a command gets from outside.
 pub struct App<V, F> {
     /// The environment and clock.

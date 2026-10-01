@@ -22,6 +22,36 @@ pub enum VcsKind {
     Git,
 }
 
+impl std::str::FromStr for VcsKind {
+    type Err = String;
+
+    /// Parses `jj` or `git`, as in `config.toml` and `--vcs`.
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "jj" => Ok(Self::Jj),
+            "git" => Ok(Self::Git),
+            _ => Err(format!("invalid vcs {text:?}: use jj or git")),
+        }
+    }
+}
+
+impl std::fmt::Display for VcsKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Jj => "jj",
+            Self::Git => "git",
+        })
+    }
+}
+
+/// `[vcs]` in `config.toml`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct VcsPolicy {
+    /// The backend `mori clone` uses when `--vcs` isn't given.
+    pub default: VcsKind,
+}
+
 /// A bookmark (branch) on a remote, as the VCS sees it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RemoteBookmark {
