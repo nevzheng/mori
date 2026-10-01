@@ -9,6 +9,7 @@ mod output;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, Parser, Subcommand};
+use mori_api::v1alpha1::Hint;
 use mori_app::routed::Routed;
 use mori_app::{
     App, Host, clone, doctor, gc, init, ls, place, restore, skills, tree, tree_remove, tree_set,
@@ -43,6 +44,7 @@ Environment:
   MORI_ROOT    The root mori manages (default ~/mori)
   MORI_AGENT   Who new trees are for, when --agent isn't given (default: your login name)
   MORI_GH      The gh program to ask about pull requests (default: gh on PATH)
+  MORI_HINTS   0 turns off hints, the one-line suggestions for a next step
   NO_COLOR     Plain text output, whatever the terminal
 
 Every command takes --json for one JSON object on stdout. Guide: https://nevzheng.github.io/mori/";
@@ -358,10 +360,11 @@ fn dashboard(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool) -> ExitCode {
         let _ = Cli::command().print_help();
         return ExitCode::from(3);
     }
-    respond(
+    respond_hinted(
         json,
         ls::run(app, &ls::LsArgs::default()),
         output::forest_text,
+        |response| &response.hints,
     )
 }
 
@@ -426,7 +429,11 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
         ),
         Command::Completions { shell } => print_completions(shell),
         Command::Man => print_man(),
-        Command::Where { path } => respond(json, run_where(app, path), output::where_text),
+        Command::Where { path } => {
+            respond_hinted(json, run_where(app, path), output::where_text, |response| {
+                &response.hints
+            })
+        }
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
@@ -437,7 +444,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
             query,
             owner,
             status,
-        } => respond(
+        } => respond_hinted(
             json,
             ls::run(
                 app,
@@ -451,6 +458,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
                 },
             ),
             output::ls_text,
+            |response| &response.hints,
         ),
         Command::Tree { command } => dispatch_tree(app, json, command),
     }
@@ -471,7 +479,7 @@ fn dispatch_tree(
             from,
             purpose,
             dry_run,
-        } => respond(
+        } => respond_hinted(
             json,
             tree::create(
                 app,
@@ -486,6 +494,7 @@ fn dispatch_tree(
                 },
             ),
             output::tree_create_text,
+            |response| &response.hints,
         ),
         TreeCommand::Set {
             repo,
@@ -609,6 +618,25 @@ fn run_doctor(
 }
 
 /// Prints a command's result: its response as JSON or text, or its error.
+/// As [`respond`], then the response's hints on stderr, for people; JSON carries them in the response.
+fn respond_hinted<T: serde::Serialize>(
+    json: bool,
+    result: Result<T, Box<dyn ErrorDetails>>,
+    text: fn(&T) -> String,
+    hints: fn(&T) -> &[Hint],
+) -> ExitCode {
+    match result {
+        Ok(response) => {
+            let code = output::success(json, &response, &text(&response));
+            if !json {
+                output::print_hints(hints(&response));
+            }
+            code
+        }
+        Err(error) => output::failure(json, error.as_ref()),
+    }
+}
+
 fn respond<T: serde::Serialize>(
     json: bool,
     result: Result<T, Box<dyn ErrorDetails>>,

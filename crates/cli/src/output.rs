@@ -8,9 +8,10 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
-    CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RepoTrees, ResolveResponse, RestoreResponse, SyncSkillsResponse, Tree,
-    TreeRow, Vcs, finding::Severity, skill_file::Action, tree_row::Status,
+    CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, Hint, InitResponse,
+    ListTreesResponse, RemoveTreeResponse, RepoTrees, ResolveResponse, RestoreResponse,
+    SyncSkillsResponse, Tree, TreeRow, Vcs, finding::Severity, skill_file::Action,
+    tree_row::Status,
 };
 use mori_core::disk::{Space, format_size};
 use mori_core::error::{Code, ErrorDetails};
@@ -197,6 +198,27 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     let _ = writeln!(text, "{hint}");
     warnings_text(&mut text, &response.warnings);
     text
+}
+
+/// Prints each hint on stderr, one line each: what mori noticed, then the command for it.
+pub fn print_hints(hints: &[Hint]) {
+    let mut text = String::new();
+    for hint in hints {
+        let command = if hint.command.is_empty() {
+            String::new()
+        } else {
+            format!(": `{}`", hint.command)
+        };
+        // Writing to a String can't fail.
+        let _ = writeln!(
+            text,
+            "{} {}{command}",
+            look::paint_err(Role::Warn, "hint:"),
+            hint.message
+        );
+    }
+    // A hint is only advice: failing to print one is no reason to fail the command.
+    let _ = std::io::Write::write_all(&mut std::io::stderr().lock(), text.as_bytes());
 }
 
 /// Appends each warning on its own line.

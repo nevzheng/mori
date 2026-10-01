@@ -255,6 +255,9 @@ message CreateTreeResponse {
   // Things worth knowing, such as free disk space below the `[disk] warn_below` floor. They never
   // stop the tree being created.
   repeated string warnings = 5;
+
+  // Suggestions for the next step, such as giving an agent's tree a purpose.
+  repeated Hint hints = 6;
 }
 
 // Request for `ListTrees`.
@@ -293,6 +296,29 @@ message ListTreesResponse {
 
   // Things worth knowing, such as free disk space below the `[disk] warn_below` floor.
   repeated string warnings = 4;
+
+  // Suggestions for the next step, such as trees whose work has landed.
+  repeated Hint hints = 5;
+}
+
+// A suggestion for the next step: what mori noticed, and the command that acts on it. A hint never
+// changes what a command did. `MORI_HINTS=0` turns hints off; a command gives at most two.
+message Hint {
+  // Stable, e.g. "IN_PERSONS_ROOT", for scripts to match on.
+  string code = 1;
+
+  // One sentence, from a fixed template: it names only repos, trees and counts, never text a
+  // person or agent wrote.
+  string message = 2;
+
+  // The command that acts on it, with `<placeholders>` for what only the reader knows.
+  string command = 3;
+
+  // The repo it is about, if any.
+  string repo = 4;
+
+  // The tree it is about, if any.
+  string tree = 5;
 }
 
 // Space on one disk.
@@ -729,5 +755,8 @@ message ResolveResponse {
 
   // The repo's context folder, `context/projects/<dir>/`; empty without a repo.
   string context_dir = 6;
+
+  // Suggestions for an agent here, such as working in a tree of its own.
+  repeated Hint hints = 7;
 }
 

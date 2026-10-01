@@ -12,6 +12,7 @@ mod disk;
 pub mod doctor;
 pub mod gc;
 mod gc_apply;
+mod hints;
 pub mod init;
 mod landing;
 pub mod ls;
@@ -46,6 +47,8 @@ pub struct Host {
     pub user: Option<String>,
     /// `MORI_AGENT`: the default owner of trees, ahead of `USER`.
     pub agent: Option<String>,
+    /// `MORI_HINTS=0`: give no hints.
+    pub hints_off: bool,
     /// Now, in seconds since the Unix epoch.
     pub now: u64,
     /// The variables the cache checks read ([`mori_core::cache::ENV_VARS`]) that are set and
@@ -62,6 +65,7 @@ impl Host {
             env: Env::from_vars(|name| std::env::var_os(name)),
             user: var("USER"),
             agent: var("MORI_AGENT").filter(|agent| !agent.trim().is_empty()),
+            hints_off: var("MORI_HINTS").as_deref() == Some("0"),
             now: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()

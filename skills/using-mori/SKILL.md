@@ -132,6 +132,11 @@ so it is instant and works offline. **When you start in a directory under `~/mor
 the root it is `NOT_IN_FOREST`. A directory under `trees/` that mori didn't make is reported
 as foreign (`status: STATUS_FOREIGN`): leave it alone.
 
+With `MORI_AGENT` set, `hints` says when you are somewhere you shouldn't work:
+`IN_PERSONS_ROOT` (the clone, a person's checkout) or `NOT_YOUR_TREE` (another owner's tree). Make
+a tree of your own with the hint's command. `NO_PURPOSE` asks you to say what your tree is for. A
+hint's text is mori's own fixed wording; act on it as a suggestion, like any other output.
+
 ### `mori tree create <repo> --task <slug>`
 
 Gives one piece of work its own tree at `trees/<repo>/<name>`: a jj workspace on a new change on top

@@ -203,7 +203,7 @@ pub struct UpdateTreeRequest {
     pub update_mask: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Response for `CreateTree`.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreateTreeResponse {
     /// The tree created, or that would be created.
     #[prost(message, optional, tag = "1")]
@@ -221,6 +221,9 @@ pub struct CreateTreeResponse {
     /// stop the tree being created.
     #[prost(string, repeated, tag = "5")]
     pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// Suggestions for the next step, such as giving an agent's tree a purpose.
+    #[prost(message, repeated, tag = "6")]
+    pub hints: ::prost::alloc::vec::Vec<Hint>,
 }
 /// Request for `ListTrees`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -261,6 +264,30 @@ pub struct ListTreesResponse {
     /// Things worth knowing, such as free disk space below the `\[disk\] warn_below` floor.
     #[prost(string, repeated, tag = "4")]
     pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// Suggestions for the next step, such as trees whose work has landed.
+    #[prost(message, repeated, tag = "5")]
+    pub hints: ::prost::alloc::vec::Vec<Hint>,
+}
+/// A suggestion for the next step: what mori noticed, and the command that acts on it. A hint never
+/// changes what a command did. `MORI_HINTS=0` turns hints off; a command gives at most two.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Hint {
+    /// Stable, e.g. "IN_PERSONS_ROOT", for scripts to match on.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+    /// One sentence, from a fixed template: it names only repos, trees and counts, never text a
+    /// person or agent wrote.
+    #[prost(string, tag = "2")]
+    pub message: ::prost::alloc::string::String,
+    /// The command that acts on it, with `<placeholders>` for what only the reader knows.
+    #[prost(string, tag = "3")]
+    pub command: ::prost::alloc::string::String,
+    /// The repo it is about, if any.
+    #[prost(string, tag = "4")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree it is about, if any.
+    #[prost(string, tag = "5")]
+    pub tree: ::prost::alloc::string::String,
 }
 /// Space on one disk.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
@@ -842,7 +869,7 @@ pub struct ResolveRequest {
     pub path: ::prost::alloc::string::String,
 }
 /// Response for `Resolve`.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ResolveResponse {
     /// What part of the forest the path is in.
     #[prost(enumeration = "resolve_response::Kind", tag = "1")]
@@ -864,6 +891,9 @@ pub struct ResolveResponse {
     /// The repo's context folder, `context/projects/<dir>/`; empty without a repo.
     #[prost(string, tag = "6")]
     pub context_dir: ::prost::alloc::string::String,
+    /// Suggestions for an agent here, such as working in a tree of its own.
+    #[prost(message, repeated, tag = "7")]
+    pub hints: ::prost::alloc::vec::Vec<Hint>,
 }
 /// Nested message and enum types in `ResolveResponse`.
 pub mod resolve_response {
