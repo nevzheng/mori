@@ -16,9 +16,11 @@ on:
 permissions:
   contents: read
 
-# One release at a time; a second push waits rather than racing for the same tag.
+# A tag's runs queue rather than race for the same release. Branch pushes are grouped per commit:
+# GitHub keeps only one pending run per group, so a shared group for main would let the next merge
+# (say, the bump back to -dev) cancel a queued release.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref_type == 'tag' && github.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -126,6 +128,12 @@ jobs:
           # A version with a suffix (0.1.0-alpha.1) is a pre-release.
           prerelease=()
           if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --draft "${prerelease[@]}" --title "mori $tag" --notes-file notes.md
+          # A re-run after a failed publish finds its own draft: refresh its files instead.
+          if [[ "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft \
+            2>/dev/null)" == true ]]; then
+            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --draft "${prerelease[@]}" --title "mori $tag" --notes-file notes.md
+          fi
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
