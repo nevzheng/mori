@@ -87,3 +87,24 @@ Feature: CUJ 3 - an agent starts a task in its own tree
     When I run "mori tree create widget --owner claude --task auth --purpose ''"
     Then it fails with status INVALID_ARGUMENT and reason "PURPOSE_INVALID"
 
+  Scenario: where inside a tree names its repo, record and context folder
+    Given I have run "mori tree create widget --owner claude --task auth --purpose 'OAuth login'"
+    When I run "mori where mori/trees/widget/claude-auth/src --json"
+    Then it succeeds
+    And where says tree "claude-auth" of "github.com/acme/widget", purpose "OAuth login"
+
+  Scenario: where in the clone is its base tree
+    When I run "mori where mori/repos/github.com/acme/widget --json"
+    Then it succeeds
+    And where says the base tree "default" of "github.com/acme/widget"
+
+  Scenario: where in a tree directory mori didn't make reports it as foreign
+    Given "<home>/mori/trees/widget/someone-elses/notes.txt" exists
+    When I run "mori where mori/trees/widget/someone-elses --json"
+    Then it succeeds
+    And where says the tree "someone-elses" is foreign
+
+  Scenario: where outside the root is nowhere
+    When I run "mori where /"
+    Then it fails with status NOT_FOUND and reason "NOT_IN_FOREST"
+

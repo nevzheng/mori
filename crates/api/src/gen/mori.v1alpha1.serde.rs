@@ -3767,6 +3767,363 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
         deserializer.deserialize_struct("mori.v1alpha1.RepoTrees", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for ResolveRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.path.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ResolveRequest", len)?;
+        if !self.path.is_empty() {
+            struct_ser.serialize_field("path", &self.path)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ResolveRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["path"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Path,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "path" => Ok(GeneratedField::Path),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ResolveRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.ResolveRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<ResolveRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut path__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Path => {
+                            if path__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("path"));
+                            }
+                            path__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(ResolveRequest {
+                    path: path__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.ResolveRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for ResolveResponse {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.kind != 0 {
+            len += 1;
+        }
+        if !self.root.is_empty() {
+            len += 1;
+        }
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if self.tree.is_some() {
+            len += 1;
+        }
+        if self.status != 0 {
+            len += 1;
+        }
+        if !self.context_dir.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ResolveResponse", len)?;
+        if self.kind != 0 {
+            let v = resolve_response::Kind::try_from(self.kind)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.kind)))?;
+            struct_ser.serialize_field("kind", &v)?;
+        }
+        if !self.root.is_empty() {
+            struct_ser.serialize_field("root", &self.root)?;
+        }
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if let Some(v) = self.tree.as_ref() {
+            struct_ser.serialize_field("tree", v)?;
+        }
+        if self.status != 0 {
+            let v = tree_row::Status::try_from(self.status).map_err(|_| {
+                serde::ser::Error::custom(format!("Invalid variant {}", self.status))
+            })?;
+            struct_ser.serialize_field("status", &v)?;
+        }
+        if !self.context_dir.is_empty() {
+            struct_ser.serialize_field("contextDir", &self.context_dir)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ResolveResponse {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "kind",
+            "root",
+            "repo",
+            "tree",
+            "status",
+            "context_dir",
+            "contextDir",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Kind,
+            Root,
+            Repo,
+            Tree,
+            Status,
+            ContextDir,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "kind" => Ok(GeneratedField::Kind),
+                            "root" => Ok(GeneratedField::Root),
+                            "repo" => Ok(GeneratedField::Repo),
+                            "tree" => Ok(GeneratedField::Tree),
+                            "status" => Ok(GeneratedField::Status),
+                            "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ResolveResponse;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.ResolveResponse")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<ResolveResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut kind__ = None;
+                let mut root__ = None;
+                let mut repo__ = None;
+                let mut tree__ = None;
+                let mut status__ = None;
+                let mut context_dir__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Kind => {
+                            if kind__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("kind"));
+                            }
+                            kind__ = Some(map_.next_value::<resolve_response::Kind>()? as i32);
+                        }
+                        GeneratedField::Root => {
+                            if root__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("root"));
+                            }
+                            root__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tree => {
+                            if tree__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tree"));
+                            }
+                            tree__ = map_.next_value()?;
+                        }
+                        GeneratedField::Status => {
+                            if status__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("status"));
+                            }
+                            status__ = Some(map_.next_value::<tree_row::Status>()? as i32);
+                        }
+                        GeneratedField::ContextDir => {
+                            if context_dir__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("contextDir"));
+                            }
+                            context_dir__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(ResolveResponse {
+                    kind: kind__.unwrap_or_default(),
+                    root: root__.unwrap_or_default(),
+                    repo: repo__.unwrap_or_default(),
+                    tree: tree__,
+                    status: status__.unwrap_or_default(),
+                    context_dir: context_dir__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.ResolveResponse", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for resolve_response::Kind {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "KIND_UNSPECIFIED",
+            Self::Root => "KIND_ROOT",
+            Self::Clone => "KIND_CLONE",
+            Self::Tree => "KIND_TREE",
+            Self::Context => "KIND_CONTEXT",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for resolve_response::Kind {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "KIND_UNSPECIFIED",
+            "KIND_ROOT",
+            "KIND_CLONE",
+            "KIND_TREE",
+            "KIND_CONTEXT",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl serde::de::Visitor<'_> for GeneratedVisitor {
+            type Value = resolve_response::Kind;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "KIND_UNSPECIFIED" => Ok(resolve_response::Kind::Unspecified),
+                    "KIND_ROOT" => Ok(resolve_response::Kind::Root),
+                    "KIND_CLONE" => Ok(resolve_response::Kind::Clone),
+                    "KIND_TREE" => Ok(resolve_response::Kind::Tree),
+                    "KIND_CONTEXT" => Ok(resolve_response::Kind::Context),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
 impl serde::Serialize for RestoreRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>

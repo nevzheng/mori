@@ -419,6 +419,15 @@ pub enum RepoError {
         repo: String,
     },
 
+    /// A path isn't under mori's root.
+    #[error("{} isn't in the forest at {}", path.display(), root.display())]
+    NotInForest {
+        /// The path.
+        path: PathBuf,
+        /// mori's root.
+        root: PathBuf,
+    },
+
     /// A short repo name matches more than one repo mori manages.
     #[error("{name:?} could be any of {}; use the full name", candidates.join(", "))]
     Ambiguous {
@@ -485,7 +494,7 @@ impl ErrorDetails for RepoError {
             Self::UrlInvalid { .. } | Self::ColocateNeedsJj | Self::Ambiguous { .. } => {
                 Code::InvalidArgument
             }
-            Self::NotManaged { .. } => Code::NotFound,
+            Self::NotManaged { .. } | Self::NotInForest { .. } => Code::NotFound,
             Self::RepoExists { .. } | Self::PathExists { .. } => Code::AlreadyExists,
             Self::TreeDirTaken { .. } => Code::FailedPrecondition,
             Self::NotRecorded { .. } => Code::Internal,
@@ -496,6 +505,7 @@ impl ErrorDetails for RepoError {
         match self {
             Self::UrlInvalid { .. } => "CLONE_URL_INVALID",
             Self::NotManaged { .. } => "REPO_NOT_MANAGED",
+            Self::NotInForest { .. } => "NOT_IN_FOREST",
             Self::RepoExists { .. } => "REPO_EXISTS",
             Self::PathExists { .. } => "PATH_EXISTS",
             Self::TreeDirTaken { .. } => "TREE_DIR_TAKEN",
@@ -519,6 +529,10 @@ impl ErrorDetails for RepoError {
                 vec![("repo", repo.clone()), ("path", path.display().to_string())]
             }
             Self::ColocateNeedsJj => vec![],
+            Self::NotInForest { path, root } => vec![
+                ("path", path.display().to_string()),
+                ("root", root.display().to_string()),
+            ],
             Self::Ambiguous { name, candidates } => {
                 vec![("name", name.clone()), ("candidates", candidates.join(","))]
             }

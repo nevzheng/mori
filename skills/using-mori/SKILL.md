@@ -119,6 +119,15 @@ safe to run, even while others work.
   every file, so use it when disk matters, not on every call. Sizes from the last 15 minutes are
   reused; **`--fresh`** measures again.
 
+### `mori where [path]`
+
+Says where a path (default: the current directory) is in the forest: the repo, the tree with its
+owner, task, lifetime and purpose, and the repo's context folder. It reads only mori's records,
+so it is instant and works offline. **When you start in a directory under `~/mori`, run
+`mori where --json` first**: it tells you what you are working on and where the notes are. Outside
+the root it is `NOT_IN_FOREST`. A directory under `trees/` that mori didn't make is reported
+as foreign (`status: STATUS_FOREIGN`): leave it alone.
+
 ### `mori tree create <repo> --task <slug>`
 
 Gives one piece of work its own tree at `trees/<repo>/<name>`: a jj workspace on a new change on top
@@ -257,6 +266,7 @@ error is a `google.rpc.Status`:
 | 3    | `UPDATE_MASK_INVALID`   | `tree set` needs `--purpose`, `--lifetime` or `--owner`.                        |
 | 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.      |
 | 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.         |
+| 5    | `NOT_IN_FOREST`         | The path isn't under mori's root. `mori where` only knows the forest.           |
 | 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                          |
 | 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc --apply`.                   |
 | 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.          |

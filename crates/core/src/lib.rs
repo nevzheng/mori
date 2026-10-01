@@ -14,6 +14,7 @@ pub mod forest;
 pub mod gc;
 pub mod init;
 pub mod paths;
+pub mod place;
 pub mod skills;
 pub mod tree;
 pub mod tree_create;

@@ -9,8 +9,8 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RepoTrees, RestoreResponse, SyncSkillsResponse, Tree, TreeRow, Vcs,
-    finding::Severity, skill_file::Action, tree_row::Status,
+    RemoveTreeResponse, RepoTrees, ResolveResponse, RestoreResponse, SyncSkillsResponse, Tree,
+    TreeRow, Vcs, finding::Severity, skill_file::Action, tree_row::Status,
 };
 use mori_core::disk::{Space, format_size};
 use mori_core::error::{Code, ErrorDetails};
@@ -206,6 +206,92 @@ fn warnings_text(text: &mut String, warnings: &[String]) {
     }
 }
 
+/// The text `where` prints.
+pub fn where_text(response: &ResolveResponse) -> String {
+    use mori_api::v1alpha1::resolve_response::Kind;
+    let mut text = String::new();
+    let root = tilde(&response.root);
+    if response.repo.is_empty() {
+        let what = match response.kind() {
+            Kind::Context => "the context folder",
+            Kind::Clone | Kind::Tree => "a directory mori has no record of",
+            Kind::Root | Kind::Unspecified => "the mori root",
+        };
+        let _ = writeln!(text, "{what}, in {root}");
+        return text;
+    }
+    let tree = response.tree.clone().unwrap_or_default();
+    let place = match response.kind() {
+        Kind::Clone => format!("clone (base tree {})", tree.name),
+        Kind::Tree if response.status() == Status::Foreign => format!("foreign tree {}", tree.name),
+        Kind::Tree => format!("tree {}", tree.name),
+        Kind::Context => "context folder".to_owned(),
+        Kind::Root | Kind::Unspecified => String::new(),
+    };
+    let _ = writeln!(
+        text,
+        "{}  {}",
+        look::paint(Role::Name, &response.repo),
+        place
+    );
+    if response.tree.is_some() {
+        if response.status() == Status::Tree {
+            let task = if tree.task.is_empty() {
+                "(base)"
+            } else {
+                &tree.task
+            };
+            let _ = writeln!(
+                text,
+                "  owner {} · task {task} · {}",
+                tree.owner, tree.lifetime
+            );
+            if !tree.purpose.is_empty() {
+                let _ = writeln!(text, "  purpose: {}", tree.purpose);
+            }
+        } else {
+            let _ = writeln!(
+                text,
+                "  {}",
+                look::paint(
+                    Role::Quiet,
+                    "foreign: mori didn't make this tree, and leaves it alone"
+                )
+            );
+        }
+        let _ = writeln!(
+            text,
+            "  path: {}",
+            look::paint(Role::Quiet, &tilde(&tree.path))
+        );
+    }
+    let _ = writeln!(
+        text,
+        "  context: {}/",
+        look::paint(Role::Quiet, &tilde(&response.context_dir))
+    );
+    text
+}
+
+/// The text `tree set` prints: the tree's record as it is now.
+pub fn tree_set_text(tree: &Tree) -> String {
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "Updated tree {}:",
+        look::paint(Role::Name, &tree.name)
+    );
+    let _ = writeln!(text, "  owner: {}", tree.owner);
+    let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
+    let purpose = if tree.purpose.is_empty() {
+        "-"
+    } else {
+        &tree.purpose
+    };
+    let _ = writeln!(text, "  purpose: {purpose}");
+    text
+}
+
 /// One repo's table for `ls`: a header line, then a row per tree.
 fn ls_repo(text: &mut String, repo: &RepoTrees, sized: bool, reused: &dyn Fn(&TreeRow) -> bool) {
     let vcs = match repo.vcs() {
@@ -278,25 +364,6 @@ fn ls_repo(text: &mut String, repo: &RepoTrees, sized: bool, reused: &dyn Fn(&Tr
         _ => None,
     });
     let _ = writeln!(text);
-}
-
-/// The text `tree set` prints: the tree's record as it is now.
-pub fn tree_set_text(tree: &Tree) -> String {
-    let mut text = String::new();
-    let _ = writeln!(
-        text,
-        "Updated tree {}:",
-        look::paint(Role::Name, &tree.name)
-    );
-    let _ = writeln!(text, "  owner: {}", tree.owner);
-    let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
-    let purpose = if tree.purpose.is_empty() {
-        "-"
-    } else {
-        &tree.purpose
-    };
-    let _ = writeln!(text, "  purpose: {purpose}");
-    text
 }
 
 /// The text `ls` prints: a table of trees per repo, then the clones mori didn't make.

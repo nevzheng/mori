@@ -11,7 +11,7 @@ use std::process::ExitCode;
 use clap::{CommandFactory, Parser, Subcommand};
 use mori_app::routed::Routed;
 use mori_app::{
-    App, Host, clone, doctor, gc, init, ls, restore, skills, tree, tree_remove, tree_set,
+    App, Host, clone, doctor, gc, init, ls, place, restore, skills, tree, tree_remove, tree_set,
 };
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
@@ -168,6 +168,18 @@ enum Command {
         /// Show what --fix would repair, and repair nothing.
         #[arg(long)]
         dry_run: bool,
+    },
+
+    /// Say where a path is in the forest: repo, tree, owner, task, purpose, context folder.
+    ///
+    /// Reads mori's records and the root layout only, so it is instant and works offline. Agents:
+    /// run it first when you start in a directory.
+    #[command(
+        after_help = "Examples:\n  mori where\n  mori where ~/mori/trees/widget/claude-auth/src\n  mori where --json"
+    )]
+    Where {
+        /// The path to look up. Defaults to the current directory.
+        path: Option<std::path::PathBuf>,
     },
 
     /// Bring back a removed tree.
@@ -400,6 +412,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
         ),
         Command::Completions { shell } => print_completions(shell),
         Command::Man => print_man(),
+        Command::Where { path } => respond(json, run_where(app, path), output::where_text),
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
@@ -494,6 +507,16 @@ fn dispatch_tree(
 /// Parses a size such as 200G for `--free`.
 fn parse_size(text: &str) -> Result<u64, String> {
     mori_core::disk::parse_size(text)
+}
+
+/// Runs `where` for `path`, made absolute against the current directory.
+fn run_where(
+    app: &App<Routed<JjCli, GitCli>, GhCli>,
+    path: Option<std::path::PathBuf>,
+) -> Result<mori_api::v1alpha1::ResolveResponse, Box<dyn ErrorDetails>> {
+    let here = std::env::current_dir().unwrap_or_default();
+    let path = path.map_or_else(|| here.clone(), |path| here.join(path));
+    place::run(app, &path)
 }
 
 /// Prints shell completions for `shell`.

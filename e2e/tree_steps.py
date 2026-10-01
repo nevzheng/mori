@@ -135,3 +135,29 @@ def json_names_the_tree(mori: Mori, placeholders: Placeholders, name: str, lifet
     assert_that(tree["path"], equal_to(str(placeholders.path(f"<home>/mori/trees/widget/{name}"))))
     assert_that(tree["lifetime"], equal_to(lifetime))
     assert tree["id"].startswith("tree_"), tree["id"]
+
+
+@then(parsers.parse('where says tree "{name}" of "{repo}", purpose "{purpose}"'))
+def where_says(mori: Mori, placeholders: Placeholders, name: str, repo: str, purpose: str) -> None:
+    response = json.loads(mori.last.stdout)
+    assert_that(response["repo"], equal_to(repo))
+    assert_that(response["tree"]["name"], equal_to(name))
+    assert_that(response["tree"].get("purpose", ""), equal_to(purpose))
+    assert_that(response.get("status"), equal_to("STATUS_TREE"))
+    assert_that(
+        response["contextDir"],
+        equal_to(str(placeholders.path("<home>/mori/context/projects/widget"))),
+    )
+
+
+@then(parsers.parse('where says the base tree "{name}" of "{repo}"'))
+def where_says_base(mori: Mori, placeholders: Placeholders, name: str, repo: str) -> None:
+    where_says(mori, placeholders, name, repo, "")
+
+
+@then(parsers.parse('where says the tree "{name}" is foreign'))
+def where_foreign(mori: Mori, name: str) -> None:
+    response = json.loads(mori.last.stdout)
+    assert_that(response["tree"]["name"], equal_to(name))
+    assert_that(response.get("status"), equal_to("STATUS_FOREIGN"))
+
