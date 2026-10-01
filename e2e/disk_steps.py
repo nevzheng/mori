@@ -7,6 +7,7 @@ import subprocess
 import pytest
 from harness import Mori, Placeholders
 from precisely import (
+    all_of,
     assert_that,
     contains_string,
     equal_to,
@@ -64,6 +65,13 @@ def landed_big_file(
         pytest.fail(f"setup: mori ls failed\n{mori.last.stderr}")
     jj(env, tree, "bookmark", "delete", bookmark)
     jj(env, tree, "git", "push", "--deleted")
+
+
+@given(parsers.parse('"{path}" says "{text}"'))
+def file_says(placeholders: Placeholders, path: str, text: str) -> None:
+    file = placeholders.path(path)
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(f"{text}\n")
 
 
 @given(parsers.parse('config.toml sets the free-space floor to "{floor}"'))
@@ -215,6 +223,23 @@ def says_summary(mori: Mori) -> None:
 def warns_over(mori: Mori, what: str, key: str) -> None:
     lines = [line for line in mori.last.stdout.splitlines() if line.startswith("warning: ")]
     assert any(what in line and f"over [disk] {key}" in line for line in lines), mori.last.stdout
+
+
+@then(parsers.parse("the output warns that no {tool} cache is shared across trees"))
+def warns_no_cache(mori: Mori, tool: str) -> None:
+    assert_that(
+        mori.last.stdout,
+        all_of(
+            contains_string("warning: agents make many trees"),
+            contains_string(f"no {tool}"),
+            contains_string("https://nevzheng.github.io/mori/shared-caches/"),
+        ),
+    )
+
+
+@then("the output has no cache warning")
+def no_cache_warning(mori: Mori) -> None:
+    assert "agents make many trees" not in mori.last.stdout, mori.last.stdout
 
 
 @then(parsers.parse('the output warns that free space is below the "{floor}" floor'))

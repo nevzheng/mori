@@ -7,6 +7,7 @@
 
 use std::path::PathBuf;
 
+use crate::cache::CacheGap;
 use crate::vcs::VcsKind;
 
 /// How bad a finding is, in increasing order.
@@ -74,6 +75,10 @@ pub enum Code {
     ContextFolderMissing,
     /// A generated `llms.txt` that differs from what mori would write.
     ContextIndexStale,
+    /// A repo's build tool has no shared cache, so every tree builds from scratch.
+    NoSharedCache,
+    /// A cache is set up, but trees at different paths can't share it.
+    CacheNotSharedAcrossTrees,
 }
 
 impl Code {
@@ -92,6 +97,8 @@ impl Code {
             Self::ConflictedBookmark => "CONFLICTED_BOOKMARK",
             Self::ContextFolderMissing => "CONTEXT_FOLDER_MISSING",
             Self::ContextIndexStale => "CONTEXT_INDEX_STALE",
+            Self::NoSharedCache => "NO_SHARED_CACHE",
+            Self::CacheNotSharedAcrossTrees => "CACHE_NOT_SHARED_ACROSS_TREES",
         }
     }
 
@@ -107,7 +114,9 @@ impl Code {
             Self::WorkspaceGone
             | Self::DirWithoutWorkspace
             | Self::ContextFolderMissing
-            | Self::ContextIndexStale => Severity::Warn,
+            | Self::ContextIndexStale
+            | Self::NoSharedCache
+            | Self::CacheNotSharedAcrossTrees => Severity::Warn,
             Self::CloneNotRecorded | Self::ForeignWorkspace => Severity::Info,
         }
     }
@@ -163,6 +172,8 @@ pub struct Facts {
     pub unrecorded_clones: Vec<(String, PathBuf)>,
     /// Whether a generated `llms.txt` differs from what mori would write now.
     pub index_stale: bool,
+    /// ccache is set up without `base_dir`, for every repo on this machine.
+    pub ccache_without_base_dir: bool,
 }
 
 /// One recorded repo.
@@ -184,6 +195,8 @@ pub struct RepoFacts {
     pub conflicted_bookmarks: Vec<String>,
     /// Whether `context/projects/<repo>/` exists.
     pub context_folder_exists: bool,
+    /// The shared caches its build tools are missing.
+    pub cache_gaps: Vec<CacheGap>,
 }
 
 /// Who knows about a tree.
@@ -232,6 +245,9 @@ pub fn check(facts: &Facts) -> Vec<Finding> {
             message: "a generated llms.txt is out of date".to_owned(),
             fix: format!("mori skills sync (or {FIX})"),
         });
+    }
+    if facts.ccache_without_base_dir {
+        findings.push(cache_finding(CacheGap::CcacheBaseDir, Subject::Root));
     }
     for (repo, path) in &facts.unrecorded_clones {
         findings.push(Finding {
@@ -304,6 +320,10 @@ fn check_repo(repo: &RepoFacts, findings: &mut Vec<Finding>) {
             ),
         );
     }
+    for gap in &repo.cache_gaps {
+        let finding = cache_finding(*gap, subject());
+        push(finding.code, finding.subject, finding.message, finding.fix);
+    }
     for dir in &repo.stray_dirs {
         push(
             Code::DirWithoutWorkspace,
@@ -319,6 +339,18 @@ fn check_repo(repo: &RepoFacts, findings: &mut Vec<Finding>) {
     }
     for tree in &repo.trees {
         check_tree(repo, tree, findings);
+    }
+}
+
+fn cache_finding(gap: CacheGap, subject: Subject) -> Finding {
+    Finding {
+        code: match gap {
+            CacheGap::Bazel | CacheGap::Cargo => Code::NoSharedCache,
+            CacheGap::CcacheBaseDir => Code::CacheNotSharedAcrossTrees,
+        },
+        subject,
+        message: gap.message(),
+        fix: gap.fix(),
     }
 }
 
@@ -503,6 +535,34 @@ mod tests {
                 "TOOL_NOT_FOUND"
             ]
         );
+    }
+
+    #[test]
+    fn missing_caches_are_warnings_that_say_why_and_how() {
+        let mut facts = one_repo(|repo| {
+            repo.cache_gaps = vec![CacheGap::Bazel, CacheGap::Cargo];
+        });
+        facts.ccache_without_base_dir = true;
+
+        let findings = check(&facts);
+        let mut found = codes(&facts);
+        found.sort_unstable();
+
+        assert_eq!(
+            found,
+            [
+                "CACHE_NOT_SHARED_ACROSS_TREES",
+                "NO_SHARED_CACHE",
+                "NO_SHARED_CACHE"
+            ]
+        );
+        assert!(findings.iter().all(|finding| {
+            finding.severity() == Severity::Warn
+                && !finding.auto_fixable()
+                && finding.message.starts_with("agents make many trees")
+                && finding.fix.contains("https://")
+        }));
+        assert_eq!(summary(&findings).split(',').next(), Some("0 problems"));
     }
 
     #[test]

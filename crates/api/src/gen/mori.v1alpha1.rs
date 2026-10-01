@@ -126,6 +126,10 @@ pub struct CloneResponse {
     /// The VCS the clone uses.
     #[prost(enumeration = "Vcs", tag = "8")]
     pub vcs: i32,
+    /// Shared caches the repo's build tools are missing (`mori doctor` reports the same), each with
+    /// what fixes it. Empty on a dry run.
+    #[prost(string, repeated, tag = "9")]
+    pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// A tree mori created.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

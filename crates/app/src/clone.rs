@@ -38,6 +38,7 @@ pub fn run<V: Backend, F: Forge>(
     let observed = observe(&paths, &db, &url)?;
     let vcs = state::clone_vcs(&paths, vcs)?;
     let plan = plan(&paths, url, vcs, !jj_only, &observed).map_err(boxed)?;
+    let mut warnings = Vec::new();
     if !dry_run {
         clone(&app.vcs, &plan)?;
         record(&mut db, &plan, app.host.user.as_deref())?;
@@ -49,8 +50,19 @@ pub fn run<V: Backend, F: Forge>(
         if let Err(error) = crate::skills::after_clone(&paths, &repo) {
             eprintln!("note: couldn't set up the repo's context folder: {error}");
         }
+        warnings = crate::cache::repo_gaps(
+            &app.host,
+            &plan.path,
+            std::path::Path::new(crate::cache::SYSTEM_BAZELRC),
+        )
+        .into_iter()
+        .map(mori_core::cache::CacheGap::warning)
+        .collect();
     }
-    Ok(response(&paths, &plan, dry_run))
+    Ok(CloneResponse {
+        warnings,
+        ..response(&paths, &plan, dry_run)
+    })
 }
 
 fn observe(
@@ -132,5 +144,6 @@ fn response(paths: &Paths, plan: &ClonePlan, dry_run: bool) -> CloneResponse {
             .join(&plan.tree_dir)
             .display()
             .to_string(),
+        warnings: Vec::new(),
     }
 }

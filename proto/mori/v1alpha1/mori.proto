@@ -153,6 +153,10 @@ message CloneResponse {
 
   // The VCS the clone uses.
   Vcs vcs = 8;
+
+  // Shared caches the repo's build tools are missing (`mori doctor` reports the same), each with
+  // what fixes it. Empty on a dry run.
+  repeated string warnings = 9;
 }
 
 // A tree mori created.

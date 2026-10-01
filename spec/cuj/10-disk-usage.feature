@@ -1,7 +1,8 @@
 Feature: CUJ 10 - see what the forest costs
   Agents can make as many trees as they like, so mori makes the cost visible. `mori ls --size`
   shows how much disk each tree uses, every `ls` says how much is free, and mori warns when free
-  space drops below a floor (10% by default). Warnings never stop a command.
+  space drops below a floor (10% by default). It also warns, after a clone and in `mori doctor`,
+  when a repo's builds share no cache across trees. Warnings never stop a command.
 
   Background:
     Given a temporary HOME with XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME inside it
@@ -103,3 +104,23 @@ Feature: CUJ 10 - see what the forest costs
     When I run "mori ls --size"
     Then it succeeds
     And the output warns that "mori's trees" is over "max_size"
+
+  Scenario: Cloning a Bazel repo without a shared cache says how to add one
+    Given "github.com/acme/gadget" is a repo on the remote with a "MODULE.bazel" file
+    When I run "mori clone github.com/acme/gadget"
+    Then it succeeds
+    And the output warns that no Bazel cache is shared across trees
+
+  Scenario: doctor warns about a missing shared cache, and still passes
+    Given "github.com/acme/gadget" is a repo on the remote with a "Cargo.toml" file
+    And I have run "mori clone github.com/acme/gadget"
+    When I run "mori doctor --json"
+    Then it succeeds
+    And doctor reports "NO_SHARED_CACHE" for "github.com/acme/gadget", not fixable
+
+  Scenario: A cache set in the home bazelrc means no warning
+    Given "<home>/.bazelrc" says "build --disk_cache=~/.cache/bazel-disk"
+    And "github.com/acme/gadget" is a repo on the remote with a "MODULE.bazel" file
+    When I run "mori clone github.com/acme/gadget"
+    Then it succeeds
+    And the output has no cache warning

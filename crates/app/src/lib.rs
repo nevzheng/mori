@@ -6,6 +6,7 @@
 //! builds one with fakes.
 
 mod bazel;
+mod cache;
 pub mod clone;
 mod disk;
 pub mod doctor;
@@ -24,6 +25,8 @@ pub mod tree_remove;
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use mori_core::error::ErrorDetails;
@@ -43,6 +46,9 @@ pub struct Host {
     pub agent: Option<String>,
     /// Now, in seconds since the Unix epoch.
     pub now: u64,
+    /// The variables the cache checks read ([`mori_core::cache::ENV_VARS`]) that are set and
+    /// not empty.
+    pub cache_vars: BTreeMap<String, OsString>,
 }
 
 impl Host {
@@ -58,6 +64,13 @@ impl Host {
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
+            cache_vars: mori_core::cache::ENV_VARS
+                .iter()
+                .filter_map(|name| {
+                    let value = std::env::var_os(name).filter(|value| !value.is_empty())?;
+                    Some(((*name).to_owned(), value))
+                })
+                .collect(),
         }
     }
 }

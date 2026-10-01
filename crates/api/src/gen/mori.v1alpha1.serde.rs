@@ -179,6 +179,9 @@ impl serde::Serialize for CloneResponse {
         if self.vcs != 0 {
             len += 1;
         }
+        if !self.warnings.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CloneResponse", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -206,6 +209,9 @@ impl serde::Serialize for CloneResponse {
                 .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
             struct_ser.serialize_field("vcs", &v)?;
         }
+        if !self.warnings.is_empty() {
+            struct_ser.serialize_field("warnings", &self.warnings)?;
+        }
         struct_ser.end()
     }
 }
@@ -228,6 +234,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             "context_dir",
             "contextDir",
             "vcs",
+            "warnings",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -240,6 +247,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
             ValidateOnly,
             ContextDir,
             Vcs,
+            Warnings,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -272,6 +280,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
                             "vcs" => Ok(GeneratedField::Vcs),
+                            "warnings" => Ok(GeneratedField::Warnings),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -299,6 +308,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                 let mut validate_only__ = None;
                 let mut context_dir__ = None;
                 let mut vcs__ = None;
+                let mut warnings__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -349,6 +359,12 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                             }
                             vcs__ = Some(map_.next_value::<Vcs>()? as i32);
                         }
+                        GeneratedField::Warnings => {
+                            if warnings__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("warnings"));
+                            }
+                            warnings__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CloneResponse {
@@ -360,6 +376,7 @@ impl<'de> serde::Deserialize<'de> for CloneResponse {
                     validate_only: validate_only__.unwrap_or_default(),
                     context_dir: context_dir__.unwrap_or_default(),
                     vcs: vcs__.unwrap_or_default(),
+                    warnings: warnings__.unwrap_or_default(),
                 })
             }
         }

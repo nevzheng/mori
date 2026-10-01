@@ -61,6 +61,15 @@ def repo_on_remote(remotes: Path, env: dict[str, str], repo: str) -> None:
     jj(env, "--repository", str(source), "bookmark", "create", "main", "--revision", "@-")
 
 
+@given(parsers.parse('"{repo}" is a repo on the remote with a "{name}" file'))
+def repo_on_remote_with(remotes: Path, env: dict[str, str], repo: str, name: str) -> None:
+    repo_on_remote(remotes, env, repo)
+    source = remotes / f"{repo}.git"
+    (source / name).write_text("")
+    jj(env, "--repository", str(source), "commit", "--message", f"add {name}")
+    jj(env, "--repository", str(source), "bookmark", "set", "main", "--revision", "@-")
+
+
 @given("mori's database is read-only")
 def database_read_only(placeholders: Placeholders) -> None:
     placeholders.path("$XDG_STATE_HOME/mori/mori.db").chmod(0o400)
