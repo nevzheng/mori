@@ -168,10 +168,6 @@ enum TreeCommand {
         /// The tree's name, e.g. claude-fix-login.
         name: String,
 
-        /// Who is asking; must be the tree's owner. Defaults to `$MORI_AGENT`, then your login name.
-        #[arg(long)]
-        agent: Option<String>,
-
         /// Allow removing a pinned tree.
         #[arg(long)]
         pinned: bool,
@@ -256,7 +252,6 @@ fn main() -> ExitCode {
                 TreeCommand::Remove {
                     repo,
                     name,
-                    agent,
                     pinned,
                     dry_run,
                 },
@@ -265,7 +260,6 @@ fn main() -> ExitCode {
             tree_remove::run(tree_remove::RemoveArgs {
                 repo,
                 name,
-                agent,
                 pinned,
                 dry_run,
             }),

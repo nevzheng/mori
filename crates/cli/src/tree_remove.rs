@@ -11,14 +11,13 @@ use mori_jj::JjCli;
 use mori_store::StoreError;
 use mori_store::records::TreeRecord;
 
+use crate::landing;
 use crate::state::{self, boxed};
-use crate::{landing, tree};
 
 /// What `mori tree remove` was asked for.
 pub struct RemoveArgs {
     pub repo: String,
     pub name: String,
-    pub agent: Option<String>,
     pub pinned: bool,
     pub dry_run: bool,
 }
@@ -28,7 +27,6 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
     let repo_id = CloneUrl::parse(&args.repo).map_err(boxed)?.repo;
     let request = Request {
         name: args.name,
-        owner: tree::owner(args.agent)?,
         pinned_ok: args.pinned,
     };
     let paths = state::paths()?;
@@ -55,7 +53,6 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
         } else {
             Role::Task
         },
-        owner: record.owner.clone(),
         // An unreadable lifetime counts as pinned: the choice that refuses.
         lifetime: record.lifetime.parse().unwrap_or(Lifetime::Pinned),
         path: if record.name == BASE_TREE_NAME {

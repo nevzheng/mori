@@ -116,8 +116,6 @@ merge). Then it forgets the workspace, deletes the directory and drops the recor
 
 - After you push, let mori see the bookmark (`mori ls` does) before the pull request merges;
   that is how it knows the work landed once the remote deletes the bookmark.
-- **`--agent <name>`**: you can only remove your own trees; pass the same name you created it
-  with.
 - **`--pinned`**: needed for a pinned tree, such as a lead tree. Only with the person's say-so.
 - **`--dry-run`**: checks everything and removes nothing.
 - If it refuses with `TREE_HAS_UNSAVED_WORK`, push your work (or ask the person whether to
@@ -181,7 +179,6 @@ error is a `google.rpc.Status`:
 | 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.     |
 | 6    | `WORKSPACE_EXISTS`      | A workspace mori didn't make has that name. Leave it; pick another slug.       |
 | 9    | `TREE_HAS_UNSAVED_WORK` | The tree has edits or unpushed changes. Push them, or ask the person.          |
-| 9    | `NOT_TREE_OWNER`        | Someone else's tree. Leave it; tell the person if it looks abandoned.          |
 | 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.       |
 | 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                |
 | 9    | `CONFIRMATION_NEEDED`   | `mori gc --apply` needs `--yes`: only when the person asked for it.            |

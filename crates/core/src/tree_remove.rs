@@ -19,8 +19,6 @@ pub struct Recorded {
     pub name: String,
     /// Its role.
     pub role: Role,
-    /// Who it's for.
-    pub owner: String,
     /// Its lifetime.
     pub lifetime: Lifetime,
     /// Where it is.
@@ -36,13 +34,12 @@ pub struct Observed {
     pub state: Option<TreeState>,
 }
 
-/// Who is asking, and what they allow.
+/// What is asked for. Anyone may remove any task tree that is safe to remove: ownership is a
+/// label, not a lock.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Request {
     /// The tree's name.
     pub name: String,
-    /// Who is asking: `--agent`, or the login name.
-    pub owner: String,
     /// Allow removing a pinned tree.
     pub pinned_ok: bool,
 }
@@ -64,7 +61,7 @@ pub struct RemovePlan {
 ///
 /// [`TreeError::WorkspaceExists`] for a workspace mori didn't make (never removed);
 /// [`TreeError::NotFound`] if there is no such tree at all; [`TreeError::BaseTree`] for the
-/// clone itself; [`TreeError::NotOwner`] if someone else owns it; [`TreeError::Pinned`] for a
+/// clone itself; [`TreeError::Pinned`] for a
 /// pinned tree without `pinned_ok`; [`TreeError::Unsaved`] if it has edits or unpushed changes.
 pub fn plan(request: &Request, observed: &Observed) -> Result<RemovePlan, TreeError> {
     let name = request.name.clone();
@@ -77,12 +74,6 @@ pub fn plan(request: &Request, observed: &Observed) -> Result<RemovePlan, TreeEr
     };
     if recorded.role == Role::Base {
         return Err(TreeError::BaseTree { name });
-    }
-    if recorded.owner != request.owner {
-        return Err(TreeError::NotOwner {
-            name,
-            owner: recorded.owner.clone(),
-        });
     }
     if recorded.lifetime == Lifetime::Pinned && !request.pinned_ok {
         return Err(TreeError::Pinned { name });
@@ -111,7 +102,6 @@ mod tests {
     fn request() -> Request {
         Request {
             name: "claude-fix-login".to_owned(),
-            owner: "claude".to_owned(),
             pinned_ok: false,
         }
     }
@@ -120,7 +110,6 @@ mod tests {
         Recorded {
             name: "claude-fix-login".to_owned(),
             role: Role::Task,
-            owner: "claude".to_owned(),
             lifetime: Lifetime::TaskDone,
             path: PathBuf::from("/home/acme/mori/trees/widget/claude-fix-login"),
         }
@@ -179,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn only_mori_s_own_task_trees_of_the_right_owner_go() {
+    fn only_mori_s_own_task_trees_go() {
         let cases = [
             (
                 Observed {
@@ -211,14 +200,6 @@ mod tests {
                     ..request()
                 },
                 "BASE_TREE",
-            ),
-            (
-                observed(),
-                Request {
-                    owner: "codex".to_owned(),
-                    ..request()
-                },
-                "NOT_TREE_OWNER",
             ),
         ];
         for (observed, request, expected) in cases {

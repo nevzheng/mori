@@ -243,15 +243,6 @@ pub enum TreeError {
         name: String,
     },
 
-    /// Someone else owns the tree.
-    #[error("{name:?} belongs to {owner}; only its owner removes it (pass --agent {owner})")]
-    NotOwner {
-        /// The name.
-        name: String,
-        /// Its owner.
-        owner: String,
-    },
-
     /// The tree is pinned: it goes only when asked for explicitly.
     #[error("{name:?} is pinned; pass --pinned to remove it anyway")]
     Pinned {
@@ -300,7 +291,6 @@ impl ErrorDetails for TreeError {
             Self::NameInvalid { .. } => Code::InvalidArgument,
             Self::OwnerUnknown
             | Self::BaseTree { .. }
-            | Self::NotOwner { .. }
             | Self::Pinned { .. }
             | Self::Unsaved { .. } => Code::FailedPrecondition,
             Self::TreeExists { .. } | Self::WorkspaceExists { .. } | Self::PathExists { .. } => {
@@ -321,7 +311,6 @@ impl ErrorDetails for TreeError {
             Self::NotRecorded { .. } => "TREE_NOT_RECORDED",
             Self::NotFound { .. } => "TREE_NOT_FOUND",
             Self::BaseTree { .. } => "BASE_TREE",
-            Self::NotOwner { .. } => "NOT_TREE_OWNER",
             Self::Pinned { .. } => "TREE_PINNED",
             Self::Unsaved { .. } => "TREE_HAS_UNSAVED_WORK",
         }
@@ -339,9 +328,6 @@ impl ErrorDetails for TreeError {
             | Self::NotFound { name }
             | Self::BaseTree { name }
             | Self::Pinned { name } => vec![("name", name.clone())],
-            Self::NotOwner { name, owner } => {
-                vec![("name", name.clone()), ("owner", owner.clone())]
-            }
             Self::Unsaved {
                 name,
                 edited,
