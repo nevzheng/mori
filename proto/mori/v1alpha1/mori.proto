@@ -570,6 +570,16 @@ message RestoreResponse {
 message DoctorRequest {
   // Only this repo, in any form `Clone` accepts. Empty: the whole root.
   string repo = 1;
+
+  // Repair the auto-fixable findings. Each removal pins the tree's commit and is journalled, so
+  // `Restore` can bring it back. Needs `confirmed`, unless `validate_only`.
+  bool fix = 2;
+
+  // Confirms `fix` (the CLI's --yes).
+  bool confirmed = 3;
+
+  // With `fix`: check everything and repair nothing (AIP-163; the CLI's --dry-run).
+  bool validate_only = 4;
 }
 
 // Response for `Doctor`.
@@ -579,6 +589,25 @@ message DoctorResponse {
 
   // One line: how many problems, and how many `mori doctor --fix --yes` would repair.
   string summary = 2;
+
+  // With `fix`: what was repaired (or would be, when `validate_only`). The findings are then
+  // what is left after the repairs.
+  repeated Fixed fixed = 3;
+
+  // Echoes the request.
+  bool validate_only = 4;
+}
+
+// One finding `Doctor` repaired.
+message Fixed {
+  // The finding's code.
+  string code = 1;
+
+  // What it was about.
+  string subject = 2;
+
+  // The journal entry for `Restore`, when the repair removed a tree; empty otherwise.
+  string journal_entry = 3;
 }
 
 // One problem, or one thing worth knowing, that doctor found.

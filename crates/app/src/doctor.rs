@@ -3,32 +3,140 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use mori_api::v1alpha1::{DoctorResponse, Finding as ApiFinding, finding::Severity as ApiSeverity};
+use mori_api::v1alpha1::{
+    DoctorResponse, Finding as ApiFinding, Fixed, finding::Severity as ApiSeverity,
+};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
-use mori_core::doctor::{Facts, Finding, Known, RepoFacts, Severity, TreeFacts, check, summary};
-use mori_core::error::{ErrorDetails, RepoError};
+use mori_core::doctor::{
+    Code, Facts, Finding, Known, RepoFacts, Severity, Subject, TreeFacts, check, summary,
+};
+use mori_core::error::{CleanupError, ErrorDetails, RepoError};
 use mori_core::forest::{Entry, reconcile};
 use mori_core::paths::Paths;
+use mori_core::skills::Mode;
 use mori_core::vcs::{Forge, VcsKind};
 use mori_store::database::Database;
+use mori_store::gc::new_id;
 use mori_store::records::RepoRecord;
 
+use crate::gc::Context;
+use crate::gc_apply;
 use crate::routed::kind_of;
 use crate::state::{self, boxed};
 use crate::{App, Backend, Host, cache, skills};
 
-/// Runs `mori doctor` for the whole root, or only `repo`. Reads only.
+/// What `--fix` was asked for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Fix {
+    /// Confirmed with `--yes`.
+    pub yes: bool,
+    /// Check everything and repair nothing.
+    pub dry_run: bool,
+}
+
+/// Runs `mori doctor` for the whole root, or only `repo`. Reads only, unless `fix` asks it to
+/// repair the auto-fixable findings: each removal pins the tree's commit and is journalled, as in
+/// `mori gc --apply`, so `mori restore` brings it back.
 ///
 /// # Errors
 ///
-/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
-/// reason.
+/// [`CleanupError::NotConfirmed`] for `--fix` without `--yes`, or a failure of the disk, the
+/// database or an adapter, with its code and reason.
 pub fn run<V: Backend, F: Forge>(
     app: &App<V, F>,
     repo: Option<&str>,
+    fix: Option<Fix>,
 ) -> Result<DoctorResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths(&app.host)?;
-    let db = state::open_database(&paths)?;
+    let mut db = state::open_database(&paths)?;
+    let mut findings = check(&gather(app, &paths, &db, repo)?);
+    let mut fixed = Vec::new();
+    let validate_only = fix.is_some_and(|fix| fix.dry_run);
+    if let Some(fix) = fix {
+        let fixable: Vec<&Finding> = findings.iter().filter(|f| f.auto_fixable()).collect();
+        if !fix.yes && !fix.dry_run && !fixable.is_empty() {
+            return Err(boxed(CleanupError::NotConfirmed {
+                count: fixable.len(),
+            }));
+        }
+        let mut synced = false;
+        for finding in fixable {
+            let journal_entry = if fix.dry_run {
+                String::new()
+            } else {
+                repair(app, &paths, &mut db, finding, &mut synced)?
+            };
+            fixed.push(Fixed {
+                code: finding.code.as_str().to_owned(),
+                subject: finding.subject.to_string(),
+                journal_entry,
+            });
+        }
+        if !fix.dry_run && !fixed.is_empty() {
+            findings = check(&gather(app, &paths, &db, repo)?);
+        }
+    }
+    Ok(DoctorResponse {
+        summary: summary(&findings),
+        findings: findings.iter().map(to_api).collect(),
+        fixed,
+        validate_only,
+    })
+}
+
+/// Repairs one auto-fixable finding, and returns its journal entry if it removed anything.
+fn repair<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    paths: &Paths,
+    db: &mut Database,
+    finding: &Finding,
+    synced: &mut bool,
+) -> Result<String, Box<dyn ErrorDetails>> {
+    match (&finding.code, &finding.subject) {
+        (Code::TreeDirGone | Code::WorkspaceGone, Subject::Tree { repo, name }) => {
+            let Some(repo) = db.repo(repo).map_err(boxed)? else {
+                return Ok(String::new());
+            };
+            let Some(record) = db
+                .trees(&repo.id)
+                .map_err(boxed)?
+                .into_iter()
+                .find(|tree| &tree.name == name)
+            else {
+                return Ok(String::new());
+            };
+            let context = Context {
+                paths,
+                vcs: &app.vcs,
+                forge: None,
+                now: app.host.now,
+                lru_max: None,
+            };
+            let entry_id = new_id("j");
+            let has_workspace = finding.code == Code::TreeDirGone;
+            let entry = gc_apply::remove(&context, db, &repo, &record, has_workspace, &entry_id)?;
+            mori_store::gc::append_journal(paths, &entry).map_err(boxed)?;
+            Ok(entry_id)
+        }
+        (Code::ContextFolderMissing | Code::ContextIndexStale, _) => {
+            // One sync repairs every context folder and index at once.
+            if !*synced {
+                skills::run(paths, Mode::Sync, false)?;
+                *synced = true;
+            }
+            Ok(String::new())
+        }
+        _ => Ok(String::new()),
+    }
+}
+
+/// Everything doctor looks at, for the whole root or only `repo`. Reads only.
+fn gather<V: Backend, F: Forge>(
+    app: &App<V, F>,
+    paths: &Paths,
+    db: &Database,
+    repo: Option<&str>,
+) -> Result<Facts, Box<dyn ErrorDetails>> {
     let mut records = db.repos().map_err(boxed)?;
     if let Some(repo) = repo {
         let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
@@ -39,12 +147,12 @@ pub fn run<V: Backend, F: Forge>(
     }
     let repos = records
         .iter()
-        .map(|record| repo_facts(&app.host, &paths, &db, &app.vcs, record))
+        .map(|record| repo_facts(&app.host, paths, db, &app.vcs, record))
         .collect::<Result<Vec<_>, _>>()?;
     let needed: Vec<VcsKind> = records
         .iter()
         .filter_map(|record| {
-            let clone = clone_path(&paths, &CloneUrl::parse(&record.remote).ok()?.repo);
+            let clone = clone_path(paths, &CloneUrl::parse(&record.remote).ok()?.repo);
             clone.exists().then(|| kind_of(&clone))
         })
         .collect::<BTreeSet<_>>()
@@ -55,25 +163,20 @@ pub fn run<V: Backend, F: Forge>(
     } else {
         let managed = records.iter().map(|record| record.remote.clone()).collect();
         let clones = mori_store::init::find_clones(&paths.repos()).map_err(boxed)?;
-        mori_core::init::unmanaged(&paths, &clones, &managed)
+        mori_core::init::unmanaged(paths, &clones, &managed)
             .into_iter()
             .map(|unmanaged| (unmanaged.repo, unmanaged.path))
             .collect()
     };
-    let facts = Facts {
+    Ok(Facts {
         tools_missing: app.vcs.missing_tools(&needed),
         repos,
         unrecorded_clones,
-        index_stale: skills::index_stale(&paths)?,
+        index_stale: skills::index_stale(paths)?,
         ccache_without_base_dir: cache::ccache_lacks_base_dir(
             &app.host,
             &cache::SYSTEM_CCACHE_CONFS.map(PathBuf::from),
         ),
-    };
-    let findings = check(&facts);
-    Ok(DoctorResponse {
-        summary: summary(&findings),
-        findings: findings.iter().map(to_api).collect(),
     })
 }
 

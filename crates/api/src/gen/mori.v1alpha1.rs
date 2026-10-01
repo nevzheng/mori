@@ -697,6 +697,16 @@ pub struct DoctorRequest {
     /// Only this repo, in any form `Clone` accepts. Empty: the whole root.
     #[prost(string, tag = "1")]
     pub repo: ::prost::alloc::string::String,
+    /// Repair the auto-fixable findings. Each removal pins the tree's commit and is journalled, so
+    /// `Restore` can bring it back. Needs `confirmed`, unless `validate_only`.
+    #[prost(bool, tag = "2")]
+    pub fix: bool,
+    /// Confirms `fix` (the CLI's --yes).
+    #[prost(bool, tag = "3")]
+    pub confirmed: bool,
+    /// With `fix`: check everything and repair nothing (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "4")]
+    pub validate_only: bool,
 }
 /// Response for `Doctor`.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -707,6 +717,26 @@ pub struct DoctorResponse {
     /// One line: how many problems, and how many `mori doctor --fix --yes` would repair.
     #[prost(string, tag = "2")]
     pub summary: ::prost::alloc::string::String,
+    /// With `fix`: what was repaired (or would be, when `validate_only`). The findings are then
+    /// what is left after the repairs.
+    #[prost(message, repeated, tag = "3")]
+    pub fixed: ::prost::alloc::vec::Vec<Fixed>,
+    /// Echoes the request.
+    #[prost(bool, tag = "4")]
+    pub validate_only: bool,
+}
+/// One finding `Doctor` repaired.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Fixed {
+    /// The finding's code.
+    #[prost(string, tag = "1")]
+    pub code: ::prost::alloc::string::String,
+    /// What it was about.
+    #[prost(string, tag = "2")]
+    pub subject: ::prost::alloc::string::String,
+    /// The journal entry for `Restore`, when the repair removed a tree; empty otherwise.
+    #[prost(string, tag = "3")]
+    pub journal_entry: ::prost::alloc::string::String,
 }
 /// One problem, or one thing worth knowing, that doctor found.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

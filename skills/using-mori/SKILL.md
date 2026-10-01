@@ -205,8 +205,12 @@ mori tree, or before handing out work. It exits 9 if it finds a problem.
 - Each finding has a code (`TREE_DIR_GONE`, `WORKSPACE_GONE`, `CONFLICTED_BOOKMARK`,
   `BACKEND_CHANGED`, `NO_SHARED_CACHE`, …), a severity (`problem`, `warn`, `info`), what it is
   about, and a `fix`. Only problems change the exit code; warnings don't.
-- Run the fix it gives, or tell the person if it involves someone else's work. Findings marked
-  auto-fixable are the safe, single-answer ones.
+- Run the fix it gives, or tell the person if it involves someone else's work.
+- **`mori doctor --fix --yes`** repairs the auto-fixable findings, the safe single-answer ones: it
+  forgets trees whose directory or workspace is gone (pinning their last commit and journalling
+  them, so `mori restore <entry>` brings them back) and restores context folders and indexes.
+  Without `--yes` it refuses (`CONFIRMATION_NEEDED`); `--dry-run` shows what it would fix. Run it
+  only when the person asked, as with `gc --apply --yes`.
 - With `--json`, findings are in `findings[]` with `code`, `severity`, `subject`, `message`, `fix`
   and `autoFixable`.
 

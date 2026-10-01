@@ -520,6 +520,20 @@ pub fn restore_text(response: &RestoreResponse) -> String {
 /// The text `doctor` prints: each finding, worst first, with its fix, then the summary.
 pub fn doctor_text(response: &DoctorResponse) -> String {
     let mut text = String::new();
+    let verb = if response.validate_only {
+        "Would fix"
+    } else {
+        "Fixed"
+    };
+    for fixed in &response.fixed {
+        let _ = writeln!(text, "{verb} {}  {}", fixed.code, fixed.subject);
+        if !fixed.journal_entry.is_empty() {
+            let _ = writeln!(text, "  undo: mori restore {}", fixed.journal_entry);
+        }
+    }
+    if !response.fixed.is_empty() {
+        let _ = writeln!(text);
+    }
     for finding in &response.findings {
         let severity = match finding.severity() {
             Severity::Problem => "problem",

@@ -112,10 +112,23 @@ enum Command {
     },
 
     /// Check the root, every clone and every tree against the VCS and the disk, and list each
-    /// problem with the command that fixes it. Reads only. Exits 9 if any problem is found.
+    /// problem with the command that fixes it. Reads only, unless --fix --yes repairs the safe
+    /// ones (removals are journalled for `mori restore`). Exits 9 if a problem remains.
     Doctor {
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
+
+        /// Repair the auto-fixable findings (needs --yes).
+        #[arg(long)]
+        fix: bool,
+
+        /// Confirm the repairs.
+        #[arg(long, requires = "fix")]
+        yes: bool,
+
+        /// With --fix: check everything and repair nothing.
+        #[arg(long, requires = "fix")]
+        dry_run: bool,
     },
 
     /// Bring back a tree `mori gc --apply` removed, from its journal entry: on its pinned commit, at
@@ -258,7 +271,17 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
             ),
             output::gc_text,
         ),
-        Command::Doctor { repo } => run_doctor(app, json, repo.as_deref()),
+        Command::Doctor {
+            repo,
+            fix,
+            yes,
+            dry_run,
+        } => run_doctor(
+            app,
+            json,
+            repo.as_deref(),
+            fix.then_some(doctor::Fix { yes, dry_run }),
+        ),
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
@@ -347,8 +370,13 @@ fn real_app() -> App<Routed<JjCli, GitCli>, GhCli> {
 }
 
 /// Runs `doctor` and prints its report; problems found make the exit code non-zero.
-fn run_doctor(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, repo: Option<&str>) -> ExitCode {
-    let result = doctor::run(app, repo);
+fn run_doctor(
+    app: &App<Routed<JjCli, GitCli>, GhCli>,
+    json: bool,
+    repo: Option<&str>,
+    fix: Option<doctor::Fix>,
+) -> ExitCode {
+    let result = doctor::run(app, repo, fix);
     let problems = result.as_ref().is_ok_and(output::doctor_has_problems);
     let code = respond(json, result, output::doctor_text);
     if problems {
