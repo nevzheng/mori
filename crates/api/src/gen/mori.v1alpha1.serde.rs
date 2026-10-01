@@ -603,6 +603,9 @@ impl serde::Serialize for CreateTreeResponse {
         if !self.warnings.is_empty() {
             len += 1;
         }
+        if !self.hints.is_empty() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("mori.v1alpha1.CreateTreeResponse", len)?;
         if let Some(v) = self.tree.as_ref() {
@@ -622,6 +625,9 @@ impl serde::Serialize for CreateTreeResponse {
         if !self.warnings.is_empty() {
             struct_ser.serialize_field("warnings", &self.warnings)?;
         }
+        if !self.hints.is_empty() {
+            struct_ser.serialize_field("hints", &self.hints)?;
+        }
         struct_ser.end()
     }
 }
@@ -638,6 +644,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
             "validateOnly",
             "vcs",
             "warnings",
+            "hints",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -647,6 +654,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
             ValidateOnly,
             Vcs,
             Warnings,
+            Hints,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -676,6 +684,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             "vcs" => Ok(GeneratedField::Vcs),
                             "warnings" => Ok(GeneratedField::Warnings),
+                            "hints" => Ok(GeneratedField::Hints),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -700,6 +709,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                 let mut validate_only__ = None;
                 let mut vcs__ = None;
                 let mut warnings__ = None;
+                let mut hints__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -732,6 +742,12 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             }
                             warnings__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Hints => {
+                            if hints__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("hints"));
+                            }
+                            hints__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CreateTreeResponse {
@@ -740,6 +756,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                     validate_only: validate_only__.unwrap_or_default(),
                     vcs: vcs__.unwrap_or_default(),
                     warnings: warnings__.unwrap_or_default(),
+                    hints: hints__.unwrap_or_default(),
                 })
             }
         }
@@ -2583,6 +2600,162 @@ impl<'de> serde::Deserialize<'de> for GcResponse {
         deserializer.deserialize_struct("mori.v1alpha1.GcResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for Hint {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.code.is_empty() {
+            len += 1;
+        }
+        if !self.message.is_empty() {
+            len += 1;
+        }
+        if !self.command.is_empty() {
+            len += 1;
+        }
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.tree.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.Hint", len)?;
+        if !self.code.is_empty() {
+            struct_ser.serialize_field("code", &self.code)?;
+        }
+        if !self.message.is_empty() {
+            struct_ser.serialize_field("message", &self.message)?;
+        }
+        if !self.command.is_empty() {
+            struct_ser.serialize_field("command", &self.command)?;
+        }
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.tree.is_empty() {
+            struct_ser.serialize_field("tree", &self.tree)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for Hint {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["code", "message", "command", "repo", "tree"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Code,
+            Message,
+            Command,
+            Repo,
+            Tree,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "code" => Ok(GeneratedField::Code),
+                            "message" => Ok(GeneratedField::Message),
+                            "command" => Ok(GeneratedField::Command),
+                            "repo" => Ok(GeneratedField::Repo),
+                            "tree" => Ok(GeneratedField::Tree),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = Hint;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.Hint")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Hint, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut code__ = None;
+                let mut message__ = None;
+                let mut command__ = None;
+                let mut repo__ = None;
+                let mut tree__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Code => {
+                            if code__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("code"));
+                            }
+                            code__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Message => {
+                            if message__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("message"));
+                            }
+                            message__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Command => {
+                            if command__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("command"));
+                            }
+                            command__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tree => {
+                            if tree__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tree"));
+                            }
+                            tree__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(Hint {
+                    code: code__.unwrap_or_default(),
+                    message: message__.unwrap_or_default(),
+                    command: command__.unwrap_or_default(),
+                    repo: repo__.unwrap_or_default(),
+                    tree: tree__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.Hint", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for InitRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -3049,6 +3222,9 @@ impl serde::Serialize for ListTreesResponse {
         if !self.warnings.is_empty() {
             len += 1;
         }
+        if !self.hints.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ListTreesResponse", len)?;
         if !self.repos.is_empty() {
             struct_ser.serialize_field("repos", &self.repos)?;
@@ -3061,6 +3237,9 @@ impl serde::Serialize for ListTreesResponse {
         }
         if !self.warnings.is_empty() {
             struct_ser.serialize_field("warnings", &self.warnings)?;
+        }
+        if !self.hints.is_empty() {
+            struct_ser.serialize_field("hints", &self.hints)?;
         }
         struct_ser.end()
     }
@@ -3077,6 +3256,7 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
             "unmanagedRepos",
             "disk",
             "warnings",
+            "hints",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -3085,6 +3265,7 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
             UnmanagedRepos,
             Disk,
             Warnings,
+            Hints,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3115,6 +3296,7 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                             }
                             "disk" => Ok(GeneratedField::Disk),
                             "warnings" => Ok(GeneratedField::Warnings),
+                            "hints" => Ok(GeneratedField::Hints),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3138,6 +3320,7 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                 let mut unmanaged_repos__ = None;
                 let mut disk__ = None;
                 let mut warnings__ = None;
+                let mut hints__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repos => {
@@ -3164,6 +3347,12 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                             }
                             warnings__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Hints => {
+                            if hints__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("hints"));
+                            }
+                            hints__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ListTreesResponse {
@@ -3171,6 +3360,7 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                     unmanaged_repos: unmanaged_repos__.unwrap_or_default(),
                     disk: disk__,
                     warnings: warnings__.unwrap_or_default(),
+                    hints: hints__.unwrap_or_default(),
                 })
             }
         }
@@ -3952,6 +4142,9 @@ impl serde::Serialize for ResolveResponse {
         if !self.context_dir.is_empty() {
             len += 1;
         }
+        if !self.hints.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ResolveResponse", len)?;
         if self.kind != 0 {
             let v = resolve_response::Kind::try_from(self.kind)
@@ -3976,6 +4169,9 @@ impl serde::Serialize for ResolveResponse {
         if !self.context_dir.is_empty() {
             struct_ser.serialize_field("contextDir", &self.context_dir)?;
         }
+        if !self.hints.is_empty() {
+            struct_ser.serialize_field("hints", &self.hints)?;
+        }
         struct_ser.end()
     }
 }
@@ -3993,6 +4189,7 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
             "status",
             "context_dir",
             "contextDir",
+            "hints",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4003,6 +4200,7 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
             Tree,
             Status,
             ContextDir,
+            Hints,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4033,6 +4231,7 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
                             "tree" => Ok(GeneratedField::Tree),
                             "status" => Ok(GeneratedField::Status),
                             "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
+                            "hints" => Ok(GeneratedField::Hints),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4058,6 +4257,7 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
                 let mut tree__ = None;
                 let mut status__ = None;
                 let mut context_dir__ = None;
+                let mut hints__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Kind => {
@@ -4096,6 +4296,12 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
                             }
                             context_dir__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Hints => {
+                            if hints__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("hints"));
+                            }
+                            hints__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ResolveResponse {
@@ -4105,6 +4311,7 @@ impl<'de> serde::Deserialize<'de> for ResolveResponse {
                     tree: tree__,
                     status: status__.unwrap_or_default(),
                     context_dir: context_dir__.unwrap_or_default(),
+                    hints: hints__.unwrap_or_default(),
                 })
             }
         }

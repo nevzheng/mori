@@ -47,7 +47,7 @@ already uses it for commit messages.
 - A repo is accepted in any form `mori clone` takes, and by its short name when exactly one repo
   matches.
 - Environment variables are documented in `mori --help`: `MORI_ROOT`, `MORI_AGENT`, `MORI_GH`,
-  `NO_COLOR`.
+  `MORI_HINTS`, `NO_COLOR`.
 
 ## Output
 
@@ -57,6 +57,29 @@ already uses it for commit messages.
 - Lists are columns with a header; a column that would be the same on every row is left out.
 - Nothing prints just to say it is working. Long operations show progress on stderr, only on a
   terminal.
+
+## Hints
+
+A hint is a suggestion for the next step, after a command that succeeded: what mori noticed, then
+the command that acts on it. Text puts it on stderr; JSON puts it in the response's `hints`, with a
+stable code.
+
+```text
+hint: tree claude-auth has no purpose; one line on what it is for shows in ls and where: `mori tree set github.com/acme/widget claude-auth --purpose "<what for>"`
+```
+
+- A hint fires only for whoever it is about. Agent hints need `MORI_AGENT`, so a person never sees
+  them.
+- A command gives at most two. `MORI_HINTS=0` turns them off.
+- A hint is a fixed template that names only repos, trees and counts, never a purpose or other
+  text someone wrote, so it can't carry planted instructions.
+
+| Code              | When                                             | Where                  |
+| ----------------- | ------------------------------------------------ | ---------------------- |
+| `IN_PERSONS_ROOT` | an agent is in the clone, a person's checkout    | `where`                |
+| `NOT_YOUR_TREE`   | an agent is in a tree another owner has          | `where`                |
+| `NO_PURPOSE`      | an agent's tree has no purpose                   | `where`, `tree create` |
+| `LANDED_TREES`    | trees hold work that landed, so gc may free them | `ls`, `mori`           |
 
 ## Errors
 

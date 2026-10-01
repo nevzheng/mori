@@ -88,6 +88,10 @@ pub fn run<V: Backend, F: Forge>(
         .into();
         response.tree = Some(tree(&paths, &repo, &name, record)?);
     }
+    response.hints = crate::hints::allowed(
+        &app.host,
+        crate::hints::for_where(app.host.agent.as_deref(), &response),
+    );
     Ok(response)
 }
 

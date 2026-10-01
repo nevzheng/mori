@@ -74,6 +74,12 @@ pub fn create<V: Backend, F: Forge>(
     }
     let mut response = response(&plan, id, args.dry_run, kind_of(&clone));
     response.warnings = crate::disk::warnings(&paths, &db, crate::disk::space(&paths), None);
+    if let Some(tree) = &response.tree {
+        response.hints = crate::hints::allowed(
+            &app.host,
+            crate::hints::for_create(app.host.user.as_deref(), tree),
+        );
+    }
     Ok(response)
 }
 
@@ -179,5 +185,6 @@ fn response(plan: &TreePlan, id: String, dry_run: bool, kind: VcsKind) -> Create
         validate_only: dry_run,
         vcs: api_vcs(kind).into(),
         warnings: Vec::new(),
+        hints: Vec::new(),
     }
 }

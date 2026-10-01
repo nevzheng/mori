@@ -116,7 +116,7 @@ pub fn run<V: Backend, F: Forge>(
             })
             .collect()
     };
-    Ok(ListTreesResponse {
+    let mut response = ListTreesResponse {
         repos,
         unmanaged_repos,
         disk: space.map(|space| Disk {
@@ -124,7 +124,13 @@ pub fn run<V: Backend, F: Forge>(
             total_bytes: space.total,
         }),
         warnings: disk::warnings(&paths, &db, space, sizes.as_ref()),
-    })
+        hints: Vec::new(),
+    };
+    // Someone asking for landed trees is already looking at them.
+    if args.status != Some(StatusFilter::Landed) {
+        response.hints = crate::hints::allowed(&app.host, crate::hints::for_ls(&response));
+    }
+    Ok(response)
 }
 
 /// Measures a tree that exists on disk, or reuses its recent size.

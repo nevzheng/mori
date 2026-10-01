@@ -13,7 +13,7 @@ use mori_core::paths::Env;
 use mori_core::vcs::{Forge, Merged, RemoteBookmark, Vcs, VcsKind};
 use tempfile::TempDir;
 
-use crate::{App, Backend, Host, clone, gc, init, ls, restore, tree, tree_remove};
+use crate::{App, Backend, Host, clone, gc, init, ls, place, restore, tree, tree_remove};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -302,6 +302,7 @@ impl Fixture {
             },
             user: Some("tester".to_owned()),
             agent: None,
+            hints_off: false,
             now: NOW,
             cache_vars: BTreeMap::new(),
         };
@@ -699,5 +700,86 @@ fn ls_filters_by_query_owner_and_state() -> Result<()> {
     assert_eq!(listed(&fixture, &by_query)?, ["claude-auth"]);
     assert_eq!(listed(&fixture, &by_owner)?, ["default"]);
     assert_eq!(listed(&fixture, &unsaved)?, ["claude-auth"]);
+    Ok(())
+}
+
+fn hint_codes(hints: &[mori_api::v1alpha1::Hint]) -> Vec<&str> {
+    hints.iter().map(|hint| hint.code.as_str()).collect()
+}
+
+fn where_codes(fixture: &Fixture, path: &Path) -> Result<Vec<String>> {
+    let response = place::run(&fixture.app, path).map_err(to_std)?;
+    Ok(hint_codes(&response.hints)
+        .into_iter()
+        .map(str::to_owned)
+        .collect())
+}
+
+#[test]
+fn where_steers_an_agent_into_a_tree_of_its_own() -> Result<()> {
+    let mut fixture = Fixture::new()?;
+    let name = fixture.create("fix-login")?;
+    let tree = fixture.home.path().join("mori/trees/widget").join(&name);
+
+    // Given no agent, mori where has no hints for a person anywhere.
+    assert!(where_codes(&fixture, &fixture.clone_path())?.is_empty());
+
+    // Given agent codex, the clone and claude's tree are not its place.
+    fixture.app.host.agent = Some("codex".to_owned());
+    assert_eq!(
+        where_codes(&fixture, &fixture.clone_path())?,
+        ["IN_PERSONS_ROOT"]
+    );
+    assert_eq!(where_codes(&fixture, &tree)?, ["NOT_YOUR_TREE"]);
+
+    // Given agent claude, its own tree, which has a purpose, needs nothing.
+    fixture.app.host.agent = Some("claude".to_owned());
+    assert!(where_codes(&fixture, &tree)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn an_agents_tree_without_a_purpose_gets_a_hint() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let create = |task: &str, agent: &str| {
+        tree::create(
+            &fixture.app,
+            tree::CreateArgs {
+                repo: REPO.to_owned(),
+                task: task.to_owned(),
+                agent: Some(agent.to_owned()),
+                lifetime: None,
+                from: None,
+                purpose: None,
+                dry_run: false,
+            },
+        )
+        .map_err(to_std)
+    };
+
+    let agents = create("auth", "claude")?;
+    let persons = create("notes", "tester")?;
+
+    assert_eq!(hint_codes(&agents.hints), ["NO_PURPOSE"]);
+    assert_eq!(
+        agents.hints[0].command,
+        format!("mori tree set {REPO} claude-auth --purpose \"<what for>\"")
+    );
+    assert!(persons.hints.is_empty());
+    Ok(())
+}
+
+#[test]
+fn ls_hints_at_landed_trees_unless_hints_are_off() -> Result<()> {
+    let mut fixture = Fixture::new()?;
+    landed_tree(&fixture)?;
+
+    let listed = ls::run(&fixture.app, &ls::LsArgs::default()).map_err(to_std)?;
+    assert_eq!(hint_codes(&listed.hints), ["LANDED_TREES"]);
+    assert_eq!(listed.hints[0].command, "mori gc");
+
+    fixture.app.host.hints_off = true;
+    let quiet = ls::run(&fixture.app, &ls::LsArgs::default()).map_err(to_std)?;
+    assert!(quiet.hints.is_empty());
     Ok(())
 }
