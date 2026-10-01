@@ -130,7 +130,9 @@ enum Command {
     ///
     /// For each tree: owner, task, lifetime, and work that exists only on this machine. Reads only;
     /// never snapshots a working copy.
-    #[command(after_help = "Examples:\n  mori ls\n  mori ls widget\n  mori ls --json")]
+    #[command(
+        after_help = "Examples:\n  mori ls\n  mori ls widget\n  mori ls --owner codex --status unsaved\n  mori ls --query oauth --json"
+    )]
     Ls {
         /// Only this repo: its full name, any form `mori clone` accepts, or a unique short name.
         repo: Option<String>,
@@ -143,6 +145,18 @@ enum Command {
         /// With --size: measure every tree again instead of reusing recent sizes.
         #[arg(long, requires = "size")]
         fresh: bool,
+
+        /// Only trees whose repo, name, task or purpose contains this text (any case).
+        #[arg(long, value_name = "TEXT")]
+        query: Option<String>,
+
+        /// Only trees with this owner.
+        #[arg(long, value_name = "OWNER")]
+        owner: Option<String>,
+
+        /// Only trees in this state.
+        #[arg(long, value_enum, value_name = "STATE")]
+        status: Option<StatusArg>,
     },
 
     /// Find drift between mori, the VCS and the disk, and fix what is safe.
@@ -416,7 +430,14 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
-        Command::Ls { repo, size, fresh } => respond(
+        Command::Ls {
+            repo,
+            size,
+            fresh,
+            query,
+            owner,
+            status,
+        } => respond(
             json,
             ls::run(
                 app,
@@ -424,6 +445,9 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
                     repo,
                     sizes: size,
                     fresh,
+                    query,
+                    owner,
+                    status: status.map(StatusArg::filter),
                 },
             ),
             output::ls_text,
@@ -517,6 +541,33 @@ fn run_where(
     let here = std::env::current_dir().unwrap_or_default();
     let path = path.map_or_else(|| here.clone(), |path| here.join(path));
     place::run(app, &path)
+}
+
+/// The states `ls --status` takes.
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+enum StatusArg {
+    /// Edits or unpushed changes.
+    Unsaved,
+    /// Recorded, present and clean.
+    Clean,
+    /// A bookmark it pushed has landed.
+    Landed,
+    /// Recorded, but the VCS has no such tree.
+    Missing,
+    /// In the VCS, but mori didn't make it.
+    Foreign,
+}
+
+impl StatusArg {
+    fn filter(self) -> ls::StatusFilter {
+        match self {
+            Self::Unsaved => ls::StatusFilter::Unsaved,
+            Self::Clean => ls::StatusFilter::Clean,
+            Self::Landed => ls::StatusFilter::Landed,
+            Self::Missing => ls::StatusFilter::Missing,
+            Self::Foreign => ls::StatusFilter::Foreign,
+        }
+    }
 }
 
 /// Prints shell completions for `shell`.

@@ -661,3 +661,43 @@ fn tree_set_changes_the_record_and_restore_keeps_the_purpose() -> Result<()> {
     assert_eq!(base.reason(), "BASE_TREE");
     Ok(())
 }
+
+fn listed(fixture: &Fixture, args: &ls::LsArgs) -> Result<Vec<String>> {
+    let response = ls::run(&fixture.app, args).map_err(to_std)?;
+    let names = response
+        .repos
+        .into_iter()
+        .flat_map(|repo| repo.trees)
+        .filter_map(|row| row.tree.map(|tree| tree.name))
+        .collect();
+    Ok(names)
+}
+
+#[test]
+fn ls_filters_by_query_owner_and_state() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let auth = fixture.create("auth")?;
+    fixture.create("docs")?;
+    fixture
+        .app
+        .vcs
+        .tree(&fixture.clone_path(), &auth, |tree| tree.changed = true)?;
+
+    let by_query = ls::LsArgs {
+        query: Some("AUTH".to_owned()),
+        ..ls::LsArgs::default()
+    };
+    let by_owner = ls::LsArgs {
+        owner: Some("tester".to_owned()),
+        ..ls::LsArgs::default()
+    };
+    let unsaved = ls::LsArgs {
+        status: Some(ls::StatusFilter::Unsaved),
+        ..ls::LsArgs::default()
+    };
+
+    assert_eq!(listed(&fixture, &by_query)?, ["claude-auth"]);
+    assert_eq!(listed(&fixture, &by_owner)?, ["default"]);
+    assert_eq!(listed(&fixture, &unsaved)?, ["claude-auth"]);
+    Ok(())
+}

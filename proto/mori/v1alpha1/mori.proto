@@ -268,6 +268,16 @@ message ListTreesRequest {
   // With `include_sizes`: measure every tree again instead of reusing a size measured in the last
   // 15 minutes.
   bool skip_size_cache = 3;
+
+  // Only trees whose repo, name, task or purpose contains this text, ignoring case.
+  string query = 4;
+
+  // Only trees with this owner.
+  string owner = 5;
+
+  // Only trees in this state: "unsaved" (edits or unpushed changes), "clean", "landed" (a bookmark
+  // the tree pushed has landed), "missing" or "foreign".
+  string status = 6;
 }
 
 // Response for `ListTrees`.
@@ -304,6 +314,9 @@ message RepoTrees {
 
   // Every tree mori recorded and every workspace the VCS reports, sorted by name.
   repeated TreeRow trees = 3;
+
+  // The repo's context folder, `context/projects/<dir>/`: notes for people and agents.
+  string context_dir = 5;
 
   // The VCS the clone uses, read from the clone.
   Vcs vcs = 4;

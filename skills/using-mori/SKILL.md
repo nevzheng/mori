@@ -106,6 +106,9 @@ safe to run, even while others work.
 - **Work:** `edited` (the working-copy change has edits) and `N unpushed` (changes that exist only
   on this machine). In a jj clone it is as of jj's last snapshot in that tree, so run `jj status`
   in your own tree first if you need it current; a git clone's is always current.
+- **Find trees:** `--owner <name>`, `--status unsaved|clean|landed|missing|foreign`, and
+  `--query <text>` (repo, name, task or purpose, any case). `landed` finds the trees whose work
+  is on trunk (a pushed bookmark merged or deleted after a squash merge): the ones to clean up.
 - Clones under `repos/` that mori didn't make are listed apart, and left alone.
 - With `--json`, each repo has `vcs` (`VCS_JJ` or `VCS_GIT`); rows are in `repos[].trees[]`, with
   `status` (`STATUS_TREE`, `STATUS_MISSING`, `STATUS_FOREIGN`), `tree`, `state`, and `bookmarks`:

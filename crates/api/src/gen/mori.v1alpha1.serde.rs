@@ -2863,6 +2863,15 @@ impl serde::Serialize for ListTreesRequest {
         if self.skip_size_cache {
             len += 1;
         }
+        if !self.query.is_empty() {
+            len += 1;
+        }
+        if !self.owner.is_empty() {
+            len += 1;
+        }
+        if !self.status.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ListTreesRequest", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -2872,6 +2881,15 @@ impl serde::Serialize for ListTreesRequest {
         }
         if self.skip_size_cache {
             struct_ser.serialize_field("skipSizeCache", &self.skip_size_cache)?;
+        }
+        if !self.query.is_empty() {
+            struct_ser.serialize_field("query", &self.query)?;
+        }
+        if !self.owner.is_empty() {
+            struct_ser.serialize_field("owner", &self.owner)?;
+        }
+        if !self.status.is_empty() {
+            struct_ser.serialize_field("status", &self.status)?;
         }
         struct_ser.end()
     }
@@ -2888,6 +2906,9 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
             "includeSizes",
             "skip_size_cache",
             "skipSizeCache",
+            "query",
+            "owner",
+            "status",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -2895,6 +2916,9 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
             Repo,
             IncludeSizes,
             SkipSizeCache,
+            Query,
+            Owner,
+            Status,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2924,6 +2948,9 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                             "skipSizeCache" | "skip_size_cache" => {
                                 Ok(GeneratedField::SkipSizeCache)
                             }
+                            "query" => Ok(GeneratedField::Query),
+                            "owner" => Ok(GeneratedField::Owner),
+                            "status" => Ok(GeneratedField::Status),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2946,6 +2973,9 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                 let mut repo__ = None;
                 let mut include_sizes__ = None;
                 let mut skip_size_cache__ = None;
+                let mut query__ = None;
+                let mut owner__ = None;
+                let mut status__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -2966,12 +2996,33 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                             }
                             skip_size_cache__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Query => {
+                            if query__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("query"));
+                            }
+                            query__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Owner => {
+                            if owner__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("owner"));
+                            }
+                            owner__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Status => {
+                            if status__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("status"));
+                            }
+                            status__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ListTreesRequest {
                     repo: repo__.unwrap_or_default(),
                     include_sizes: include_sizes__.unwrap_or_default(),
                     skip_size_cache: skip_size_cache__.unwrap_or_default(),
+                    query: query__.unwrap_or_default(),
+                    owner: owner__.unwrap_or_default(),
+                    status: status__.unwrap_or_default(),
                 })
             }
         }
@@ -3642,6 +3693,9 @@ impl serde::Serialize for RepoTrees {
         if !self.trees.is_empty() {
             len += 1;
         }
+        if !self.context_dir.is_empty() {
+            len += 1;
+        }
         if self.vcs != 0 {
             len += 1;
         }
@@ -3654,6 +3708,9 @@ impl serde::Serialize for RepoTrees {
         }
         if !self.trees.is_empty() {
             struct_ser.serialize_field("trees", &self.trees)?;
+        }
+        if !self.context_dir.is_empty() {
+            struct_ser.serialize_field("contextDir", &self.context_dir)?;
         }
         if self.vcs != 0 {
             let v = Vcs::try_from(self.vcs)
@@ -3669,13 +3726,14 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["repo", "path", "trees", "vcs"];
+        const FIELDS: &[&str] = &["repo", "path", "trees", "context_dir", "contextDir", "vcs"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repo,
             Path,
             Trees,
+            ContextDir,
             Vcs,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -3704,6 +3762,7 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                             "repo" => Ok(GeneratedField::Repo),
                             "path" => Ok(GeneratedField::Path),
                             "trees" => Ok(GeneratedField::Trees),
+                            "contextDir" | "context_dir" => Ok(GeneratedField::ContextDir),
                             "vcs" => Ok(GeneratedField::Vcs),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -3727,6 +3786,7 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                 let mut repo__ = None;
                 let mut path__ = None;
                 let mut trees__ = None;
+                let mut context_dir__ = None;
                 let mut vcs__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
@@ -3748,6 +3808,12 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                             }
                             trees__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::ContextDir => {
+                            if context_dir__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("contextDir"));
+                            }
+                            context_dir__ = Some(map_.next_value()?);
+                        }
                         GeneratedField::Vcs => {
                             if vcs__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("vcs"));
@@ -3760,6 +3826,7 @@ impl<'de> serde::Deserialize<'de> for RepoTrees {
                     repo: repo__.unwrap_or_default(),
                     path: path__.unwrap_or_default(),
                     trees: trees__.unwrap_or_default(),
+                    context_dir: context_dir__.unwrap_or_default(),
                     vcs: vcs__.unwrap_or_default(),
                 })
             }
