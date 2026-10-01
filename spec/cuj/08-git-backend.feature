@@ -57,3 +57,15 @@ Feature: CUJ 8 - trees as git worktrees
     And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
     And the clone has a git worktree "claude-fix-login"
     And the journal has an entry for "claude-fix-login" whose commit is pinned
+
+  Scenario: A worker's git tree lands with the lead's branch that holds its work
+    Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task lead"
+    And someone commits work with git in "claude-fix-login"
+    And the git tree "claude-lead" merges "claude-fix-login" and pushes it as "feat/combined"
+    And I have run "mori ls"
+    And the remote deletes the git branch "feat/combined" after a squash merge
+    When I run "mori gc --apply --yes"
+    Then it succeeds
+    And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
+    And the journal has an entry for "claude-fix-login" whose commit is pinned

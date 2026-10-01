@@ -64,10 +64,20 @@ def git_push(env: dict[str, str], placeholders: Placeholders, branch: str) -> No
     git(env, tree, "push", "--quiet", "origin", f"HEAD:refs/heads/{branch}")
 
 
+@given(parsers.parse('the git tree "{lead}" merges "{worker}" and pushes it as "{branch}"'))
+def git_lead_merges(
+    env: dict[str, str], placeholders: Placeholders, lead: str, worker: str, branch: str
+) -> None:
+    worker_head = git(env, placeholders.path(f"{TREES}/{worker}"), "rev-parse", "HEAD").strip()
+    tree = placeholders.path(f"{TREES}/{lead}")
+    git(env, tree, "merge", "--quiet", "--no-edit", worker_head)
+    git(env, tree, "push", "--quiet", "origin", f"HEAD:refs/heads/{branch}")
+
+
 @given(parsers.parse('the remote deletes the git branch "{branch}" after a squash merge'))
 def git_remote_deletes(env: dict[str, str], placeholders: Placeholders, branch: str) -> None:
     # The squashed commit lands on trunk elsewhere; what the tree sees is its branch vanishing.
-    tree = placeholders.path(f"{TREES}/claude-fix-login")
+    tree = placeholders.path(CLONE)
     git(env, tree, "push", "--quiet", "origin", f":refs/heads/{branch}")
 
 

@@ -317,3 +317,54 @@ fn status_paths_skip_rename_sources() {
 
     assert_eq!(paths, ["src/lib.rs", "new.rs", "notes.txt"]);
 }
+
+#[test]
+fn a_branch_stacked_on_the_tree_s_work_counts_for_it() -> Result<()> {
+    let repo = Repo::new()?;
+    let worker = repo.add("worker")?;
+    let lead = repo.add("lead")?;
+    let mine = repo.commit(&worker, "auth.txt")?;
+    // The lead merges the worker's commit, adds its own, and pushes a branch from its own tree.
+    repo.git
+        .run(&lead, &["merge", "--quiet", "--ff-only", &mine])?;
+    let tip = repo.commit(&lead, "ui.txt")?;
+    repo.git.run(
+        &lead,
+        &["push", "--quiet", "origin", "HEAD:refs/heads/feat/combined"],
+    )?;
+    // An unrelated branch off trunk must not count.
+    let other = repo.add("other")?;
+    repo.commit(&other, "other.txt")?;
+    repo.git.run(
+        &other,
+        &["push", "--quiet", "origin", "HEAD:refs/heads/other"],
+    )?;
+    repo.git.fetch(&repo.clone())?;
+
+    let pushed = repo.git.pushed_bookmarks(&repo.clone(), "worker")?;
+
+    assert_eq!(
+        pushed,
+        [RemoteBookmark {
+            name: "feat/combined".to_owned(),
+            remote: "origin".to_owned(),
+            commit_id: tip,
+        }]
+    );
+    assert_eq!(repo.git.state(&repo.clone(), "worker")?.unpushed, 0);
+    Ok(())
+}
+
+#[test]
+fn a_tree_with_no_work_of_its_own_has_no_branches() -> Result<()> {
+    let repo = Repo::new()?;
+    repo.add("idle")?;
+    let busy = repo.add("busy")?;
+    repo.commit(&busy, "x.txt")?;
+    repo.git
+        .run(&busy, &["push", "--quiet", "origin", "HEAD:refs/heads/x"])?;
+    repo.git.fetch(&repo.clone())?;
+
+    assert!(repo.git.pushed_bookmarks(&repo.clone(), "idle")?.is_empty());
+    Ok(())
+}
