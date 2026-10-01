@@ -114,9 +114,27 @@ impl GitCli {
         );
         if added.is_err() {
             let _ = std::fs::remove_dir_all(path);
-            let _ = self.run(clone, &["worktree", "prune"]);
+            let _ = self.remove_worktree(clone, path);
         }
         added.map(|_| ())
+    }
+
+    /// Removes the worktree at `path` and its directory. With the directory already gone, git
+    /// still clears that one entry; a bare `git worktree prune` would clear every stale entry,
+    /// including worktrees mori didn't make.
+    fn remove_worktree(&self, clone: &Path, path: &Path) -> Result<(), GitError> {
+        let path_arg = path.to_string_lossy();
+        self.run(
+            clone,
+            &[
+                "worktree",
+                "remove",
+                "--force",
+                "--end-of-options",
+                &path_arg,
+            ],
+        )
+        .map(|_| ())
     }
 }
 
@@ -173,26 +191,10 @@ impl Vcs for GitCli {
         Ok(())
     }
 
-    /// Removes the worktree, which also deletes its directory; a worktree whose directory is
-    /// already gone is pruned instead.
+    /// Removes the worktree, which also deletes its directory if it is still there.
     fn forget_tree(&self, clone: &Path, name: &str) -> Result<(), GitError> {
         let root = self.root(clone, name)?;
-        if root.exists() {
-            let root_arg = root.to_string_lossy();
-            self.run(
-                clone,
-                &[
-                    "worktree",
-                    "remove",
-                    "--force",
-                    "--end-of-options",
-                    &root_arg,
-                ],
-            )
-            .map(|_| ())
-        } else {
-            self.run(clone, &["worktree", "prune"]).map(|_| ())
-        }
+        self.remove_worktree(clone, &root)
     }
 
     fn state_covering(

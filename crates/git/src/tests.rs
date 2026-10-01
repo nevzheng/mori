@@ -174,6 +174,26 @@ fn a_pinned_tree_can_be_removed_and_brought_back() -> Result<()> {
 }
 
 #[test]
+fn forgetting_a_deleted_tree_leaves_other_stale_worktrees_alone() -> Result<()> {
+    let repo = Repo::new()?;
+    let mine = repo.add("claude-fix-login")?;
+    let foreign = repo.add("someone-else")?;
+    std::fs::remove_dir_all(&mine)?;
+    std::fs::remove_dir_all(&foreign)?;
+
+    repo.git.forget_tree(&repo.clone(), "claude-fix-login")?;
+
+    let names: Vec<String> = repo
+        .git
+        .list(&repo.clone())?
+        .into_iter()
+        .map(|workspace| workspace.name)
+        .collect();
+    assert_eq!(names, ["default", "someone-else"]);
+    Ok(())
+}
+
+#[test]
 fn an_unknown_commit_does_not_exist() -> Result<()> {
     let repo = Repo::new()?;
 
