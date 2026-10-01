@@ -17,7 +17,10 @@ Every tree mori creates is a **jj workspace**, not a git worktree. So:
   git share the same commits and refs. That checkout is the person's; don't change it unless
   asked.
 - **GitHub and other git tools** still see ordinary branches: jj bookmarks are git branches once
-  pushed.
+  pushed. `gh` can't find the repo from inside a tree (no `.git`), so name both:
+  `gh pr create --repo <owner>/<repo> --head <bookmark>`, or run `gh` from the clone.
+
+If a command says "not a git repository", you are in a jj workspace: use the jj column below.
 
 ## Don't
 

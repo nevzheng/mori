@@ -116,6 +116,12 @@ def says_created(mori: Mori, name: str) -> None:
     assert_that(mori.last.stdout, contains_string(f"Created tree {name}:"))
 
 
+@then(parsers.parse('the output says the tree is a jj workspace and points to the "{skill}" skill'))
+def says_jj_workspace(mori: Mori, skill: str) -> None:
+    assert_that(mori.last.stdout, contains_string("jj workspace"))
+    assert_that(mori.last.stdout, contains_string(skill))
+
+
 @then(parsers.parse('it names the tree "{name}", its path and its lifetime "{lifetime}"'))
 def json_names_the_tree(mori: Mori, placeholders: Placeholders, name: str, lifetime: str) -> None:
     tree = json.loads(mori.last.stdout)["tree"]
