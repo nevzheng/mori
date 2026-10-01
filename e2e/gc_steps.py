@@ -115,11 +115,13 @@ def removed_with(mori: Mori, cleanup: dict[str, str], command: str) -> None:
     result = mori.run(f"{command} --json")
     if result.returncode != 0:
         pytest.fail(f"setup: {command} exited {result.returncode}\n{result.stderr}")
-    removed = [
-        item
-        for item in json.loads(result.stdout)["items"]
-        if item.get("outcome") == "OUTCOME_REMOVED"
-    ]
+    response = json.loads(result.stdout)
+    if "items" not in response:
+        # `mori tree remove` journals only a tree whose directory is gone.
+        assert response.get("journalEntry"), result.stdout
+        cleanup["entry"] = response["journalEntry"]
+        return
+    removed = [item for item in response["items"] if item.get("outcome") == "OUTCOME_REMOVED"]
     assert removed, result.stdout
     cleanup["entry"] = removed[0]["entryId"]
 

@@ -81,7 +81,7 @@ pub fn apply_one<V: Backend>(
 }
 
 /// Pins, forgets, deletes and drops one tree, and returns its journal entry.
-fn remove<V: Backend>(
+pub(crate) fn remove<V: Backend>(
     context: &Context<V>,
     db: &mut Database,
     repo: &RepoRecord,

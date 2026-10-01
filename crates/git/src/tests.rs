@@ -368,3 +368,17 @@ fn a_tree_with_no_work_of_its_own_has_no_branches() -> Result<()> {
     assert!(repo.git.pushed_bookmarks(&repo.clone(), "idle")?.is_empty());
     Ok(())
 }
+
+#[test]
+fn a_deleted_worktree_still_has_its_commit() -> Result<()> {
+    let repo = Repo::new()?;
+    let path = repo.add("t")?;
+    let commit = repo.commit(&path, "work.txt")?;
+
+    std::fs::remove_dir_all(&path)?;
+
+    assert_eq!(repo.git.working_copy_commit(&repo.clone(), "t")?, commit);
+    repo.git.forget_tree(&repo.clone(), "t")?;
+    assert_eq!(repo.git.list(&repo.clone())?.len(), 1);
+    Ok(())
+}

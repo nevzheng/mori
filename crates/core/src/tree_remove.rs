@@ -5,6 +5,10 @@
 //! first, so edits since jj last ran there count, then [`plan`] decides from what it observed.
 //! Removing forgets the workspace, deletes the directory, then drops the record; a crash between
 //! steps leaves a missing tree, which `mori ls` shows.
+//!
+//! A tree whose directory was deleted by hand can't be checked: its edits are gone, and only its
+//! last commit is left in the clone. It may go anyway, with that commit pinned and journalled so
+//! `mori restore` brings it back.
 
 use std::path::PathBuf;
 
@@ -30,8 +34,11 @@ pub struct Recorded {
 pub struct Observed {
     /// The record, if mori made a tree of that name in the repo.
     pub recorded: Option<Recorded>,
-    /// The workspace's state after a fresh snapshot, if the VCS has a workspace of that name.
+    /// The workspace's state after a fresh snapshot, if the VCS has a workspace of that name and
+    /// its directory exists.
     pub state: Option<TreeState>,
+    /// The VCS has a workspace of that name, but its directory was deleted.
+    pub dir_gone: bool,
 }
 
 /// What is asked for. Anyone may remove any task tree that is safe to remove: ownership is a
@@ -53,6 +60,9 @@ pub struct RemovePlan {
     pub path: PathBuf,
     /// Whether there is a workspace to forget. A missing tree only has its record dropped.
     pub forget_workspace: bool,
+    /// Pin the tree's last commit and journal the removal first: its directory is gone, so
+    /// nothing could check that its work is safe elsewhere.
+    pub pin: bool,
 }
 
 /// Decides whether the tree may go.
@@ -78,6 +88,14 @@ pub fn plan(request: &Request, observed: &Observed) -> Result<RemovePlan, TreeEr
     if recorded.lifetime == Lifetime::Pinned && !request.pinned_ok {
         return Err(TreeError::Pinned { name });
     }
+    if observed.dir_gone {
+        return Ok(RemovePlan {
+            name,
+            path: recorded.path.clone(),
+            forget_workspace: true,
+            pin: true,
+        });
+    }
     if let Some(state) = &observed.state
         && (state.changed || state.unpushed > 0)
     {
@@ -91,6 +109,7 @@ pub fn plan(request: &Request, observed: &Observed) -> Result<RemovePlan, TreeEr
         name,
         path: recorded.path.clone(),
         forget_workspace: observed.state.is_some(),
+        pin: false,
     })
 }
 
@@ -127,6 +146,7 @@ mod tests {
         Observed {
             recorded: Some(recorded()),
             state: Some(clean()),
+            dir_gone: false,
         }
     }
 
@@ -136,6 +156,37 @@ mod tests {
 
         assert_eq!(plan.path, recorded().path);
         assert!(plan.forget_workspace);
+    }
+
+    #[test]
+    fn a_tree_whose_directory_is_gone_goes_with_its_commit_pinned() {
+        let observed = Observed {
+            state: None,
+            dir_gone: true,
+            ..observed()
+        };
+
+        let plan = plan(&request(), &observed).unwrap();
+
+        assert!(plan.forget_workspace);
+        assert!(plan.pin);
+    }
+
+    #[test]
+    fn a_pinned_tree_whose_directory_is_gone_still_needs_pinned_ok() {
+        let observed = Observed {
+            recorded: Some(Recorded {
+                lifetime: Lifetime::Pinned,
+                ..recorded()
+            }),
+            state: None,
+            dir_gone: true,
+        };
+
+        assert_eq!(
+            plan(&request(), &observed).unwrap_err().reason(),
+            "TREE_PINNED"
+        );
     }
 
     #[test]
@@ -182,6 +233,7 @@ mod tests {
                 Observed {
                     recorded: None,
                     state: None,
+                    dir_gone: false,
                 },
                 request(),
                 "TREE_NOT_FOUND",

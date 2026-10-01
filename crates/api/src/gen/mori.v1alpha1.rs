@@ -348,6 +348,14 @@ pub struct RemoveTreeResponse {
     /// Echoes the request: true if nothing was actually removed.
     #[prost(bool, tag = "4")]
     pub validate_only: bool,
+    /// The journal entry, set only for a tree whose directory was already deleted by hand: its last
+    /// commit is pinned, and `mori restore <journal_entry>` brings it back.
+    #[prost(string, tag = "5")]
+    pub journal_entry: ::prost::alloc::string::String,
+    /// True if its directory was already deleted by hand, so its last commit is (or, in a dry run,
+    /// would be) pinned and journalled rather than checked.
+    #[prost(bool, tag = "6")]
+    pub directory_gone: bool,
 }
 /// Request for `SyncSkills`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
