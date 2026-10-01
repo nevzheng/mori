@@ -21,8 +21,8 @@ use crate::landing;
 use crate::state::{self, boxed};
 use crate::{App, Backend};
 
-/// What `mori ls` was asked for.
-#[derive(Clone, Debug, Default)]
+/// What `mori ls` was asked for. The default lists every tree, without sizes.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LsArgs {
     /// Only this repo.
     pub repo: Option<String>,
@@ -30,23 +30,42 @@ pub struct LsArgs {
     pub sizes: bool,
     /// Measure again instead of reusing recent sizes (`--fresh`).
     pub fresh: bool,
+    /// Only trees whose repo, name, task or purpose contains this, ignoring case.
+    pub query: Option<String>,
+    /// Only trees with this owner.
+    pub owner: Option<String>,
+    /// Only trees in this state.
+    pub status: Option<StatusFilter>,
 }
 
-/// Runs `ls` for every repo mori manages, or only `repo`.
+/// The states `ls --status` picks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StatusFilter {
+    /// Edits or unpushed changes.
+    Unsaved,
+    /// Recorded, present and clean.
+    Clean,
+    /// A bookmark it pushed has landed: merged, or deleted from the remote after a squash merge.
+    Landed,
+    /// Recorded, but the VCS has no such tree.
+    Missing,
+    /// In the VCS, but mori didn't make it.
+    Foreign,
+}
+
+/// Runs `ls`.
 ///
 /// # Errors
 ///
-/// The plan's refusal, or a failure of the disk, the database or an adapter, with its code and
-/// reason.
+/// A failure of the disk, the database or an adapter, with its code and reason.
 pub fn run<V: Backend, F: Forge>(
     app: &App<V, F>,
     args: &LsArgs,
 ) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
-    let repo = args.repo.as_deref();
     let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
     let mut records = db.repos().map_err(boxed)?;
-    if let Some(repo) = repo {
+    if let Some(repo) = &args.repo {
         let wanted = state::repo_id(&db, repo)?.to_string();
         records.retain(|record| record.remote == wanted);
         if records.is_empty() {
@@ -54,18 +73,27 @@ pub fn run<V: Backend, F: Forge>(
         }
     }
     let managed: BTreeSet<String> = records.iter().map(|repo| repo.remote.clone()).collect();
-    let mut repos: Vec<RepoTrees> = records
-        .iter()
-        .map(|repo| list_repo(&paths, &mut db, &app.vcs, repo))
-        .collect::<Result<_, _>>()?;
+    let mut repos = Vec::new();
+    for record in &records {
+        let mut repo = list_repo(&paths, &mut db, &app.vcs, record)?;
+        repo.trees.retain(|row| matches(&repo.repo, row, args));
+        repos.push(repo);
+    }
+    // A repo with nothing left to show is left out when the listing was narrowed.
+    let narrowed = args.query.is_some() || args.owner.is_some() || args.status.is_some();
+    if narrowed {
+        repos.retain(|repo| !repo.trees.is_empty());
+    }
+    // Sizes only for the trees listed, so a page measures only its own trees.
     if args.sizes {
         for row in repos.iter_mut().flat_map(|repo| repo.trees.iter_mut()) {
             add_size(&mut db, row, app.host.now, args.fresh);
         }
     }
     let space = disk::space(&paths);
-    // Every repo was measured, so a repo absent here (when one repo was asked for) is unknown.
-    let sizes: Option<BTreeMap<String, u64>> = args.sizes.then(|| {
+    // Per-repo totals for the disk limits, only when every tree of every listed repo was measured:
+    // a narrowed listing would undercount.
+    let sizes: Option<BTreeMap<String, u64>> = (args.sizes && !narrowed).then(|| {
         repos
             .iter()
             .map(|repo| {
@@ -76,7 +104,7 @@ pub fn run<V: Backend, F: Forge>(
             })
             .collect()
     });
-    let unmanaged_repos = if repo.is_some() {
+    let unmanaged_repos = if args.repo.is_some() {
         Vec::new()
     } else {
         let clones = mori_store::init::find_clones(&paths.repos()).map_err(boxed)?;
@@ -111,6 +139,34 @@ fn add_size(db: &mut Database, row: &mut TreeRow, now: u64, fresh: bool) {
     row.size_bytes = size.bytes;
     row.size_partial = size.partial;
     row.size_measured_at = disk::measured_at(&size);
+}
+
+/// Whether the tree in `row`, of `repo`, passes the filters in `args`.
+fn matches(repo: &str, row: &TreeRow, args: &LsArgs) -> bool {
+    let tree = row.tree.clone().unwrap_or_default();
+    let query = args.query.as_deref().map(str::to_lowercase);
+    let found = query.is_none_or(|query| {
+        [repo, &tree.name, &tree.task, &tree.purpose]
+            .iter()
+            .any(|field| field.to_lowercase().contains(&query))
+    });
+    let owned = args
+        .owner
+        .as_deref()
+        .is_none_or(|owner| tree.owner == owner);
+    let state = row.state.clone().unwrap_or_default();
+    let in_state = args.status.is_none_or(|status| match status {
+        StatusFilter::Unsaved => {
+            row.status() == Status::Tree && (state.changed || state.unpushed > 0)
+        }
+        StatusFilter::Clean => {
+            row.status() == Status::Tree && !state.changed && state.unpushed == 0
+        }
+        StatusFilter::Landed => row.bookmarks.iter().any(|bookmark| bookmark.landed),
+        StatusFilter::Missing => row.status() == Status::Missing,
+        StatusFilter::Foreign => row.status() == Status::Foreign,
+    });
+    found && owned && in_state
 }
 
 fn list_repo(
@@ -166,6 +222,12 @@ fn list_repo(
     Ok(RepoTrees {
         repo: repo.remote.clone(),
         path: clone.display().to_string(),
+        context_dir: paths
+            .root
+            .join("context/projects")
+            .join(&repo.dir_name)
+            .display()
+            .to_string(),
         trees,
         vcs: if clone.exists() {
             crate::api_vcs(crate::routed::kind_of(&clone)).into()

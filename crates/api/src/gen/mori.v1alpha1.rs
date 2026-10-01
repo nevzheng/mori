@@ -235,6 +235,16 @@ pub struct ListTreesRequest {
     /// 15 minutes.
     #[prost(bool, tag = "3")]
     pub skip_size_cache: bool,
+    /// Only trees whose repo, name, task or purpose contains this text, ignoring case.
+    #[prost(string, tag = "4")]
+    pub query: ::prost::alloc::string::String,
+    /// Only trees with this owner.
+    #[prost(string, tag = "5")]
+    pub owner: ::prost::alloc::string::String,
+    /// Only trees in this state: "unsaved" (edits or unpushed changes), "clean", "landed" (a bookmark
+    /// the tree pushed has landed), "missing" or "foreign".
+    #[prost(string, tag = "6")]
+    pub status: ::prost::alloc::string::String,
 }
 /// Response for `ListTrees`.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -274,6 +284,9 @@ pub struct RepoTrees {
     /// Every tree mori recorded and every workspace the VCS reports, sorted by name.
     #[prost(message, repeated, tag = "3")]
     pub trees: ::prost::alloc::vec::Vec<TreeRow>,
+    /// The repo's context folder, `context/projects/<dir>/`: notes for people and agents.
+    #[prost(string, tag = "5")]
+    pub context_dir: ::prost::alloc::string::String,
     /// The VCS the clone uses, read from the clone.
     #[prost(enumeration = "Vcs", tag = "4")]
     pub vcs: i32,

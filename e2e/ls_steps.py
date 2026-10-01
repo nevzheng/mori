@@ -148,3 +148,13 @@ def pushed_landed(mori: Mori, name: str, bookmark: str) -> None:
         (seen[bookmark].get("onRemote", False), seen[bookmark].get("landed", False)),
         equal_to((False, True)),
     )
+
+
+@then(parsers.parse('the forest shows only the trees "{names}"'))
+def shows_only(mori: Mori, names: str) -> None:
+    listed = [
+        row["tree"]["name"]
+        for repo in json.loads(mori.last.stdout).get("repos", [])
+        for row in repo.get("trees", [])
+    ]
+    assert_that(listed, equal_to(names.split(", ")))

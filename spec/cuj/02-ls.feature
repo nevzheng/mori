@@ -92,3 +92,22 @@ Feature: CUJ 2 - see the forest
     When I run "mori ls nothing"
     Then it fails with status NOT_FOUND and reason "REPO_NOT_MANAGED"
 
+  Scenario: Trees can be found by owner and text
+    Given I have run "mori tree create widget --owner claude --task auth --purpose 'OAuth login'"
+    And I have run "mori tree create widget --owner codex --task docs"
+    When I run "mori ls --owner codex --json"
+    Then it succeeds
+    And the forest shows only the trees "codex-docs"
+    When I run "mori ls --query oauth --json"
+    Then the forest shows only the trees "claude-auth"
+
+  Scenario: Trees whose work landed can be found
+    Given I have run "mori tree create widget --owner claude --task fix-login"
+    And I have run "mori tree create widget --owner claude --task docs"
+    And someone commits work in "claude-fix-login"
+    And pushes it to the remote as "claude/fix-login"
+    And I have run "mori ls"
+    And the remote deletes "claude/fix-login" after a squash merge
+    When I run "mori ls --status landed --json"
+    Then it succeeds
+    And the forest shows only the trees "claude-fix-login"
