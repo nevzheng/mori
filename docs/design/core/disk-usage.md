@@ -55,14 +55,21 @@ Measure, show, and let gc act on a size target:
   times last), until the total reaches the target; the last pick may overshoot it. Missing trees
   free nothing and aren't picked. Without `--apply` it shows the plan; with `--apply --yes` it
   carries it out. Removed trees are journalled and restorable as always.
-- **Nudges toward shared caches.** Only where it can be read with certainty: a repo that builds
-  with Bazel (`MODULE.bazel` or `WORKSPACE`) with no `--disk_cache` or `--remote_cache` in any
-  bazelrc it reads; with Cargo (`Cargo.toml`) and no `rustc-wrapper` or `RUSTC_WRAPPER`; or with a
-  `package-lock.json` or `yarn.lock` (pnpm shares one store across trees). It gets a doctor
-  finding `NO_SHARED_CACHE` (info) and a one-line tip after `mori clone`, both linking the tips
-  page. C/C++ (ccache) and Gradle (its build cache) can be configured too many ways to check
-  reliably, so they get tips on the page and no check. The low-disk warning names `gc
-  --free` and the page too. mori only reads these files; it never edits them.
+- **Cache checks.** A family of doctor warnings, grouped by language, each shipped only where the
+  setting can be read with certainty. Every one leads with the reason: agents make many trees, and
+  each tree that builds from scratch costs disk.
+  - **Bazel** (`MODULE.bazel`, `WORKSPACE`): no `--disk_cache`, `--remote_cache` or
+    `--remote_executor` in any bazelrc it reads. Warning `NO_SHARED_CACHE`.
+  - **Cargo** (`Cargo.toml`): no `rustc-wrapper`, shared target directory, or matching env var
+    in any Cargo config. Warning `NO_SHARED_CACHE`.
+  - **ccache** (a `ccache.conf` exists): no `base_dir`, so trees never share cache hits. Warning
+    `CACHE_NOT_SHARED_ACROSS_TREES`.
+
+  The same warning shows once after `mori clone`. Go, uv, pip, Poetry, Maven, Conan, pnpm, Yarn,
+  npm downloads, NuGet and Pants share their caches by default and need no check. CMake launchers,
+  the Gradle build cache, Turborepo, Nx and Buck2 can be configured too many ways to check without
+  false alarms, so they get tips on the page and no check. mori only reads these files; it never
+  edits them.
 - **Opt-in limits.** `[disk]` in `config.toml` can set tree counts and disk budgets, none set by
   default. Each limit only warns and suggests the `gc --free` that fixes it. `[trees.lru] max`
   stays as it is: it decides which lru trees gc may remove, while these limits only warn.
@@ -109,9 +116,9 @@ Six CLs after this doc:
 2. gc sizes: bytes per item, reclaimable total, and `gc --free`.
 3. Bazel leftovers: found, sized, listed and removed by gc, and counted in tree sizes.
 4. Opt-in limits in `[disk]`.
-5. The shared-cache nudge: the `NO_SHARED_CACHE` doctor finding and the tip after `mori clone`.
-6. The "Disk usage tips" page (shared caches, sizing, sparse checkouts, what mori does for you)
-   and the `disk-usage` skill.
+5. The cache checks: Bazel, Cargo and ccache warnings in doctor, and the same after `mori clone`.
+6. The "Disk usage tips" page, grouped by language (shared caches, remote caches, sizing, sparse
+   checkouts, what mori does for you), and the `disk-usage` skill.
 
 ## Q8. How will we know it worked?
 
@@ -134,8 +141,8 @@ All additive. Sums (per repo, reclaimable, total used) are left to the client.
 - New enum `GcItem.Kind` (`KIND_UNSPECIFIED`, `KIND_TREE`, `KIND_BAZEL_LEFTOVER`) and
   `GcItem.kind`. A leftover is class remove, reason `ORPHANED`, path its output base.
 - `GcResponse.disk` and `GcResponse.warnings`.
-- New doctor finding code `NO_SHARED_CACHE`, severity info, subject the repo, fix a link to the
-  tips page.
+- New doctor finding codes `NO_SHARED_CACHE` and `CACHE_NOT_SHARED_ACROSS_TREES`, severity warn,
+  subject the repo, fix a link to the tips page.
 
 No new error reasons: `--free` with nothing safe to free is a plan with nothing picked.
 
@@ -203,11 +210,14 @@ selected 5 items, 214G. Run `mori gc --free 200G --apply --yes` to remove them.
   process). `install/` and `cache/` beside the bases have no `DO_NOT_BUILD_HERE` and are never
   touched. Read-only files are made writable first. Leftovers aren't journalled: they hold only
   cache.
-- The shared-cache check reads only: the system bazelrc (`/etc/bazel.bazelrc`), the repo's
-  `.bazelrc` and the files it imports, and `~/.bazelrc`, where `--disk_cache` or `--remote_cache`
-  in any section counts; and for Cargo, `$CARGO_HOME/config.toml` (default `~/.cargo`), the repo's
-  `.cargo/config.toml`, and `RUSTC_WRAPPER`, `CARGO_BUILD_RUSTC_WRAPPER` or a shared target
-  directory. The finding names what it checked, and isn't reported when a file can't be read.
+- The cache checks read only. Bazel: `/etc/bazel.bazelrc`, the tree's `.bazelrc`, `~/.bazelrc`
+  and each path in `$BAZELRC`, following `import` and `try-import`; a flag on a `build:<config>`
+  line counts as set, and a `tools/bazel` wrapper skips the check. Cargo: `.cargo/config.toml` in
+  the tree and every parent, and `$CARGO_HOME`'s, following `include`, plus `RUSTC_WRAPPER`,
+  `CARGO_BUILD_RUSTC_WRAPPER`, `RUSTC_WORKSPACE_WRAPPER`, `CARGO_TARGET_DIR`,
+  `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR`. An env var only ever proves a cache is
+  set, and a tree with `.envrc`, `mise.toml` or `devbox.json` (which set env elsewhere) is skipped.
+  A file that can't be read skips the check rather than warning.
 - `gc --free --apply` re-runs the safety checks per tree before removing it, as `--apply` does
   today.
 
@@ -236,10 +246,10 @@ Scenario: Bazel output left by a deleted tree is listed and removed
   When I run "mori gc --apply --yes"
   Then the output base is gone
 
-Scenario: A Bazel repo without a shared cache gets a tip
+Scenario: A Bazel repo without a shared cache gets a warning
   Given a repo with a MODULE.bazel and no disk or remote cache in any bazelrc
   When I run "mori doctor"
-  Then I see a NO_SHARED_CACHE finding that links the disk usage tips page
+  Then I see a NO_SHARED_CACHE warning that links the disk usage tips page
 
 Scenario: Limits only warn
   Given max_trees_per_repo is 1 and the repo has one task tree
