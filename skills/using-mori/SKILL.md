@@ -3,7 +3,8 @@ name: using-mori
 description: >-
   How to use the mori CLI, which keeps one clone per repo in a fixed layout and records the repos
   and trees it creates. Use when a task says to set up mori, clone a repo with mori, or work in a
-  directory under mori's root (default ~/mori), and before touching anything under that root.
+  directory under mori's root (default ~/mori), and before touching anything under that root;
+  start with `mori where` to learn which repo and tree you are in.
 ---
 
 # Using mori

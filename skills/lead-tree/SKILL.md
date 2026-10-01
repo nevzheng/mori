@@ -2,8 +2,9 @@
 name: lead-tree
 description: >-
   How to run a lead tree with mori: one long-lived tree where work from several agents is merged
-  and staged before review. Use when a task asks you to coordinate other agents' work, combine or
-  land their changes, or keep a stack of changes together, in a repo mori manages.
+  and staged, then handed to the person as one `ready/<topic>` to review from their root checkout.
+  Use when a task asks you to coordinate other agents' work, combine or land their changes, or
+  keep a stack of changes together, in a repo mori manages.
 ---
 
 # Running a lead tree

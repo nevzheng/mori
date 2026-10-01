@@ -8,7 +8,7 @@
 ## Skills
 
 - [using-mori](using-mori/SKILL.md): the commands, JSON output, errors and the rules agents follow when using mori
-- [lead-tree](lead-tree/SKILL.md): how to run a long-lived coordinating tree where several agents' work comes together
+- [lead-tree](lead-tree/SKILL.md): how to run a long-lived coordinating tree where several agents' work comes together, and hand it to the person as one `ready/<topic>`
 - [vcs-in-mori](vcs-in-mori/SKILL.md): jj and git in a mori repo: which works where, what's safe to mix, and the equivalents
 - [agent-workflows](agent-workflows/SKILL.md): coordinator and workers, exchanging work (change IDs, bookmarks, patches), restacking
 - [disk-usage](disk-usage/SKILL.md): keeping a forest from filling the disk: measuring, freeing space safely with gc, and cache warnings

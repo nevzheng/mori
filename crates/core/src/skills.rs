@@ -219,6 +219,8 @@ pub fn root_index() -> String {
      - `repos/<host>/<owner>/<repo>/`: one clone per repo, managed by `mori clone`\n\
      - `trees/<repo>/<name>/`: task trees, managed by `mori tree create` and `mori tree remove`\n\n\
      ## Start here\n\n\
+     - Run `mori where` in your directory: it says which repo and tree you are in, what the tree\n\
+     \x20 is for, and where the repo's notes are.\n\
      - [Context index](context/llms.txt): how to use mori, every skill, and each repo's notes\n\
      - [mori](https://nevzheng.github.io/mori/): the project's site and design docs\n\n\
      ## Getting started\n\n\

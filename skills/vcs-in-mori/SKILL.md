@@ -2,8 +2,8 @@
 name: vcs-in-mori
 description: >-
   How to use jj and git in a repo mori manages: jj clones and git clones, which tool works where,
-  what is safe to mix, and the jj and git commands for the same jobs. Use before running version-control commands in a mori
-  clone or tree, or when unsure whether to reach for jj or git.
+  what is safe to mix, and the jj and git commands for the same jobs. Use before running
+  version-control commands in a mori clone or tree, or when unsure whether to reach for jj or git.
 ---
 
 # jj and git in a mori repo
