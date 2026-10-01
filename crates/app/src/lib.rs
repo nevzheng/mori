@@ -17,6 +17,9 @@ mod state;
 pub mod tree;
 pub mod tree_remove;
 
+#[cfg(test)]
+mod tests;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use mori_core::error::ErrorDetails;
