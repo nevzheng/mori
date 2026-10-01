@@ -548,6 +548,7 @@ dependencies = [
 name = "mori-cli"
 version = "0.1.0-dev"
 dependencies = [
+ "anstyle",
  "clap",
  "clap_complete",
  "clap_mangen",

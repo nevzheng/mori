@@ -27,6 +27,14 @@ rust_binary(
 )
 
 rust_test(
+    name = "mori_unit_test",
+    size = "small",
+    crate = ":mori",
+    lint_config = ":lints",
+    deps = all_crate_deps(normal_dev = True),
+)
+
+rust_test(
     name = "cli_test",
     version = MORI_VERSION,
     size = "small",

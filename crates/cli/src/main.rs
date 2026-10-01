@@ -3,6 +3,7 @@
 //! Every failure is a `google.rpc.Status`, and the exit code is its canonical code's number: 0 for
 //! success, 3 for bad arguments, 9 for a failed precondition, and so on.
 
+mod look;
 mod output;
 
 use std::process::ExitCode;
@@ -25,8 +26,13 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// When to use colour: auto (on a terminal, unless `NO_COLOR` is set), always or never.
+    #[arg(long, global = true, value_enum, default_value_t, value_name = "WHEN")]
+    color: look::ColorWhen,
+
+    /// With no command, on a terminal: the forest at a glance.
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 /// The environment section of `mori --help`.
@@ -41,7 +47,9 @@ Every command takes --json for one JSON object on stdout. Guide: https://nevzhen
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Set up mori's root, config and database. Only adds things; safe to run again.
+    /// Set up mori's root, config, database and agent skills.
+    ///
+    /// Only adds things; safe to run again.
     #[command(after_help = "Examples:\n  mori init\n  mori init --dry-run")]
     Init {
         /// Show what would be created, and create nothing.
@@ -49,8 +57,10 @@ enum Command {
         dry_run: bool,
     },
 
-    /// Clone a repo into repos/<host>/<owner>/<repo> and record it. Refuses a repo mori already
-    /// has, and any directory it didn't make.
+    /// Clone a repo into the root and record it.
+    ///
+    /// The clone goes to repos/<host>/<owner>/<repo>. Refuses a repo mori already has, and any
+    /// directory it didn't make.
     #[command(
         after_help = "Examples:\n  mori clone github.com/acme/widget\n  mori clone --vcs git git@github.com:acme/widget.git\n  mori clone --dry-run https://github.com/acme/widget"
     )]
@@ -72,8 +82,10 @@ enum Command {
         vcs: Option<VcsKind>,
     },
 
-    /// Report which trees may be removed and whether each is safe to remove. With --apply --yes,
-    /// also remove a batch of them: each is checked again first, and each removal is journalled,
+    /// Find the trees that can go, and remove them safely.
+    ///
+    /// Reports which trees may be removed and whether each is safe to remove. With --apply --yes,
+    /// also removes a batch of them: each is checked again first, and each removal is journalled,
     /// so `mori restore` can undo it.
     #[command(
         after_help = "Examples:\n  mori gc                  # the report\n  mori gc --dry-run        # what --apply would remove\n  mori gc --apply --yes    # remove what can go"
@@ -112,8 +124,10 @@ enum Command {
         free: Option<u64>,
     },
 
-    /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
-    /// only on this machine. Reads only; never snapshots a working copy.
+    /// List the repos and their trees.
+    ///
+    /// For each tree: owner, task, lifetime, and work that exists only on this machine. Reads only;
+    /// never snapshots a working copy.
     #[command(after_help = "Examples:\n  mori ls\n  mori ls widget\n  mori ls --json")]
     Ls {
         /// Only this repo: its full name, any form `mori clone` accepts, or a unique short name.
@@ -129,9 +143,11 @@ enum Command {
         fresh: bool,
     },
 
-    /// Check the root, every clone and every tree against the VCS and the disk, and list each
-    /// problem with the command that fixes it. Reads only, unless --fix --yes repairs the safe
-    /// ones (removals are journalled for `mori restore`). Findings don't change the exit code.
+    /// Find drift between mori, the VCS and the disk, and fix what is safe.
+    ///
+    /// Checks the root, every clone and every tree, and lists each problem with the command that
+    /// fixes it. Reads only, unless --fix --yes repairs the safe ones (removals are journalled for
+    /// `mori restore`). Findings don't change the exit code.
     #[command(
         after_help = "Examples:\n  mori doctor\n  mori doctor --dry-run      # what --fix would repair\n  mori doctor --fix --yes"
     )]
@@ -152,21 +168,25 @@ enum Command {
         dry_run: bool,
     },
 
-    /// Bring back a tree `mori gc --apply` removed, from its journal entry: on its pinned commit, at
-    /// its old path, under its old record.
+    /// Bring back a removed tree.
+    ///
+    /// From its journal entry (given by `mori gc --apply` or `mori doctor --fix`): on its pinned
+    /// commit, at its old path, under its old record.
     #[command(after_help = "Examples:\n  mori restore j-1790000000-0a1b0002")]
     Restore {
         /// The journal entry, from `mori gc --apply`.
         entry: String,
     },
 
-    /// Agent skills in the root: mori's own, installed by `mori init`, and anyone else's.
+    /// Manage the agent skills in the root.
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
     },
 
-    /// Print shell completions for mori, e.g. `mori completions zsh > ~/.zfunc/_mori`.
+    /// Print shell completions.
+    ///
+    /// For example: `mori completions zsh > ~/.zfunc/_mori`.
     Completions {
         /// bash, zsh, fish, elvish or powershell.
         shell: clap_complete::Shell,
@@ -176,7 +196,7 @@ enum Command {
     #[command(hide = true)]
     Man,
 
-    /// Work with trees: the jj workspaces or git worktrees mori creates for tasks.
+    /// Create and remove trees: a jj workspace or git worktree per task.
     Tree {
         #[command(subcommand)]
         command: TreeCommand,
@@ -185,8 +205,9 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum SkillsCommand {
-    /// Update mori's skills and the llms.txt indexes to this mori's version. Changes only files
-    /// mori wrote and nobody edited; never touches anyone else's skills.
+    /// Update mori's skills and the llms.txt indexes to this version.
+    ///
+    /// Changes only files mori wrote and nobody edited; never touches anyone else's skills.
     #[command(after_help = "Examples:\n  mori skills sync\n  mori skills sync --dry-run")]
     Sync {
         /// Show what would change, and write nothing.
@@ -197,9 +218,10 @@ enum SkillsCommand {
 
 #[derive(Debug, Subcommand)]
 enum TreeCommand {
-    /// Give one task its own tree under trees/<repo>/, on top of trunk, recorded with its owner,
-    /// task and lifetime. In a jj clone it is a jj workspace; in a git clone, a detached git
-    /// worktree.
+    /// Give one task its own tree.
+    ///
+    /// The tree goes under trees/<repo>/, on top of trunk, recorded with its owner, task and
+    /// lifetime. In a jj clone it is a jj workspace; in a git clone, a detached git worktree.
     #[command(
         after_help = "Examples:\n  mori tree create widget --task fix-login --agent claude\n  mori tree create widget --task lead --lifetime pinned\n  mori tree create widget --task spike --lifetime ttl:3d --from main"
     )]
@@ -229,9 +251,10 @@ enum TreeCommand {
         dry_run: bool,
     },
 
-    /// Remove a task tree, only when nothing in it exists only on this machine: no edits and no
-    /// change missing from the remote. Never removes the clone itself or a workspace mori didn't
-    /// make.
+    /// Remove a tree whose work is safe elsewhere.
+    ///
+    /// Only when nothing in it exists only on this machine: no edits and no change missing from
+    /// the remote. Never removes the clone itself or a workspace mori didn't make.
     #[command(
         after_help = "Examples:\n  mori tree remove widget claude-fix-login\n  mori tree remove widget claude-fix-login --dry-run"
     )]
@@ -257,17 +280,35 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return output::usage_error(&error),
     };
+    look::init(cli.color, cli.json);
     let app = real_app();
-    if matches!(cli.command, Command::Init { .. } | Command::Ls { .. }) {
+    let Some(command) = cli.command else {
+        return dashboard(&app, cli.json);
+    };
+    if matches!(command, Command::Init { .. } | Command::Ls { .. }) {
         skills::stale_hint(&app.host);
     }
-    dispatch(&app, cli)
+    dispatch(&app, cli.json, command)
+}
+
+/// `mori` with no command: the forest at a glance on a terminal (or with `--json`, the same as
+/// `mori ls --json`); elsewhere, the help, as a usage error.
+fn dashboard(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool) -> ExitCode {
+    use std::io::IsTerminal;
+    if !json && !std::io::stdout().is_terminal() {
+        let _ = Cli::command().print_help();
+        return ExitCode::from(3);
+    }
+    respond(
+        json,
+        ls::run(app, &ls::LsArgs::default()),
+        output::forest_text,
+    )
 }
 
 /// Runs the parsed command and prints its result.
-fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
-    let json = cli.json;
-    match cli.command {
+fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Command) -> ExitCode {
+    match command {
         Command::Init { dry_run } => {
             respond(json, init::run(&app.host, dry_run), output::init_text)
         }
