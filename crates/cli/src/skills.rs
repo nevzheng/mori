@@ -26,9 +26,19 @@ pub fn run(paths: &Paths, mode: Mode, dry_run: bool) -> Result<Outcome, Box<dyn 
     } else {
         mori_store::skills::migrate_legacy(paths).map_err(boxed)?
     };
+    let repos = repo_contexts(paths)?;
     let observed = mori_store::skills::observe(paths).map_err(boxed)?;
-    let steps = mori_store::skills::sync_plan(&observed, mode, &repo_contexts(paths)?);
-    let created = created(paths, &steps);
+    let steps = mori_store::skills::sync_plan(&observed, mode, &repos);
+    let mut created = created(paths, &steps);
+    if !dry_run {
+        // Repos cloned before context folders existed get theirs now.
+        for repo in &repos {
+            for path in mori_store::skills::ensure_repo_context(paths, repo).map_err(boxed)? {
+                let is_dir = path.is_dir();
+                created.push((path, is_dir));
+            }
+        }
+    }
     if !dry_run {
         mori_store::skills::apply(paths, &steps, observed.manifest).map_err(boxed)?;
     }
@@ -131,4 +141,13 @@ pub fn stale_hint() {
             paths.root.join("skills").display()
         );
     }
+}
+
+/// After a clone: the repo's context folder, and the indexes listing it. Returns the folder.
+pub fn after_clone(paths: &Paths, repo: &RepoContext) -> Result<PathBuf, Box<dyn ErrorDetails>> {
+    mori_store::skills::ensure_repo_context(paths, repo).map_err(boxed)?;
+    let observed = mori_store::skills::observe(paths).map_err(boxed)?;
+    let steps = mori_store::skills::index_plan(&observed, &repo_contexts(paths)?);
+    mori_store::skills::apply(paths, &steps, observed.manifest).map_err(boxed)?;
+    Ok(paths.root.join("context/projects").join(&repo.dir))
 }

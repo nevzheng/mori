@@ -8,6 +8,7 @@ use mori_core::clone::{
 };
 use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::paths::Paths;
+use mori_core::skills::RepoContext;
 use mori_core::tree::Lifetime;
 use mori_core::tree_create::default_owner;
 use mori_jj::JjCli;
@@ -31,8 +32,16 @@ pub fn run(
     if !dry_run {
         clone(&plan)?;
         record(&mut db, &plan)?;
+        let repo = RepoContext {
+            dir: plan.tree_dir.clone(),
+            repo: plan.url.repo.to_string(),
+        };
+        // The clone is made and recorded; its context folder is a convenience on top.
+        if let Err(error) = crate::skills::after_clone(&paths, &repo) {
+            eprintln!("note: couldn't set up the repo's context folder: {error}");
+        }
     }
-    Ok(response(&plan, dry_run))
+    Ok(response(&paths, &plan, dry_run))
 }
 
 fn observe(
@@ -97,7 +106,7 @@ fn record(db: &mut Database, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetail
     })
 }
 
-fn response(plan: &ClonePlan, dry_run: bool) -> CloneResponse {
+fn response(paths: &Paths, plan: &ClonePlan, dry_run: bool) -> CloneResponse {
     CloneResponse {
         repo: plan.url.repo.to_string(),
         path: plan.path.display().to_string(),
@@ -105,5 +114,11 @@ fn response(plan: &ClonePlan, dry_run: bool) -> CloneResponse {
         colocated: plan.colocate,
         tree_dir: plan.tree_dir.clone(),
         validate_only: dry_run,
+        context_dir: paths
+            .root
+            .join("context/projects")
+            .join(&plan.tree_dir)
+            .display()
+            .to_string(),
     }
 }

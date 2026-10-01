@@ -128,6 +128,10 @@ message CloneResponse {
 
   // Echoes the request: true if nothing was actually cloned.
   bool validate_only = 6;
+
+  // The repo's context folder, `context/projects/<tree_dir>/`: notes and context for it, for people and
+  // every agent. Created with the clone.
+  string context_dir = 7;
 }
 
 // A tree mori created.

@@ -34,6 +34,13 @@ Everything agents should know lives under `context/` in the root, indexed by `co
 (start from the root's `llms.txt`). mori's skills are in `context/skills/<name>/SKILL.md`, where
 `mori init` installs them; skills of your own go beside them, and the index lists them too.
 
+### A repo's context folder
+
+Every repo mori clones gets `context/projects/<repo>/` (named like its `trees/<repo>/` folder),
+listed in `context/llms.txt`. Before working on a repo, read what is there; put notes, plans and
+anything the next agent should know there too. It is shared by the person and every agent and
+harness, and mori never changes it after writing its starter `README.md`.
+
 ## The layout
 
 ```text

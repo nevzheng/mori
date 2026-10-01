@@ -162,7 +162,7 @@ pub fn skill_info(dir: &str, skill_md: &str) -> SkillInfo {
 /// A cloned repo's context folder, for the index.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RepoContext {
-    /// Its directory under `context/`, e.g. `widget`.
+    /// Its directory under `context/projects/`, e.g. `widget`.
     pub dir: String,
     /// The repo, e.g. `github.com/acme/widget`.
     pub repo: String,
@@ -179,7 +179,7 @@ pub fn context_index(skills: &[SkillInfo], repos: &[RepoContext]) -> String {
     let mut text = String::from(
         "# Context\n\n\
          > What agents working under this root should know. `skills/<name>/SKILL.md` are skills,\n\
-         > mori's and anyone else's side by side; each `<repo>/` folder holds notes and context for\n\
+         > mori's and anyone else's side by side; each `projects/<repo>/` folder holds notes and context for\n\
          > one cloned repo, for people and every agent alike. mori generates this index and changes\n\
          > only the files it wrote.\n\n\
          ## Skills\n\n",
@@ -194,7 +194,11 @@ pub fn context_index(skills: &[SkillInfo], repos: &[RepoContext]) -> String {
     if !repos.is_empty() {
         text.push_str("\n## Repos\n\n");
         for repo in &repos {
-            let _ = writeln!(text, "- [{}]({}/): {}", repo.dir, repo.dir, repo.repo);
+            let _ = writeln!(
+                text,
+                "- [{}](projects/{}/): {}",
+                repo.dir, repo.dir, repo.repo
+            );
         }
     }
     text
@@ -328,7 +332,7 @@ mod tests {
             [
                 "- [a-flow](skills/a-flow/SKILL.md): Mine.",
                 "- [using-mori](skills/using-mori/SKILL.md): Use mori.",
-                "- [widget](widget/): github.com/acme/widget",
+                "- [widget](projects/widget/): github.com/acme/widget",
             ]
         );
     }

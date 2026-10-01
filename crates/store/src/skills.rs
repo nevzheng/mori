@@ -185,18 +185,61 @@ pub fn sync_plan(observed: &Observed, mode: Mode, repos: &[RepoContext]) -> Vec<
             skills.push(skill_info(dir, contents));
         }
     }
-    let indexes = vec![
+    steps.extend(plan(
+        indexes(&skills, repos),
+        &observed.on_disk,
+        &observed.manifest,
+        mode,
+    ));
+    steps
+}
+
+/// Plans only the two indexes, as a sync would: for when the list of repos changed (a clone) but
+/// the skills didn't.
+#[must_use]
+pub fn index_plan(observed: &Observed, repos: &[RepoContext]) -> Vec<Step> {
+    plan(
+        indexes(&observed.skills, repos),
+        &observed.on_disk,
+        &observed.manifest,
+        Mode::Sync,
+    )
+}
+
+fn indexes(skills: &[SkillInfo], repos: &[RepoContext]) -> Vec<Wanted> {
+    vec![
         Wanted {
             path: CONTEXT_INDEX.to_owned(),
-            contents: context_index(&skills, repos),
+            contents: context_index(skills, repos),
         },
         Wanted {
             path: ROOT_INDEX.to_owned(),
             contents: root_index(),
         },
-    ];
-    steps.extend(plan(indexes, &observed.on_disk, &observed.manifest, mode));
-    steps
+    ]
+}
+
+/// Gives a cloned repo its context folder, `context/projects/<dir>/`, with a starter README, if the folder
+/// doesn't exist yet. Returns what it created. An existing folder is the person's: it is never
+/// changed, even if it has no README.
+///
+/// # Errors
+///
+/// I/O errors.
+pub fn ensure_repo_context(paths: &Paths, repo: &RepoContext) -> Result<Vec<PathBuf>, StoreError> {
+    let dir = paths.root.join("context/projects").join(&repo.dir);
+    if dir.symlink_metadata().is_ok() {
+        return Ok(Vec::new());
+    }
+    std::fs::create_dir_all(&dir).map_err(|source| io(&dir, source))?;
+    let readme = dir.join("README.md");
+    let text = format!(
+        "# {}\n\nNotes, plans and context for this repo, for people and every agent working on it.\n\
+         Anything goes: mori wrote this file once and won't change it.\n",
+        repo.repo
+    );
+    replace(&readme, &text)?;
+    Ok(vec![dir, readme])
 }
 
 /// Moves a root from the old layout (`skills/` and `skills/llms.txt` at the top) to `context/`:
@@ -504,5 +547,34 @@ mod tests {
                 .join("context/skills/lead-tree/SKILL.md")
                 .is_file()
         );
+    }
+
+    #[test]
+    fn a_repo_gets_a_context_folder_once() {
+        let home = tempfile::tempdir().unwrap();
+        let paths = paths(home.path());
+        let widget = RepoContext {
+            dir: "widget".to_owned(),
+            repo: "github.com/acme/widget".to_owned(),
+        };
+
+        let created = ensure_repo_context(&paths, &widget).unwrap();
+
+        let readme = paths.root.join("context/projects/widget/README.md");
+        assert_eq!(
+            created,
+            [paths.root.join("context/projects/widget"), readme.clone()]
+        );
+        assert!(
+            std::fs::read_to_string(&readme)
+                .unwrap()
+                .starts_with("# github.com/acme/widget\n")
+        );
+        std::fs::write(&readme, "mine\n").unwrap();
+        assert_eq!(
+            ensure_repo_context(&paths, &widget).unwrap(),
+            Vec::<PathBuf>::new()
+        );
+        assert_eq!(std::fs::read_to_string(&readme).unwrap(), "mine\n");
     }
 }
