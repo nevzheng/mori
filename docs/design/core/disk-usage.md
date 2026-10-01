@@ -46,8 +46,8 @@ Measure, show, and let gc act on a size target:
   Plain `ls` doesn't measure.
 - **Free space.** Every `ls` and `tree create` reads free space on the disk under the root (one
   `statvfs` call, instant) and warns below a floor: 10% free by default.
-- **Bazel leftovers.** An output base whose workspace is a tree path mori recorded (a tree row whose
-  directory is gone, or a journalled removal) and no longer exists belongs to a tree mori deleted.
+- **Bazel leftovers.** An output base whose workspace was inside mori's `trees/` directory and no
+  longer exists belongs to a tree mori deleted (or someone deleted by hand).
   Nothing can use it again. gc lists leftovers as safe to remove, unless a Bazel server still
   runs on it.
 - **`gc --free <size>`.** From the trees gc already classed as safe to remove, plus leftovers, it
@@ -203,13 +203,14 @@ selected 5 items, 214G. Run `mori gc --free 200G --apply --yes` to remove them.
   fails the command.
 - The walk never follows symlinks and stays on one filesystem, so a link to `/` can't make a tree
   look huge or make mori read outside it.
-- A leftover is removed only if its `DO_NOT_BUILD_HERE` (trimmed) names a tree path mori
-  recorded that doesn't exist, compared by path components after resolving symlinks (so
-  `/home/acme/mori2` never matches `/home/acme/mori`), the base itself is a direct child of the
-  Bazel output user root, and no Bazel server runs on it (`server/server.pid.txt` names no live
-  process). `install/` and `cache/` beside the bases have no `DO_NOT_BUILD_HERE` and are never
-  touched. Read-only files are made writable first. Leftovers aren't journalled: they hold only
-  cache.
+- A leftover is removed only if its `DO_NOT_BUILD_HERE` (trimmed) names a path inside mori's
+  `trees/` directory that doesn't exist, compared by path components and also with symlinks
+  resolved (so `/home/acme/mori2` never matches `/home/acme/mori`), the base itself is a direct
+  child of the Bazel output user root, and no Bazel server runs on it (`server/server.pid.txt`
+  names no live process, or can't be read). Only mori makes directories in `trees/`, and this also
+  catches trees removed cleanly, which leave no journal entry. `install/` and `cache/` beside the
+  bases have no `DO_NOT_BUILD_HERE` and are never touched. Read-only files are made writable
+  first. Leftovers aren't journalled: they hold only cache.
 - The cache checks read only. Bazel: `/etc/bazel.bazelrc`, the tree's `.bazelrc`, `~/.bazelrc`
   and each path in `$BAZELRC`, following `import` and `try-import`; a flag on a `build:<config>`
   line counts as set, and a `tools/bazel` wrapper skips the check. Cargo: `.cargo/config.toml` in

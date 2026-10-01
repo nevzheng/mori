@@ -547,6 +547,9 @@ pub struct GcItem {
     /// may go (classes remove, blocked and keep); 0 for the others and for missing trees.
     #[prost(uint64, tag = "9")]
     pub size_bytes: u64,
+    /// What the item is.
+    #[prost(enumeration = "gc_item::Kind", tag = "10")]
+    pub kind: i32,
 }
 /// Nested message and enum types in `GcItem`.
 pub mod gc_item {
@@ -628,6 +631,40 @@ pub mod gc_item {
                 "OUTCOME_WOULD_REMOVE" => Some(Self::WouldRemove),
                 "OUTCOME_SKIPPED_CHANGED" => Some(Self::SkippedChanged),
                 "OUTCOME_SKIPPED_UNSAVED" => Some(Self::SkippedUnsaved),
+                _ => None,
+            }
+        }
+    }
+    /// What the item is.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Kind {
+        /// Not set; read as a tree.
+        Unspecified = 0,
+        /// A tree.
+        Tree = 1,
+        /// A Bazel output base left by a tree mori deleted: only cache, never journalled. `name` is the
+        /// tree's name, `path` the output base, and reason `ORPHANED`.
+        BazelLeftover = 2,
+    }
+    impl Kind {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "KIND_UNSPECIFIED",
+                Self::Tree => "KIND_TREE",
+                Self::BazelLeftover => "KIND_BAZEL_LEFTOVER",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "KIND_UNSPECIFIED" => Some(Self::Unspecified),
+                "KIND_TREE" => Some(Self::Tree),
+                "KIND_BAZEL_LEFTOVER" => Some(Self::BazelLeftover),
                 _ => None,
             }
         }

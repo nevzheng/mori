@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Condvar, Mutex, PoisonError};
 
-use mori_core::disk::Space;
+use mori_core::disk::{OutputBase, Space};
 
 use crate::StoreError;
 
@@ -191,6 +191,93 @@ fn parse_df(stdout: &str) -> Option<Space> {
     })
 }
 
+/// Every Bazel output base directly under `user_root`: the directories with a
+/// `DO_NOT_BUILD_HERE` file. `install/`, `cache/` and anything else are skipped. A missing root
+/// has none.
+#[must_use]
+pub fn output_bases(user_root: &Path) -> Vec<OutputBase> {
+    let Ok(entries) = std::fs::read_dir(user_root) else {
+        return Vec::new();
+    };
+    let mut bases: Vec<OutputBase> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| {
+            let path = entry.path();
+            let named = std::fs::read_to_string(path.join("DO_NOT_BUILD_HERE")).ok()?;
+            let workspace = PathBuf::from(named.trim());
+            Some(OutputBase {
+                workspace_exists: workspace.symlink_metadata().is_ok(),
+                server_running: server_running(&path),
+                workspace,
+                path,
+            })
+        })
+        .collect();
+    bases.sort_by(|a, b| a.path.cmp(&b.path));
+    bases
+}
+
+/// Whether a Bazel server may still run on `base`: its pid file names a live process, or can't
+/// be read. Unsure counts as running, so mori never deletes under a live server.
+fn server_running(base: &Path) -> bool {
+    let pid_file = base.join("server/server.pid.txt");
+    match std::fs::read_to_string(&pid_file) {
+        Err(error) => error.kind() != std::io::ErrorKind::NotFound,
+        Ok(text) => match text.trim().parse::<u32>() {
+            Err(_) => true,
+            Ok(pid) => Command::new("kill")
+                .arg("-0")
+                .arg(pid.to_string())
+                .output()
+                .map_or(true, |output| output.status.success()),
+        },
+    }
+}
+
+/// Deletes an output base. Bazel makes parts of it read-only, so everything in it is made
+/// writable by its owner first. Symlinks are deleted, never followed.
+///
+/// # Errors
+///
+/// [`StoreError::Io`] if it can't be deleted.
+pub fn remove_output_base(base: &Path) -> Result<(), StoreError> {
+    make_writable(base);
+    match std::fs::remove_dir_all(base) {
+        Err(source) if source.kind() != std::io::ErrorKind::NotFound => Err(StoreError::Io {
+            path: base.to_path_buf(),
+            source,
+        }),
+        _ => Ok(()),
+    }
+}
+
+fn make_writable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let Ok(meta) = path.symlink_metadata() else {
+        return;
+    };
+    if meta.file_type().is_symlink() {
+        return;
+    }
+    let mode = meta.permissions().mode();
+    if mode & 0o200 == 0 || (meta.is_dir() && mode & 0o700 != 0o700) {
+        let wanted = if meta.is_dir() {
+            mode | 0o700
+        } else {
+            mode | 0o200
+        };
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(wanted));
+    }
+    if meta.is_dir()
+        && let Ok(entries) = std::fs::read_dir(path)
+    {
+        for entry in entries.filter_map(Result::ok) {
+            make_writable(&entry.path());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,6 +345,74 @@ mod tests {
             })
         );
         assert_eq!(parse_df("Filesystem\n"), None);
+    }
+
+    fn fake_base(root: &Path, hash: &str, workspace: &Path) -> PathBuf {
+        let base = root.join(hash);
+        std::fs::create_dir_all(base.join("execroot/_main")).unwrap();
+        std::fs::write(
+            base.join("DO_NOT_BUILD_HERE"),
+            format!("{}\n", workspace.display()),
+        )
+        .unwrap();
+        base
+    }
+
+    #[test]
+    fn output_bases_are_the_directories_naming_a_workspace() {
+        let root = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().unwrap();
+        fake_base(root.path(), "aaa", workspace.path());
+        fake_base(root.path(), "bbb", &workspace.path().join("gone"));
+        std::fs::create_dir_all(root.path().join("install/1234")).unwrap();
+
+        let bases = output_bases(root.path());
+
+        assert_eq!(bases.len(), 2, "{bases:?}");
+        assert_eq!(bases[0].workspace, workspace.path());
+        assert!(bases[0].workspace_exists);
+        assert!(!bases[1].workspace_exists);
+        assert!(!bases[1].server_running);
+        assert_eq!(output_bases(&root.path().join("missing")), []);
+    }
+
+    #[test]
+    fn a_live_or_unreadable_server_pid_counts_as_running() {
+        let root = tempfile::tempdir().unwrap();
+        let base = fake_base(root.path(), "aaa", Path::new("/nowhere"));
+        std::fs::create_dir_all(base.join("server")).unwrap();
+
+        std::fs::write(
+            base.join("server/server.pid.txt"),
+            std::process::id().to_string(),
+        )
+        .unwrap();
+        assert!(server_running(&base));
+        std::fs::write(base.join("server/server.pid.txt"), "not a pid").unwrap();
+        assert!(server_running(&base));
+        std::fs::remove_file(base.join("server/server.pid.txt")).unwrap();
+        assert!(!server_running(&base));
+    }
+
+    #[test]
+    fn a_read_only_output_base_is_removed() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("keep"), b"keep").unwrap();
+        let base = fake_base(root.path(), "aaa", Path::new("/nowhere"));
+        let sealed = base.join("execroot/_main/external");
+        std::fs::create_dir_all(&sealed).unwrap();
+        std::fs::write(sealed.join("file"), b"x").unwrap();
+        std::os::unix::fs::symlink(outside.path(), base.join("link")).unwrap();
+        std::fs::set_permissions(sealed.join("file"), std::fs::Permissions::from_mode(0o444))
+            .unwrap();
+        std::fs::set_permissions(&sealed, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        remove_output_base(&base).unwrap();
+
+        assert!(!base.exists());
+        assert!(outside.path().join("keep").exists());
     }
 
     #[test]

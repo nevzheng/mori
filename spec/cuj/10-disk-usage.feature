@@ -68,3 +68,24 @@ Feature: CUJ 10 - see what the forest costs
     When I run "mori gc --offline --free 1M --apply --yes"
     Then it succeeds
     And only one of "claude-fix-login" and "claude-fix-signup" is left
+
+  Scenario: Bazel output left by a deleted tree is listed and removed, and nothing else
+    Given config.toml points the Bazel output user root at "<home>/bazel-root"
+    And Bazel has an output base for "<home>/mori/trees/widget/claude-fix-login"
+    And Bazel has an output base for "<home>/src/project"
+    And I have run "mori tree remove github.com/acme/widget claude-fix-login"
+    When I run "mori gc --offline --json"
+    Then it succeeds
+    And gc lists the Bazel output of "claude-fix-login" as safe to remove
+    And gc lists no Bazel output of "project"
+    When I run "mori gc --offline --apply --yes"
+    Then it succeeds
+    And the Bazel output base for "<home>/mori/trees/widget/claude-fix-login" is gone
+    And the Bazel output base for "<home>/src/project" is still there
+
+  Scenario: Bazel output of a tree that still exists is never a leftover
+    Given config.toml points the Bazel output user root at "<home>/bazel-root"
+    And Bazel has an output base for "<home>/mori/trees/widget/claude-fix-login"
+    When I run "mori gc --offline --json"
+    Then it succeeds
+    And gc lists no Bazel output of "claude-fix-login"

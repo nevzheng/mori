@@ -80,7 +80,10 @@ impl Config {
              # Warn when free space on the disk under the root drops below this: a share of the\n\
              # disk or a size such as \"200G\". \"0%\" turns the warning off.\n\
              # [disk]\n\
-             # warn_below = \"10%\"\n"
+             # warn_below = \"10%\"\n\
+             # Where Bazel keeps output bases, if you moved it with --output_user_root. `mori gc`\n\
+             # removes the ones left by deleted trees.\n\
+             # bazel_output_user_root = \"/fast/bazel\"\n"
         ))
     }
 }

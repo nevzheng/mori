@@ -4,6 +4,7 @@
 //! the decision to the person; see `docs/design/core/disk-usage.md`.
 
 use std::fmt;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use serde::Deserialize;
@@ -14,6 +15,8 @@ use serde::Deserialize;
 pub struct DiskPolicy {
     /// Warn when free space on the disk under the root drops below this.
     pub warn_below: Floor,
+    /// Where Bazel keeps output bases, if not the platform default (`--output_user_root`).
+    pub bazel_output_user_root: Option<PathBuf>,
 }
 
 /// How little free space is too little: a share of the disk, or a size.
@@ -150,6 +153,43 @@ pub fn pick_to_free(candidates: &[Candidate], target: u64) -> Vec<usize> {
         picked.push(index);
     }
     picked
+}
+
+/// The default Bazel output user root for `user` with home `home`: under `~/.cache/bazel` on
+/// Linux, `/private/var/tmp` on macOS.
+#[must_use]
+pub fn default_bazel_output_user_root(home: &Path, user: &str, macos: bool) -> PathBuf {
+    if macos {
+        PathBuf::from(format!("/private/var/tmp/_bazel_{user}"))
+    } else {
+        home.join(".cache/bazel").join(format!("_bazel_{user}"))
+    }
+}
+
+/// A Bazel output base, as found on disk.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutputBase {
+    /// The output base directory.
+    pub path: PathBuf,
+    /// The workspace it was built from, as its `DO_NOT_BUILD_HERE` names it.
+    pub workspace: PathBuf,
+    /// Whether the workspace directory still exists.
+    pub workspace_exists: bool,
+    /// Whether a Bazel server may still run on it (a live or unreadable pid file).
+    pub server_running: bool,
+}
+
+/// Whether `base` is output left by a tree mori deleted: its workspace was inside mori's `trees/`
+/// directory (`trees_dirs` holds each spelling of it, compared by path components), that
+/// workspace is gone, and no Bazel server runs on it. Only mori makes directories in `trees/`, so
+/// nothing else is ever a leftover.
+#[must_use]
+pub fn is_leftover(base: &OutputBase, trees_dirs: &[PathBuf]) -> bool {
+    !base.workspace_exists
+        && !base.server_running
+        && trees_dirs
+            .iter()
+            .any(|dir| base.workspace != *dir && base.workspace.starts_with(dir))
 }
 
 /// How long a measured size is reused before `ls --size` or `gc` measures again.
@@ -364,6 +404,60 @@ mod tests {
         assert_eq!(pick_to_free(&candidates, 5 * G), [2]);
         assert_eq!(pick_to_free(&candidates, 6 * G), [2, 0]);
         assert_eq!(pick_to_free(&candidates, 100 * G), [2, 0]);
+    }
+
+    #[test]
+    fn a_leftover_is_only_a_gone_tree_mori_made_with_no_server() {
+        let trees = [PathBuf::from("/home/acme/mori/trees")];
+        let leftover = |workspace: &str, exists: bool, running: bool| {
+            is_leftover(
+                &OutputBase {
+                    path: PathBuf::from("/home/acme/.cache/bazel/_bazel_acme/abc"),
+                    workspace: PathBuf::from(workspace),
+                    workspace_exists: exists,
+                    server_running: running,
+                },
+                &trees,
+            )
+        };
+
+        assert!(leftover(
+            "/home/acme/mori/trees/widget/claude-fix",
+            false,
+            false
+        ));
+        assert!(!leftover(
+            "/home/acme/mori/trees/widget/claude-fix",
+            true,
+            false
+        ));
+        assert!(!leftover(
+            "/home/acme/mori/trees/widget/claude-fix",
+            false,
+            true
+        ));
+        assert!(!leftover("/home/acme/src/other", false, false));
+        assert!(!leftover(
+            "/home/acme/mori2/trees/widget/claude-fix",
+            false,
+            false
+        ));
+        assert!(!leftover("/home/acme/mori/treesx/widget/a", false, false));
+        assert!(!leftover("/home/acme/mori/trees", false, false));
+    }
+
+    #[test]
+    fn the_bazel_root_follows_the_platform() {
+        let home = Path::new("/home/acme");
+
+        assert_eq!(
+            default_bazel_output_user_root(home, "acme", false),
+            PathBuf::from("/home/acme/.cache/bazel/_bazel_acme")
+        );
+        assert_eq!(
+            default_bazel_output_user_root(home, "acme", true),
+            PathBuf::from("/private/var/tmp/_bazel_acme")
+        );
     }
 
     #[test]
