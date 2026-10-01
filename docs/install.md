@@ -1,12 +1,12 @@
 # Install and release channels
 
 mori ships through **channels**. A channel is a promise about where a build comes from and how
-often it changes. There is one channel today, and a second is coming.
+often it changes. There are two.
 
-| Channel     | What it is                                         | How you get it                       | Who it's for                  |
-| ----------- | -------------------------------------------------- | ------------------------------------ | ----------------------------- |
-| **head**    | Every commit on `main`, as soon as it merges       | `cargo install --git` (below)        | Dogfooding, and contributors  |
-| **release** | Tagged versions, `v0.1.0-alpha.1` onward (planned) | Prebuilt binaries on GitHub Releases | Everyone else, once it exists |
+| Channel     | What it is                                   | How you get it                       | Who it's for                 |
+| ----------- | -------------------------------------------- | ------------------------------------ | ---------------------------- |
+| **head**    | Every commit on `main`, as soon as it merges | `cargo install --git` (below)        | Dogfooding, and contributors |
+| **release** | Tagged versions, `v0.1.0-alpha.1` onward     | Prebuilt binaries on GitHub Releases | Everyone else                |
 
 **Dogfooding is head.** There is no separate dogfood channel: the people building mori use what is
 on `main`, so the bugs they hit are the bugs in head. A third channel would only be worth having
@@ -37,18 +37,25 @@ mori skills sync
 `mori init` and `mori ls` print a one-line hint when the installed skills came from a different
 mori than the one you're running.
 
-## release (planned)
+## release
 
-The first tag, the pre-release `v0.1.0-alpha.1`, is cut once mori has been dogfooded:
+Each release on [GitHub Releases](https://github.com/nevzheng/mori/releases) has `mori` for macOS
+(Apple silicon and Intel) and Linux (x86-64 and arm64), each archive with its SHA-256 checksum.
+Pre-releases (`-alpha.N`) are marked as such. Download the archive for your machine, check it,
+and put `mori` on your `PATH`:
 
-- a week of daily use with no lost work;
-- `mori doctor` built, to find and fix drift between mori's records and the disk;
-- no open papercuts that would confuse an agent.
+```sh
+shasum -a 256 -c mori-v0.1.0-alpha.1-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf mori-v0.1.0-alpha.1-aarch64-apple-darwin.tar.gz
+cp mori-v0.1.0-alpha.1-aarch64-apple-darwin/mori ~/.local/bin/
+```
 
-A tag `vX.Y.Z` builds `mori` for macOS (Apple silicon and Intel) and Linux (x86-64 and arm64) and
-attaches the archives and their SHA-256 checksums to a GitHub release. A release's version has no
-`-dev` suffix. Until then, head is the only channel. When and how releases are cut, and what they
-promise, is the [release policy](releases.md).
+On macOS, a binary a browser downloaded is quarantined until you clear it:
+`xattr -d com.apple.quarantine ~/.local/bin/mori`.
+
+Releases are immutable, and GitHub attests to each one (`gh release verify v0.1.0-alpha.1 -R
+nevzheng/mori`). When and how releases are cut, and what they promise, is the
+[release policy](releases.md).
 
 ## Which one am I running?
 
