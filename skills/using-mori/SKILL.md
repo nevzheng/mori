@@ -240,6 +240,13 @@ mori tree, or before handing out work. Findings don't change its exit code (0); 
 - With `--json`, findings are in `findings[]` with `code`, `severity`, `subject`, `message`, `fix`
   and `autoFixable`.
 
+### `mori mcp`
+
+Serves mori to MCP clients over stdio: `mori_where`, `mori_projects`, `mori_trees`, `mori_doctor`
+(read only), and `mori_tree_create` and `mori_tree_set` (records only). If your harness has these
+tools, use them the same way as the commands; removing, `gc --apply` and `doctor --fix` are CLI
+only, for the person.
+
 ### `mori skills sync`
 
 Updates mori's skills in the root (`context/skills/`, and the `context/llms.txt` and `llms.txt`

@@ -23,6 +23,7 @@ rust_binary(
         "//crates/git:mori_git",
         "//crates/github:mori_github",
         "//crates/jj:mori_jj",
+        "//crates/mcp:mori_mcp",
     ],
 )
 

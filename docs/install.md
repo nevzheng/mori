@@ -68,5 +68,14 @@ mori completions zsh > ~/.zfunc/_mori    # or bash, fish, elvish, powershell
 mori man | man -l -
 ```
 
-Then point your agent at the root once, for example by adding "Before working under ~/mori, read
-~/mori/llms.txt" to the instructions file it reads (`AGENTS.md`, `CLAUDE.md`, or your tool's rules).
+Agents that speak MCP can also ask mori directly. `mori mcp` serves six tools over stdio: where
+am I, the repos, the trees with their purposes, a health check, and creating or describing a tree.
+For example:
+
+```sh
+claude mcp add mori -- mori mcp
+```
+
+Either way, point your agent at the root once, for example by adding "Before working under ~/mori,
+read ~/mori/llms.txt" to the instructions file it reads (`AGENTS.md`, `CLAUDE.md`, or your tool's
+rules).
