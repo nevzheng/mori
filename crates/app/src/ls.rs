@@ -1,7 +1,7 @@
 //! `mori ls`: every repo mori manages and every tree in it, matched against what jj reports.
 //! Reads only; it never snapshots a working copy.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mori_api::v1alpha1::{
     Disk, ListTreesResponse, PushedBookmark, RepoTrees, Tree, TreeRow, TreeState, UnmanagedRepo,
@@ -64,6 +64,18 @@ pub fn run<V: Backend, F: Forge>(
         }
     }
     let space = disk::space(&paths);
+    // Every repo was measured, so a repo absent here (when one repo was asked for) is unknown.
+    let sizes: Option<BTreeMap<String, u64>> = args.sizes.then(|| {
+        repos
+            .iter()
+            .map(|repo| {
+                (
+                    repo.repo.clone(),
+                    repo.trees.iter().map(|row| row.size_bytes).sum(),
+                )
+            })
+            .collect()
+    });
     let unmanaged_repos = if repo.is_some() {
         Vec::new()
     } else {
@@ -83,7 +95,7 @@ pub fn run<V: Backend, F: Forge>(
             free_bytes: space.free,
             total_bytes: space.total,
         }),
-        warnings: disk::low_space(&paths, space).into_iter().collect(),
+        warnings: disk::warnings(&paths, &db, space, sizes.as_ref()),
     })
 }
 

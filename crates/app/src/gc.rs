@@ -145,7 +145,8 @@ pub fn run<V: Backend, F: Forge>(
             free_bytes: space.free,
             total_bytes: space.total,
         }),
-        warnings: disk::low_space(&paths, space).into_iter().collect(),
+        // Sizes in gc cover only the trees that may go, so only tree counts are checked here.
+        warnings: disk::warnings(&paths, &db, space, None),
     })
 }
 

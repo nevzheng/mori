@@ -89,3 +89,17 @@ Feature: CUJ 10 - see what the forest costs
     When I run "mori gc --offline --json"
     Then it succeeds
     And gc lists no Bazel output of "claude-fix-login"
+
+  Scenario: A tree limit only warns, and the tree is still created
+    Given config.toml sets the disk limit "max_trees_per_repo" to "1"
+    When I run "mori tree create github.com/acme/widget --agent claude --task fix-signup"
+    Then it succeeds
+    And "<home>/mori/trees/widget/claude-fix-signup" exists
+    And the output warns that "github.com/acme/widget" is over "max_trees_per_repo"
+
+  Scenario: A size limit warns when sizes are measured
+    Given config.toml sets the disk limit "max_size" to the size "1K"
+    And "claude-fix-login" holds a 2 MB file
+    When I run "mori ls --size"
+    Then it succeeds
+    And the output warns that "mori's trees" is over "max_size"

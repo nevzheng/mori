@@ -83,7 +83,12 @@ impl Config {
              # warn_below = \"10%\"\n\
              # Where Bazel keeps output bases, if you moved it with --output_user_root. `mori gc`\n\
              # removes the ones left by deleted trees.\n\
-             # bazel_output_user_root = \"/fast/bazel\"\n"
+             # bazel_output_user_root = \"/fast/bazel\"\n\
+             # Limits, none by default. They only warn, and say what would bring you back under.\n\
+             # max_trees = 100\n\
+             # max_trees_per_repo = 20\n\
+             # max_size = \"2T\"\n\
+             # max_size_per_repo = \"500G\"\n"
         ))
     }
 }
@@ -184,6 +189,18 @@ mod tests {
         );
         assert!(Config::parse(&format!("{base}[disk]\nwarn_below = \"lots\"\n"), path).is_err());
         assert!(Config::parse(&format!("{base}[disk]\nmax = 1\n"), path).is_err());
+        let limits = Config::parse(
+            &format!("{base}[disk]\nmax_trees = 9\nmax_size_per_repo = \"500G\"\n"),
+            path,
+        )
+        .unwrap()
+        .disk;
+        assert_eq!(limits.max_trees, Some(9));
+        assert_eq!(
+            limits.max_size_per_repo,
+            Some(crate::disk::Size(500 * 1024 * 1024 * 1024))
+        );
+        assert_eq!(limits.max_trees_per_repo, None);
     }
 
     #[test]

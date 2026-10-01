@@ -71,9 +71,7 @@ pub fn create<V: Backend, F: Forge>(
         id = record(&mut db, repo_id.as_deref().unwrap_or_default(), &plan)?;
     }
     let mut response = response(&plan, id, args.dry_run, kind_of(&clone));
-    response.warnings = crate::disk::low_space(&paths, crate::disk::space(&paths))
-        .into_iter()
-        .collect();
+    response.warnings = crate::disk::warnings(&paths, &db, crate::disk::space(&paths), None);
     Ok(response)
 }
 
