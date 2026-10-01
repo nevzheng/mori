@@ -8,6 +8,7 @@ from harness import Placeholders
 from pytest_bdd import given, parsers, then
 
 TREES = "<home>/mori/trees/widget"
+CLONE = "<home>/mori/repos/github.com/acme/widget"
 
 
 def jj(env: dict[str, str], *args: str) -> None:
@@ -66,6 +67,29 @@ def commit_more(env: dict[str, str], placeholders: Placeholders, name: str) -> N
     tree = placeholders.path(f"{TREES}/{name}")
     (tree / "logout.rs").write_text("fn logout() {}\n")
     jj(env, "--repository", str(tree), "commit", "--message", "logout")
+
+
+@given(
+    parsers.parse('trunk moves and another workspace rebases the working copy of "{name}" onto it')
+)
+def rebase_from_elsewhere(env: dict[str, str], placeholders: Placeholders, name: str) -> None:
+    # As a lead agent rebasing a worker's change does, this leaves the tree's working copy stale.
+    # The new trunk commit is pushed, so it is no one's unsaved work.
+    clone = placeholders.path(CLONE)
+    (clone / "NOTES.md").write_text("trunk moved\n")
+    jj(env, "--repository", str(clone), "commit", "--message", "notes")
+    jj(env, "--repository", str(clone), "bookmark", "set", "main", "--revision", "@-")
+    jj(env, "--repository", str(clone), "git", "push", "--bookmark", "main")
+    jj(
+        env,
+        "--repository",
+        str(clone),
+        "rebase",
+        "--revisions",
+        f"{name}@",
+        "--destination",
+        "main",
+    )
 
 
 @then(parsers.parse('mori has no record of the tree "{name}"'))
