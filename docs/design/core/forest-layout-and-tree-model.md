@@ -14,7 +14,10 @@
 > `[trees.landed]` setting was dropped: both landing rules (pull request merged, pushed bookmark
 > deleted) always apply. The `lru` lifetime and `[trees.lru] max` stay. Trees no longer store a role
 > (schema v4): the base tree is the clone's own workspace, `default`, and every other recorded tree
-> is a task tree. The text below is the design as accepted.
+> is a task tree. The context half then moved under `context/`: `context/skills/`, a generated
+> `context/llms.txt`, and one `context/<repo>/` folder of notes per cloned repo; there is no
+> `projects/`. `mori skills sync` moves an older root's files there. The text below is the design as
+> accepted.
 
 ## Q1. What are you trying to do?
 

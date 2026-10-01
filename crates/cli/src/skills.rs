@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use mori_api::v1alpha1::{SkillFile, SyncSkillsResponse, skill_file::Action as FileAction};
 use mori_core::error::{ConfigError, ErrorDetails};
 use mori_core::paths::Paths;
-use mori_core::skills::{Action, Mode, Step};
+use mori_core::skills::{Action, Mode, RepoContext, Step};
 
 use crate::state::{self, boxed};
 
@@ -15,17 +15,45 @@ pub struct Outcome {
     pub steps: Vec<Step>,
     /// The directories and files that don't exist yet and get created, parents first.
     pub created: Vec<(PathBuf, bool)>,
+    /// Files from the old `skills/` layout that someone edited, so they stay where they are.
+    pub kept_legacy: Vec<PathBuf>,
 }
 
 /// Plans the skills in `mode` and, unless `dry_run`, writes them.
 pub fn run(paths: &Paths, mode: Mode, dry_run: bool) -> Result<Outcome, Box<dyn ErrorDetails>> {
+    let kept_legacy = if dry_run {
+        Vec::new()
+    } else {
+        mori_store::skills::migrate_legacy(paths).map_err(boxed)?
+    };
     let observed = mori_store::skills::observe(paths).map_err(boxed)?;
-    let steps = mori_store::skills::sync_plan(&observed, mode);
+    let steps = mori_store::skills::sync_plan(&observed, mode, &repo_contexts(paths)?);
     let created = created(paths, &steps);
     if !dry_run {
         mori_store::skills::apply(paths, &steps, observed.manifest).map_err(boxed)?;
     }
-    Ok(Outcome { steps, created })
+    Ok(Outcome {
+        steps,
+        created,
+        kept_legacy,
+    })
+}
+
+/// Every recorded repo's context folder, for the index. None before mori is set up.
+fn repo_contexts(paths: &Paths) -> Result<Vec<RepoContext>, Box<dyn ErrorDetails>> {
+    if paths.database.symlink_metadata().is_err() {
+        return Ok(Vec::new());
+    }
+    let db = mori_store::database::Database::open(&paths.database).map_err(boxed)?;
+    Ok(db
+        .repos()
+        .map_err(boxed)?
+        .into_iter()
+        .map(|repo| RepoContext {
+            dir: repo.dir_name,
+            repo: repo.remote,
+        })
+        .collect())
 }
 
 /// The new directories (`true`) and files (`false`) the written steps bring into existence.
@@ -80,6 +108,10 @@ pub fn sync(dry_run: bool) -> Result<SyncSkillsResponse, Box<dyn ErrorDetails>> 
                 }
                 .into(),
             })
+            .chain(outcome.kept_legacy.iter().map(|path| SkillFile {
+                path: path.display().to_string(),
+                action: FileAction::KeptEdited.into(),
+            }))
             .collect(),
         validate_only: dry_run,
     })
