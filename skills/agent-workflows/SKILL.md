@@ -21,8 +21,9 @@ One agent (the coordinator) splits a task; worker agents each do a piece in thei
    `mori tree create <repo> --agent <me> --task lead --lifetime pinned`. See `lead-tree`.
 2. **Each worker** gets its own tree: `mori tree create <repo> --agent <name> --task <slug>`
    (or set `MORI_AGENT` once). One tree per piece of work.
-3. **A worker finishing** describes each change (`jj describe`), stops editing, and reports its
-   change IDs (`jj log -r '::<tree>@ ~ ::trunk()'`) with a line on what they do. Notes for the
+3. **A worker finishing** runs `jj commit -m "…"` (not `jj describe`, which leaves the work as the
+   working copy and the tree reading as edited), stops editing, and reports its change IDs
+   (`jj log -r '::<tree>@- ~ ::trunk()'`) with a line on what they do. Notes for the
    repo go in `~/mori/context/projects/<repo>/`.
 4. **The coordinator** moves the changes into its stack (`jj rebase -s <first> -d <where>`),
    resolves conflicts in its own tree, tests, and pushes only with the person's yes.
@@ -41,7 +42,9 @@ Pick the first that fits:
    the receiver rebases or merges them (`jj rebase -s <id> -d <where>`, `jj new <a> <b>`).
 2. **Another machine or a cloud agent:** push a **bookmark** (a branch):
    `jj bookmark create <name> -r <id>` then `jj git push -b <name>`. The receiver runs
-   `jj git fetch` and builds on `<name>@origin`.
+   `jj git fetch` and builds on `<name>@origin`. After that pull request is squash-merged, both
+   sides run `jj git fetch` then `jj rebase -s <first change of their own> -d 'trunk()'`; the
+   merged originals drop out and mori counts them as landed.
 3. **No shared remote:** send a **patch**. `jj diff --git -r <id> > fix.patch` (or
    `git format-patch` in the clone for authorship); the receiver applies it in their tree with
    `patch -p1 < fix.patch`, or `git am` in a colocated clone, and describes the result.
@@ -56,8 +59,10 @@ Keep a stack of changes on top of the latest trunk:
 1. `jj git fetch`
 2. `jj rebase -s <bottom of the stack> -d 'trunk()'`: the whole stack moves, descendants and
    all.
-3. Resolve conflicts: `jj status` shows conflicted changes; edit, then `jj squash` the fix into
-   the change it belongs to.
+3. Resolve conflicts at the **first** conflicted change, not on top of the stack:
+   `jj log -r 'conflicts()'` lists them; `jj new <first>`, fix the files, then `jj squash` puts the
+   fix into that change, and the changes above it usually resolve with it. Repeat for any left.
+   jj refuses to push a stack that still has a conflicted change.
 4. Fold small fixes into the right change: `jj absorb` moves working-copy edits into the commits
    that last touched those lines.
 5. Push every bookmark in the stack: `jj git push -b <one> -b <two>`.

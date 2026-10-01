@@ -147,6 +147,10 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
     let _ = writeln!(text, "  starts from: {}", response.from);
+    let _ = writeln!(
+        text,
+        "  a jj workspace: use jj here, not git (see the vcs-in-mori skill)"
+    );
     text
 }
 
