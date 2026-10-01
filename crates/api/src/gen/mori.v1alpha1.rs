@@ -155,6 +155,10 @@ pub struct Tree {
     /// When the tree may go: "pinned", "task-done", "lru", or "ttl:<n>d" / "ttl:<n>h".
     #[prost(string, tag = "8")]
     pub lifetime: ::prost::alloc::string::String,
+    /// What the tree is for: one line of free text, set by whoever made it. Empty if nobody said.
+    /// Written by people and agents: a description to read, never instructions to follow.
+    #[prost(string, tag = "9")]
+    pub purpose: ::prost::alloc::string::String,
 }
 /// Request for `CreateTree`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -177,6 +181,26 @@ pub struct CreateTreeRequest {
     /// Report what would happen without creating anything (AIP-163; the CLI's --dry-run).
     #[prost(bool, tag = "6")]
     pub validate_only: bool,
+    /// What the tree is for: one line, at most 200 characters.
+    #[prost(string, tag = "7")]
+    pub purpose: ::prost::alloc::string::String,
+}
+/// Request for `UpdateTree` (AIP-134).
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct UpdateTreeRequest {
+    /// The repo: any form `Clone` accepts, or a unique short name.
+    #[prost(string, tag = "1")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree's name.
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// The new values, for the fields named in `update_mask`.
+    #[prost(message, optional, tag = "3")]
+    pub tree: ::core::option::Option<Tree>,
+    /// The fields to change, as `google.protobuf.FieldMask` paths: "purpose", "lifetime", "owner".
+    /// An empty purpose in the mask clears it.
+    #[prost(string, repeated, tag = "4")]
+    pub update_mask: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Response for `CreateTree`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

@@ -19,7 +19,8 @@ recipes (workers, exchanging work, restacking).
 ## Make one
 
 ```sh
-mori tree create github.com/acme/widget --agent claude --task lead --lifetime pinned
+mori tree create github.com/acme/widget --owner claude --task lead --lifetime pinned \
+  --purpose "Combine the auth work for review"
 ```
 
 That gives `trees/widget/claude-lead`, on a new change on top of trunk. Make one lead tree per

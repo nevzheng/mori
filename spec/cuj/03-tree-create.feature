@@ -70,3 +70,20 @@ Feature: CUJ 3 - an agent starts a task in its own tree
     When I run "mori tree create --json github.com/acme/widget --agent claude --task fix-login"
     Then stdout is exactly one JSON object
     And it names the tree "claude-fix-login", its path and its lifetime "task-done"
+
+  Scenario: A tree has a purpose, which tree set can change
+    Given I have run "mori tree create widget --owner claude --task auth --purpose 'OAuth login'"
+    And I have run "mori tree set widget claude-auth --purpose 'OAuth device flow' --lifetime pinned"
+    When I run "mori ls --json"
+    Then the forest shows "claude-auth" with purpose "OAuth device flow"
+    And the forest shows "claude-auth" as claude's task "auth", lifetime "pinned"
+
+  Scenario: tree set needs something to change
+    Given I have run "mori tree create widget --owner claude --task auth"
+    When I run "mori tree set widget claude-auth"
+    Then it fails with status INVALID_ARGUMENT and reason "UPDATE_MASK_INVALID"
+
+  Scenario: A purpose is one line
+    When I run "mori tree create widget --owner claude --task auth --purpose ''"
+    Then it fails with status INVALID_ARGUMENT and reason "PURPOSE_INVALID"
+

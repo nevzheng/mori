@@ -198,6 +198,24 @@ impl ErrorDetails for ConfigError {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TreeError {
+    /// A purpose can't be used.
+    #[error("that purpose can't be used: {why}")]
+    PurposeInvalid {
+        /// Why not.
+        why: String,
+    },
+
+    /// An update names a field that can't be changed.
+    #[error("{field:?} can't be changed; a tree's purpose, lifetime and owner can")]
+    UpdateMaskInvalid {
+        /// The field.
+        field: String,
+    },
+
+    /// An update asks to change nothing.
+    #[error("nothing to change: give a purpose, a lifetime or an owner")]
+    NothingToChange,
+
     /// A tree name, given or made from the name template, can't be used.
     #[error("{name:?} can't be a tree name: {why}")]
     NameInvalid {
@@ -317,7 +335,10 @@ impl ErrorDetails for TreeError {
 
     fn code(&self) -> Code {
         match self {
-            Self::NameInvalid { .. } => Code::InvalidArgument,
+            Self::NameInvalid { .. }
+            | Self::PurposeInvalid { .. }
+            | Self::UpdateMaskInvalid { .. }
+            | Self::NothingToChange => Code::InvalidArgument,
             Self::OwnerUnknown
             | Self::BaseTree { .. }
             | Self::Pinned { .. }
@@ -333,6 +354,8 @@ impl ErrorDetails for TreeError {
     fn reason(&self) -> &'static str {
         match self {
             Self::NameInvalid { .. } => "TREE_NAME_INVALID",
+            Self::PurposeInvalid { .. } => "PURPOSE_INVALID",
+            Self::UpdateMaskInvalid { .. } | Self::NothingToChange => "UPDATE_MASK_INVALID",
             Self::OwnerUnknown => "OWNER_UNKNOWN",
             Self::TreeExists { .. } => "TREE_EXISTS",
             Self::WorkspaceExists { .. } => "WORKSPACE_EXISTS",
@@ -366,7 +389,8 @@ impl ErrorDetails for TreeError {
                 ("edited", edited.to_string()),
                 ("unpushed", unpushed.to_string()),
             ],
-            Self::OwnerUnknown => vec![],
+            Self::OwnerUnknown | Self::PurposeInvalid { .. } | Self::NothingToChange => vec![],
+            Self::UpdateMaskInvalid { field } => vec![("field", field.clone())],
             Self::PathExists { path } => vec![("path", path.display().to_string())],
             Self::NotRecorded { name, path, .. } => {
                 vec![("name", name.clone()), ("path", path.display().to_string())]

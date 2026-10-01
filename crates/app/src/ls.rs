@@ -242,5 +242,6 @@ fn recorded_tree(repo: &RepoRecord, record: TreeRecord, path: String) -> Tree {
         owner: record.owner,
         task: record.task.unwrap_or_default(),
         lifetime: record.lifetime,
+        purpose: record.purpose.unwrap_or_default(),
     }
 }

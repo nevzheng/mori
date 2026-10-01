@@ -108,6 +108,18 @@ def shows_only(mori: Mori, repo: str) -> None:
 # The text view
 
 
+@then(parsers.parse('the forest shows "{name}" with purpose "{purpose}"'))
+def shows_purpose(mori: Mori, name: str, purpose: str) -> None:
+    rows = [
+        row["tree"]
+        for repo in json.loads(mori.last.stdout)["repos"]
+        for row in repo.get("trees", [])
+        if row["tree"]["name"] == name
+    ]
+    assert rows, f"no {name} in {mori.last.stdout}"
+    assert_that(rows[0].get("purpose", ""), equal_to(purpose))
+
+
 @then(parsers.parse('the output has a row for "{name}" with "{owner}", "{task}" and "{lifetime}"'))
 def text_row(mori: Mori, name: str, owner: str, task: str, lifetime: str) -> None:
     assert_that(mori.last.stdout, contains_string("NAME"))

@@ -28,6 +28,19 @@ pub struct NewTree<'a> {
     pub task: Option<&'a str>,
     /// Its lifetime, in the text form `mori_core::tree::Lifetime` prints.
     pub lifetime: &'a str,
+    /// What it is for, if anyone said.
+    pub purpose: Option<&'a str>,
+}
+
+/// The fields `update_tree` changes; `None` leaves a field as it is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TreeUpdate<'a> {
+    /// A new purpose; `Some(None)` clears it.
+    pub purpose: Option<Option<&'a str>>,
+    /// A new lifetime, in its text form.
+    pub lifetime: Option<&'a str>,
+    /// A new owner.
+    pub owner: Option<&'a str>,
 }
 
 /// A recorded repo.
@@ -58,6 +71,8 @@ pub struct TreeRecord {
     pub task: Option<String>,
     /// Its lifetime.
     pub lifetime: String,
+    /// What it is for, if anyone said.
+    pub purpose: Option<String>,
     /// When mori recorded it (RFC 3339, UTC).
     pub created_at: String,
     /// When mori last saw it used (RFC 3339, UTC).
@@ -136,10 +151,17 @@ impl Database {
         tx.execute(
             &format!(
                 "INSERT INTO trees
-                     (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
-                 VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, {NOW}, {NOW})"
+                     (id, repo_id, name, owner, task, lifetime, purpose, created_at, last_used_at)
+                 VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})"
             ),
-            params![repo_id, base.name, base.owner, base.task, base.lifetime],
+            params![
+                repo_id,
+                base.name,
+                base.owner,
+                base.task,
+                base.lifetime,
+                base.purpose
+            ],
         )
         .map_err(sqlite)?;
         tx.commit().map_err(sqlite)?;
@@ -182,11 +204,19 @@ impl Database {
             .query_row(
                 &format!(
                     "INSERT INTO trees
-                         (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
-                     VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, {NOW}, {NOW})
+                         (id, repo_id, name, owner, task, lifetime, purpose, created_at,
+                          last_used_at)
+                     VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})
                      RETURNING {TREE_COLUMNS}"
                 ),
-                params![repo_id, tree.name, tree.owner, tree.task, tree.lifetime],
+                params![
+                    repo_id,
+                    tree.name,
+                    tree.owner,
+                    tree.task,
+                    tree.lifetime,
+                    tree.purpose
+                ],
                 tree_record,
             )
             .map_err(sqlite)
@@ -376,8 +406,9 @@ impl Database {
             .query_row(
                 &format!(
                     "INSERT INTO trees
-                         (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})
+                         (id, repo_id, name, owner, task, lifetime, purpose, created_at,
+                          last_used_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, {NOW}, {NOW})
                      RETURNING {TREE_COLUMNS}"
                 ),
                 params![
@@ -386,11 +417,52 @@ impl Database {
                     tree.name,
                     tree.owner,
                     tree.task,
-                    tree.lifetime
+                    tree.lifetime,
+                    tree.purpose
                 ],
                 tree_record,
             )
             .map_err(sqlite)
+    }
+
+    /// Changes the record of the tree named `name` in the repo with ID `repo_id`, and returns it;
+    /// `None` if there is no such tree. Only the record changes, never the tree itself.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error.
+    pub fn update_tree(
+        &mut self,
+        repo_id: &str,
+        name: &str,
+        update: &TreeUpdate,
+    ) -> Result<Option<TreeRecord>, StoreError> {
+        let path = self.path.clone();
+        let sqlite = |source| StoreError::Sqlite {
+            path: path.clone(),
+            source,
+        };
+        let tx = self.conn.transaction().map_err(sqlite)?;
+        let set = |column: &str, value: Option<&str>| {
+            tx.execute(
+                &format!("UPDATE trees SET {column} = ?3 WHERE repo_id = ?1 AND name = ?2"),
+                params![repo_id, name, value],
+            )
+        };
+        if let Some(purpose) = update.purpose {
+            set("purpose", purpose).map_err(sqlite)?;
+        }
+        if let Some(lifetime) = update.lifetime {
+            set("lifetime", Some(lifetime)).map_err(sqlite)?;
+        }
+        if let Some(owner) = update.owner {
+            set("owner", Some(owner)).map_err(sqlite)?;
+        }
+        tx.commit().map_err(sqlite)?;
+        Ok(self
+            .trees(repo_id)?
+            .into_iter()
+            .find(|tree| tree.name == name))
     }
 
     /// The recorded repo with identity `remote`, if any.
@@ -456,7 +528,8 @@ fn is_key_clash(error: &rusqlite::Error) -> bool {
     )
 }
 
-const TREE_COLUMNS: &str = "id, repo_id, name, owner, task, lifetime, created_at, last_used_at";
+const TREE_COLUMNS: &str =
+    "id, repo_id, name, owner, task, lifetime, created_at, last_used_at, purpose";
 
 fn tree_record(row: &rusqlite::Row) -> rusqlite::Result<TreeRecord> {
     Ok(TreeRecord {
@@ -468,6 +541,7 @@ fn tree_record(row: &rusqlite::Row) -> rusqlite::Result<TreeRecord> {
         lifetime: row.get(5)?,
         created_at: row.get(6)?,
         last_used_at: row.get(7)?,
+        purpose: row.get(8)?,
     })
 }
 
@@ -507,6 +581,7 @@ mod tests {
             owner: "you",
             task: None,
             lifetime: "pinned",
+            purpose: None,
         }
     }
 
@@ -594,12 +669,54 @@ mod tests {
         assert_eq!(db.repo("github.com/acme/gadget").unwrap(), None);
     }
 
+    #[test]
+    fn update_tree_changes_only_what_it_is_given() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        db.record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+
+        let updated = db
+            .update_tree(
+                &repo.id,
+                "claude-fix-login",
+                &TreeUpdate {
+                    lifetime: Some("pinned"),
+                    ..TreeUpdate::default()
+                },
+            )
+            .unwrap()
+            .unwrap();
+        let cleared = db
+            .update_tree(
+                &repo.id,
+                "claude-fix-login",
+                &TreeUpdate {
+                    purpose: Some(None),
+                    ..TreeUpdate::default()
+                },
+            )
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(updated.lifetime, "pinned");
+        assert_eq!(updated.purpose.as_deref(), Some("Fix the login redirect"));
+        assert_eq!(cleared.purpose, None);
+        assert_eq!(cleared.lifetime, "pinned");
+        assert!(
+            db.update_tree(&repo.id, "nothing", &TreeUpdate::default())
+                .unwrap()
+                .is_none()
+        );
+    }
+
     fn task_tree(name: &'static str) -> NewTree<'static> {
         NewTree {
             name,
             owner: "claude",
             task: Some("fix-login"),
             lifetime: "task-done",
+            purpose: Some("Fix the login redirect"),
         }
     }
 

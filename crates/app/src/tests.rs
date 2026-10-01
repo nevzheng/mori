@@ -324,6 +324,7 @@ impl Fixture {
                 agent: Some("claude".to_owned()),
                 lifetime: None,
                 from: None,
+                purpose: Some(format!("work on {task}")),
                 dry_run: false,
             },
         )
@@ -610,5 +611,53 @@ fn a_bookmark_moved_off_the_tree_never_lands_it() -> Result<()> {
     // and it still hasn't when the moved bookmark later lands and the remote deletes it.
     fixture.app.vcs.state.borrow_mut().elsewhere.clear();
     assert_eq!(gc_reason(&fixture, &name)?, "NOT_YET");
+    Ok(())
+}
+
+#[test]
+fn tree_set_changes_the_record_and_restore_keeps_the_purpose() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let name = fixture.create("fix-login")?;
+
+    let set = crate::tree_set::run(
+        &fixture.app,
+        crate::tree_set::SetArgs {
+            repo: "widget".to_owned(),
+            name: name.clone(),
+            purpose: Some("Fix the login redirect".to_owned()),
+            lifetime: Some(mori_core::tree::Lifetime::Pinned),
+            owner: None,
+        },
+    )
+    .map_err(to_std)?;
+
+    assert_eq!(set.purpose, "Fix the login redirect");
+    assert_eq!(set.lifetime, "pinned");
+    let nothing = crate::tree_set::run(
+        &fixture.app,
+        crate::tree_set::SetArgs {
+            repo: "widget".to_owned(),
+            name: name.clone(),
+            purpose: None,
+            lifetime: None,
+            owner: None,
+        },
+    )
+    .err()
+    .ok_or("changed nothing without an error")?;
+    assert_eq!(nothing.reason(), "UPDATE_MASK_INVALID");
+    let base = crate::tree_set::run(
+        &fixture.app,
+        crate::tree_set::SetArgs {
+            repo: "widget".to_owned(),
+            name: "default".to_owned(),
+            purpose: None,
+            lifetime: Some(mori_core::tree::Lifetime::TaskDone),
+            owner: None,
+        },
+    )
+    .err()
+    .ok_or("unpinned the base tree")?;
+    assert_eq!(base.reason(), "BASE_TREE");
     Ok(())
 }

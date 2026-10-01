@@ -10,7 +10,9 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use mori_app::routed::Routed;
-use mori_app::{App, Host, clone, doctor, gc, init, ls, restore, skills, tree, tree_remove};
+use mori_app::{
+    App, Host, clone, doctor, gc, init, ls, restore, skills, tree, tree_remove, tree_set,
+};
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
 use mori_core::vcs::VcsKind;
@@ -223,7 +225,7 @@ enum TreeCommand {
     /// The tree goes under trees/<repo>/, on top of trunk, recorded with its owner, task and
     /// lifetime. In a jj clone it is a jj workspace; in a git clone, a detached git worktree.
     #[command(
-        after_help = "Examples:\n  mori tree create widget --task fix-login --agent claude\n  mori tree create widget --task lead --lifetime pinned\n  mori tree create widget --task spike --lifetime ttl:3d --from main"
+        after_help = "Examples:\n  mori tree create widget --task fix-login --owner claude --purpose \"Fix the login redirect\"\n  mori tree create widget --task lead --lifetime pinned\n  mori tree create widget --task spike --lifetime ttl:3d --from main"
     )]
     Create {
         /// The repo: its full name (github.com/acme/widget), or a unique short name (widget).
@@ -234,8 +236,12 @@ enum TreeCommand {
         task: String,
 
         /// Who the tree is for, e.g. claude. Defaults to `$MORI_AGENT`, then your login name.
-        #[arg(long, value_name = "OWNER")]
+        #[arg(long = "owner", alias = "agent", value_name = "OWNER")]
         agent: Option<String>,
+
+        /// What the tree is for, in one line (at most 200 characters).
+        #[arg(long, value_name = "TEXT")]
+        purpose: Option<String>,
 
         /// When the tree may go: pinned, task-done, lru, or ttl:<n>d. Defaults to the
         /// [trees.lifetime] task setting (task-done).
@@ -249,6 +255,33 @@ enum TreeCommand {
         /// Show what would happen, and create nothing.
         #[arg(long)]
         dry_run: bool,
+    },
+
+    /// Change a tree's purpose, lifetime or owner.
+    ///
+    /// Only mori's record changes: never the tree, its files or the VCS. `--purpose ""` clears the
+    /// purpose.
+    #[command(
+        after_help = "Examples:\n  mori tree set widget claude-auth --purpose \"OAuth device flow\"\n  mori tree set widget claude-lead --lifetime pinned\n  mori tree set widget claude-auth --owner codex"
+    )]
+    Set {
+        /// The repo: its full name, or a unique short name.
+        repo: String,
+
+        /// The tree's name, e.g. claude-fix-login.
+        name: String,
+
+        /// What the tree is for, in one line; empty clears it.
+        #[arg(long, value_name = "TEXT")]
+        purpose: Option<String>,
+
+        /// When the tree may go: pinned, task-done, lru, or ttl:<n>d.
+        #[arg(long, value_name = "LIFETIME")]
+        lifetime: Option<Lifetime>,
+
+        /// Who the tree is for.
+        #[arg(long, value_name = "OWNER")]
+        owner: Option<String>,
     },
 
     /// Remove a tree whose work is safe elsewhere.
@@ -399,6 +432,7 @@ fn dispatch_tree(
             agent,
             lifetime,
             from,
+            purpose,
             dry_run,
         } => respond(
             json,
@@ -410,10 +444,31 @@ fn dispatch_tree(
                     agent,
                     lifetime,
                     from,
+                    purpose,
                     dry_run,
                 },
             ),
             output::tree_create_text,
+        ),
+        TreeCommand::Set {
+            repo,
+            name,
+            purpose,
+            lifetime,
+            owner,
+        } => respond(
+            json,
+            tree_set::run(
+                app,
+                tree_set::SetArgs {
+                    repo,
+                    name,
+                    purpose,
+                    lifetime,
+                    owner,
+                },
+            ),
+            output::tree_set_text,
         ),
         TreeCommand::Remove {
             repo,

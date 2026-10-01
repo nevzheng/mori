@@ -25,11 +25,13 @@ const APPLICATION_ID: i32 = 0x6d6f_7269;
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The schema version this mori writes, and the newest it reads.
-pub const SCHEMA_VERSION: i32 = 5;
+pub const SCHEMA_VERSION: i32 = 6;
 
 /// The steps from an empty file to each version: `MIGRATIONS[n]` takes version `n` to `n + 1`.
 /// Append only: a released step never changes.
-const MIGRATIONS: [&str; 5] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
+const MIGRATIONS: [&str; 6] = [
+    SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6,
+];
 
 const SCHEMA_V1: &str = "
     CREATE TABLE meta (
@@ -92,6 +94,11 @@ const SCHEMA_V5: &str = "
         partial     INTEGER NOT NULL,
         measured_at INTEGER NOT NULL
     ) STRICT;
+";
+
+// What a tree is for: one line of free text, set by whoever made it.
+const SCHEMA_V6: &str = "
+    ALTER TABLE trees ADD COLUMN purpose TEXT;
 ";
 
 /// An open mori database.
@@ -405,8 +412,8 @@ mod tests {
         assert!(matches!(
             error,
             StoreError::SchemaTooNew {
-                found: 6,
-                supported: 5,
+                found: 7,
+                supported: 6,
                 ..
             }
         ));
@@ -415,8 +422,8 @@ mod tests {
             error.metadata(),
             vec![
                 ("path", path.display().to_string()),
-                ("foundVersion", "6".to_owned()),
-                ("supportedVersion", "5".to_owned()),
+                ("foundVersion", "7".to_owned()),
+                ("supportedVersion", "6".to_owned()),
             ]
         );
     }

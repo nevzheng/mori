@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
     CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RepoTrees, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs,
+    RemoveTreeResponse, RepoTrees, RestoreResponse, SyncSkillsResponse, Tree, TreeRow, Vcs,
     finding::Severity, skill_file::Action, tree_row::Status,
 };
 use mori_core::disk::{Space, format_size};
@@ -183,6 +183,9 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
     let _ = writeln!(text, "  path: {}", tilde(&tree.path));
     let _ = writeln!(text, "  repo: {}", tree.repo);
     let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
+    if !tree.purpose.is_empty() {
+        let _ = writeln!(text, "  purpose: {}", tree.purpose);
+    }
     let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
     let _ = writeln!(text, "  starts from: {}", response.from);
     let hint = if response.vcs() == Vcs::Git {
@@ -248,6 +251,22 @@ fn ls_repo(text: &mut String, repo: &RepoTrees, sized: bool, reused: &dyn Fn(&Tr
             row.remove(1);
         }
     }
+    // PURPOSE only when some tree has one, cut to fit a line.
+    let purposes: Vec<&str> = repo
+        .trees
+        .iter()
+        .map(|row| row.tree.as_ref().map_or("", |tree| tree.purpose.as_str()))
+        .collect();
+    if purposes.iter().any(|purpose| !purpose.is_empty()) {
+        header.push("PURPOSE".to_owned());
+        for (row, purpose) in cells.iter_mut().zip(purposes) {
+            row.push(if purpose.is_empty() {
+                "-".to_owned()
+            } else {
+                shorten(purpose, 50)
+            });
+        }
+    }
     let work = header.iter().position(|column| column == "WORK");
     table_with(text, &header, &cells, |column, cell| match (column, cell) {
         (0, _) => Some(Role::Name),
@@ -259,6 +278,25 @@ fn ls_repo(text: &mut String, repo: &RepoTrees, sized: bool, reused: &dyn Fn(&Tr
         _ => None,
     });
     let _ = writeln!(text);
+}
+
+/// The text `tree set` prints: the tree's record as it is now.
+pub fn tree_set_text(tree: &Tree) -> String {
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "Updated tree {}:",
+        look::paint(Role::Name, &tree.name)
+    );
+    let _ = writeln!(text, "  owner: {}", tree.owner);
+    let _ = writeln!(text, "  lifetime: {}", tree.lifetime);
+    let purpose = if tree.purpose.is_empty() {
+        "-"
+    } else {
+        &tree.purpose
+    };
+    let _ = writeln!(text, "  purpose: {purpose}");
+    text
 }
 
 /// The text `ls` prints: a table of trees per repo, then the clones mori didn't make.
@@ -515,9 +553,10 @@ pub fn forest_text(response: &ListTreesResponse) -> String {
             } else {
                 task
             };
+            let purpose = row_purpose(&repo.trees[tree_index]);
             let _ = writeln!(
                 text,
-                "{} {} {}  {}  {owner} · {task} · {lifetime}",
+                "{} {} {}  {}  {owner} · {task} · {lifetime}{purpose}",
                 look::trunk(last_repo),
                 look::branch(last_tree),
                 look::paint(Role::Name, &format!("{name:width$}")),
@@ -537,6 +576,27 @@ pub fn forest_text(response: &ListTreesResponse) -> String {
         )
     );
     text
+}
+
+/// " — <purpose>" for the forest view, or nothing when the tree has none.
+fn row_purpose(row: &TreeRow) -> String {
+    match row.tree.as_ref().map(|tree| tree.purpose.as_str()) {
+        Some(purpose) if !purpose.is_empty() => {
+            let dash = if look::glyphs() { "—" } else { "-" };
+            format!("  {dash} {}", shorten(purpose, 60))
+        }
+        _ => String::new(),
+    }
+}
+
+/// `text` cut to `max` characters, with `…` (or `...` without glyphs) when cut.
+fn shorten(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_owned();
+    }
+    let ellipsis = if look::glyphs() { "…" } else { "..." };
+    let keep = max.saturating_sub(ellipsis.chars().count());
+    format!("{}{ellipsis}", text.chars().take(keep).collect::<String>())
 }
 
 /// `text` padded with spaces to `width` characters (not bytes: marks may be multi-byte).

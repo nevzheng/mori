@@ -117,6 +117,7 @@ fn record(
             owner: &owner,
             task: None,
             lifetime: &lifetime,
+            purpose: None,
         },
     )
     .map(|_| ())

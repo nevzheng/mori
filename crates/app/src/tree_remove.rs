@@ -205,5 +205,6 @@ fn tree_message(repo: &str, plan: &RemovePlan, record: TreeRecord) -> Tree {
         owner: record.owner,
         task: record.task.unwrap_or_default(),
         lifetime: record.lifetime,
+        purpose: record.purpose.unwrap_or_default(),
     }
 }
