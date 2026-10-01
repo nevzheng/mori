@@ -248,21 +248,39 @@ impl Vcs for GitCli {
         Ok(self.run(&root, &["rev-parse", "HEAD"])?.trim().to_owned())
     }
 
-    /// Remote branches whose tip is in the tree's history but not in trunk's.
+    /// Remote branches that hold the tree's own work (its commits not in trunk): those whose tip
+    /// is in the tree's history, and those stacked on top of it, as when a lead merges a worker's
+    /// commit into a branch and pushes that. A tree with no work of its own has none.
     fn pushed_bookmarks(&self, clone: &Path, name: &str) -> Result<Vec<RemoteBookmark>, GitError> {
         let root = self.root(clone, name)?;
         let trunk = self.trunk(&root);
-        let mut args = vec![
-            "for-each-ref",
-            "--format=%(refname:lstrip=2)%09%(objectname)%09%(symref)",
-            "--merged",
-            "HEAD",
-        ];
-        if let Some(trunk) = trunk {
-            args.extend(["--no-merged", trunk]);
+        let query = |relation: &str| -> Result<Vec<RemoteBookmark>, GitError> {
+            let mut args = vec![
+                "for-each-ref",
+                "--format=%(refname:lstrip=2)%09%(objectname)%09%(symref)",
+                relation,
+                "HEAD",
+            ];
+            if let Some(trunk) = trunk {
+                args.extend(["--no-merged", trunk]);
+            }
+            args.push("refs/remotes");
+            parse_remote_branches(&self.run(&root, &args)?)
+        };
+        let mut branches = query("--merged")?;
+        // Without trunk there is no telling the tree's own work from everyone's.
+        let has_own_work = trunk.is_some_and(|trunk| {
+            self.run(&root, &["merge-base", "--is-ancestor", "HEAD", trunk])
+                .is_err()
+        });
+        if has_own_work {
+            for branch in query("--contains")? {
+                if !branches.contains(&branch) {
+                    branches.push(branch);
+                }
+            }
         }
-        args.push("refs/remotes");
-        parse_remote_branches(&self.run(&root, &args)?)
+        Ok(branches)
     }
 
     /// Every remote-tracking branch, wherever it points; `origin/HEAD` is skipped.
