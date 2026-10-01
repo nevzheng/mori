@@ -106,5 +106,5 @@ line. The one mark is `森` in the header of the terminal dashboard (`mori` with
 ## API
 
 The proto follows the AIPs it names: `validate_only` for dry runs (AIP-163), `Status` and
-`ErrorInfo` for errors (AIP-193), `page_size`/`page_token`/`filter` for lists (AIP-132, 158, 160),
+`ErrorInfo` for errors (AIP-193), plain filters for lists (AIP-160, no paging: a forest is small),
 and an `update_mask` for updates (AIP-134). Removed fields are `reserved`, never reused.
