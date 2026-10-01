@@ -12,7 +12,7 @@ use mori_api::v1alpha1::{GcItem, GcResponse};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
 use mori_core::error::{CleanupError, ErrorDetails, RepoError};
 use mori_core::forest::{Entry, Workspaces, reconcile};
-use mori_core::gc::{Class, Facts, Reason, classify};
+use mori_core::gc::{Class, Facts, Reason, classify, over_cap};
 use mori_core::paths::Paths;
 use mori_core::tree::{Lifetime, Role};
 use mori_github::GhCli;
@@ -63,11 +63,13 @@ pub fn run(args: &GcArgs) -> Result<GcResponse, Box<dyn ErrorDetails>> {
             return Err(boxed(RepoError::NotManaged { repo: wanted }));
         }
     }
+    let lru_max = state::tree_policy(&paths)?.lru.max;
     let context = Context {
         paths: &paths,
         jj: &jj,
         gh: gh.as_ref(),
         now: now(),
+        lru_max,
     };
     let mut items = Vec::new();
     for repo in &repos {
@@ -118,6 +120,8 @@ pub struct Context<'a> {
     pub jj: &'a JjCli,
     pub gh: Option<&'a GhCli>,
     pub now: u64,
+    /// `[trees.lru] max`.
+    pub lru_max: Option<u32>,
 }
 
 /// What one tree looks like before it is classified.
@@ -161,9 +165,16 @@ pub fn report_repo(
     for entry in reconcile(records, workspaces, |record| record.name.as_str()) {
         rows.push(row(context, db, repo, &id, &clone, entry)?);
     }
+    let idle: Vec<(String, Option<u64>)> = rows
+        .iter()
+        .filter(|row| matches!(row.facts.recorded, Some((Role::Task, _))))
+        .map(|row| (row.name.clone(), row.facts.idle_seconds))
+        .collect();
+    let beyond = over_cap(&idle, context.lru_max);
     Ok(rows
         .into_iter()
-        .map(|row| {
+        .map(|mut row| {
+            row.facts.over_cap = beyond.contains(&row.name);
             let (class, reason) = classify(&row.facts);
             GcItem {
                 repo: repo.remote.clone(),
@@ -206,6 +217,7 @@ fn row(
                 state: None,
                 landed: None,
                 idle_seconds: None,
+                over_cap: false,
             },
             landed_count: 0,
         },
@@ -217,6 +229,7 @@ fn row(
                 state: None,
                 landed: None,
                 idle_seconds: None,
+                over_cap: false,
             },
             landed_count: 0,
         },
@@ -245,6 +258,7 @@ fn row(
                     state: Some(state),
                     landed,
                     idle_seconds,
+                    over_cap: false,
                 },
                 landed_count: commits.len(),
             }
@@ -287,6 +301,7 @@ fn describe(row: &Row, reason: Reason) -> String {
         Reason::Pinned => "lifetime pinned".to_owned(),
         Reason::Missing => "its workspace is gone; only the record goes".to_owned(),
         Reason::Landed => format!("{} landed bookmark(s)", row.landed_count),
+        Reason::OverCap => "beyond the repo's lru cap".to_owned(),
         Reason::Idle => format!(
             "no change for {} days",
             days(row.facts.idle_seconds.unwrap_or_default())
