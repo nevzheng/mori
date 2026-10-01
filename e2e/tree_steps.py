@@ -39,6 +39,11 @@ def workspaces(env: dict[str, str], clone: Path) -> list[str]:
 # Setup
 
 
+@given(parsers.parse('MORI_AGENT is "{agent}"'))
+def mori_agent_is(env: dict[str, str], agent: str) -> None:
+    env["MORI_AGENT"] = agent
+
+
 @given(parsers.parse('USER is "{user}"'))
 def user_is(env: dict[str, str], user: str) -> None:
     env["USER"] = user

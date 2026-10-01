@@ -63,9 +63,13 @@ pub fn create(args: CreateArgs) -> Result<CreateTreeResponse, Box<dyn ErrorDetai
     Ok(response(&plan, id, args.dry_run))
 }
 
-/// Who is acting: `--agent` if given, else the login name.
+/// Who is acting: `--agent` if given, else `$MORI_AGENT`, else the login name.
 pub fn owner(agent: Option<String>) -> Result<String, Box<dyn ErrorDetails>> {
-    match agent {
+    // An agent's harness can set MORI_AGENT once, so the agent can't forget --agent.
+    let from_env = std::env::var("MORI_AGENT")
+        .ok()
+        .filter(|agent| !agent.trim().is_empty());
+    match agent.or(from_env) {
         Some(agent) => Ok(agent),
         None => default_owner(std::env::var("USER").ok().as_deref()).map_err(boxed),
     }

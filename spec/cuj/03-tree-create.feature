@@ -23,6 +23,12 @@ Feature: CUJ 3 - an agent starts a task in its own tree
     Then it succeeds
     And "<home>/mori/trees/widget/tester-fix-login" exists
 
+  Scenario: An agent's harness can name it once, in MORI_AGENT
+    Given MORI_AGENT is "codex"
+    When I run "mori tree create github.com/acme/widget --task fix-login"
+    Then it succeeds
+    And "<home>/mori/trees/widget/codex-fix-login" exists
+
   Scenario: A long-lived coordinating tree is a pinned task tree
     When I run "mori tree create github.com/acme/widget --agent claude --task lead --lifetime pinned"
     Then it succeeds

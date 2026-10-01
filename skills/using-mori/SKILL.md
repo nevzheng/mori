@@ -91,8 +91,8 @@ safe to run, even while others work.
 Gives one piece of work its own tree: a jj workspace at `trees/<repo>/<name>`, on a new change on
 top of trunk, recorded with its owner, task and lifetime. Work in that directory; it is yours.
 
-- **`--agent <name>`**: who the tree is for, e.g. `claude`. Always pass it when you are an agent;
-  without it the owner is the person's login name.
+- **`--agent <name>`**: who the tree is for, e.g. `claude`. Always pass it when you are an agent,
+  unless your harness sets `MORI_AGENT`; without either, the owner is the person's login name.
 - **`--task <slug>`**: lowercase letters, digits and hyphens, e.g. `fix-login`. The tree's name is
   `<owner>-<task>` by default (the `[trees] name` template in `config.toml` can change it).
 - **`--lifetime`**: `pinned`, `task-done` (the default), `lru`, or `ttl:<n>d`. A tree only becomes
