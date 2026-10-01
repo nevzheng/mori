@@ -3,6 +3,10 @@
 What changed in each release of mori. Head (`main`) is ahead of the newest entry; see
 [Install and release channels](https://nevzheng.github.io/mori/install/).
 
+## Unreleased (0.1.0)
+
+Nothing yet since 0.1.0-alpha.1.
+
 ## 0.1.0-alpha.1 (2026-10-01)
 
 The first pre-release, to prove the release flow and start dogfooding from a tag. Expect rough
