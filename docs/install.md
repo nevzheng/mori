@@ -41,8 +41,16 @@ mori than the one you're running.
 
 Each release on [GitHub Releases](https://github.com/nevzheng/mori/releases) has `mori` for macOS
 (Apple silicon and Intel) and Linux (x86-64 and arm64), each archive with its SHA-256 checksum.
-Pre-releases (`-alpha.N`) are marked as such. Download the archive for your machine, check it,
-and put `mori` on your `PATH`:
+Pre-releases (`-alpha.N`) are marked as such.
+
+With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), name the version:
+
+```sh
+cargo binstall --git https://github.com/nevzheng/mori mori-cli@0.1.0-alpha.1
+```
+
+mori isn't on crates.io, so `--git` is needed: a crate there named `mori-cli` is another project.
+Or download the archive for your machine, check it, and put `mori` on your `PATH`:
 
 ```sh
 shasum -a 256 -c mori-v0.1.0-alpha.1-aarch64-apple-darwin.tar.gz.sha256

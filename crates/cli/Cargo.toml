@@ -28,6 +28,13 @@ tempfile.workspace = true
 [lints]
 workspace = true
 
+# `cargo binstall` fetches the archive the release workflow attaches, named after the binary
+# rather than this crate.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/mori-v{ version }-{ target }{ archive-suffix }"
+bin-dir = "mori-v{ version }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
 [[bin]]
 name = "mori"
 path = "src/main.rs"
