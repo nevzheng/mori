@@ -40,3 +40,10 @@ Feature: CUJ 6 - clean up safely: removing what the report finds
     Then it succeeds
     And the output says "claude-fix-login" was kept because it has unsaved work
     And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
+
+  Scenario: A tree whose working copy another workspace rebased is still removed
+    Given trunk moves and another workspace rebases the working copy of "claude-fix-login" onto it
+    When I run "mori gc --apply --yes"
+    Then it succeeds
+    And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
+    And the journal has an entry for "claude-fix-login" whose commit is pinned

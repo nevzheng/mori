@@ -1,9 +1,9 @@
 Feature: CUJ 4 - an agent finishes and removes its tree
   `mori tree remove` removes a task tree mori made, only when nothing in it exists only on this
   machine: no edits and no change missing from the remote, or work that landed. Anyone may remove
-  any task tree that is safe to remove. It snapshots the
-  tree first, so recent edits count. It never removes the clone itself or a workspace mori
-  didn't make.
+  any task tree that is safe to remove. It snapshots the tree first, so recent edits count, even
+  in a tree whose working copy another workspace rebased (which leaves it stale). It never removes
+  the clone itself or a workspace mori didn't make.
 
   Background:
     Given a temporary HOME with XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME inside it
@@ -25,6 +25,18 @@ Feature: CUJ 4 - an agent finishes and removes its tree
     When I run "mori tree remove github.com/acme/widget claude-fix-login"
     Then it fails with status FAILED_PRECONDITION and reason "TREE_HAS_UNSAVED_WORK"
     And "<home>/mori/trees/widget/claude-fix-login/login.rs" exists
+
+  Scenario: A tree whose working copy another workspace rebased is still removed
+    Given trunk moves and another workspace rebases the working copy of "claude-fix-login" onto it
+    When I run "mori tree remove github.com/acme/widget claude-fix-login"
+    Then it succeeds
+    And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
+
+  Scenario: Edits jj hasn't seen yet still block removal after a rebase elsewhere
+    Given someone edits "claude-fix-login" without running jj
+    And trunk moves and another workspace rebases the working copy of "claude-fix-login" onto it
+    When I run "mori tree remove github.com/acme/widget claude-fix-login"
+    Then it fails with status FAILED_PRECONDITION and reason "TREE_HAS_UNSAVED_WORK"
 
   Scenario: Committed but unpushed work blocks removal
     Given someone commits work in "claude-fix-login"

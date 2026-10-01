@@ -3,7 +3,8 @@
 //! Reads pass `--ignore-working-copy`, so jj doesn't even snapshot a working copy while mori looks.
 //! The writes, [`JjCli::clone_repo`] and [`JjCli::add_workspace`], each make one new directory and
 //! clean up after themselves if jj fails. [`JjCli::snapshot`] and [`JjCli::forget_workspace`] are
-//! for removing a tree, and change only jj's own records.
+//! for removing a tree, and change only jj's own records, except that a snapshot first brings a
+//! stale working copy up to date.
 
 use std::ffi::OsString;
 use std::io::ErrorKind;
@@ -144,12 +145,20 @@ impl JjCli {
     }
 
     /// Snapshots the working copy of the tree at `tree`, so jj records edits made since it last
-    /// ran there. Files aren't changed; only jj's record of them is.
+    /// ran there.
+    ///
+    /// A working copy goes stale when its commit is rewritten from another workspace (a lead
+    /// agent rebasing a worker's change, say), and jj then refuses to snapshot it. So this first
+    /// runs `jj workspace update-stale`, which does nothing to a fresh working copy. A stale one
+    /// is moved to its rewritten commit, which changes its files. Edits jj hadn't seen yet are
+    /// snapshotted onto the old commit instead, which leaves the tree's change divergent;
+    /// [`Workspaces::state`] counts a divergent working copy as changed, so they still count.
     ///
     /// # Errors
     ///
     /// [`JjError::Failed`] with jj's message, [`JjError::NotFound`] if jj isn't installed.
     pub fn snapshot(&self, tree: &Path) -> Result<(), JjError> {
+        self.write(tree, &["workspace", "update-stale"])?;
         self.write(tree, &["util", "snapshot"])
     }
 
@@ -538,9 +547,10 @@ fn parse_remote_bookmarks(stdout: &str) -> Result<Vec<RemoteBookmark>, JjError> 
         .collect()
 }
 
-/// Prints the working-copy change's ID and whether it has edits.
+/// Prints the working-copy change's ID and whether it has edits. A divergent change counts as
+/// edited: another commit of it may hold edits that aren't in the tree (see [`JjCli::snapshot`]).
 const STATE_TEMPLATE: &str =
-    r#"change_id.short(12) ++ " " ++ if(empty, "clean", "changed") ++ "\n""#;
+    r#"change_id.short(12) ++ " " ++ if(empty && !divergent, "clean", "changed") ++ "\n""#;
 
 /// Quotes `name` as a revset string, so any workspace name, even a foreign one, is taken
 /// literally.
@@ -1093,6 +1103,70 @@ mod tests {
             &["--repository", &tree_arg, "commit", "--message", "login"],
         )?;
         Ok((clone, tree))
+    }
+
+    /// Rebases the tree's committed change onto a new commit made in the clone, as a lead agent
+    /// does, which leaves the tree's working copy stale.
+    fn rebase_from_the_clone(jj: &JjCli, clone: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let clone_arg = clone.display().to_string();
+        std::fs::write(clone.join("NOTES.md"), "trunk moved\n")?;
+        run(
+            jj,
+            &["--repository", &clone_arg, "commit", "--message", "notes"],
+        )?;
+        run(
+            jj,
+            &[
+                "--repository",
+                &clone_arg,
+                "rebase",
+                "--source",
+                "claude-fix-login@-",
+                "--destination",
+                "@-",
+            ],
+        )
+    }
+
+    #[test]
+    fn a_snapshot_brings_a_stale_tree_up_to_date() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let (clone, tree) = tree_with_a_commit(&jj, dir.path())?;
+        rebase_from_the_clone(&jj, &clone)?;
+
+        jj.snapshot(&tree)?;
+
+        let state = jj.state(&clone, "claude-fix-login")?;
+        assert!(!state.changed);
+        assert_eq!(state.unpushed, 2, "the rebased change and the clone's own");
+        assert_eq!(
+            std::fs::read_to_string(tree.join("NOTES.md"))?,
+            "trunk moved\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(tree.join("login.rs"))?,
+            "fn login() {}\n"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn edits_in_a_stale_tree_still_count() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        let (clone, tree) = tree_with_a_commit(&jj, dir.path())?;
+        std::fs::write(tree.join("logout.rs"), "fn logout() {}\n")?;
+        rebase_from_the_clone(&jj, &clone)?;
+
+        jj.snapshot(&tree)?;
+
+        assert!(jj.state(&clone, "claude-fix-login")?.changed);
+        Ok(())
     }
 
     #[test]
