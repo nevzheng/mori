@@ -9,3 +9,5 @@
 
 - [using-mori](using-mori/SKILL.md): the commands, JSON output, errors and the rules agents follow when using mori
 - [lead-tree](lead-tree/SKILL.md): how to run a long-lived coordinating tree where several agents' work comes together
+- [vcs-in-mori](vcs-in-mori/SKILL.md): jj and git in a mori repo: which works where, what's safe to mix, and the equivalents
+- [agent-workflows](agent-workflows/SKILL.md): coordinator and workers, exchanging work (change IDs, bookmarks, patches), restacking
