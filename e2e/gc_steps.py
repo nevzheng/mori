@@ -49,6 +49,15 @@ def push_top(env: dict[str, str], placeholders: Placeholders, name: str, bookmar
     jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
 
 
+@given(parsers.parse('someone rebases "{name}" onto trunk and pushes "{bookmark}"'))
+def rebase_onto_trunk(
+    env: dict[str, str], placeholders: Placeholders, name: str, bookmark: str
+) -> None:
+    tree = str(placeholders.path(f"{TREES}/{name}"))
+    jj(env, "--repository", tree, "rebase", "--source", "@-", "--destination", "trunk()")
+    jj(env, "--repository", tree, "git", "push", "--bookmark", bookmark)
+
+
 @then("the output says how to apply the report")
 def says_how_to_apply(mori: Mori) -> None:
     assert_that(mori.last.stdout, contains_string("`mori gc --apply --yes`"))

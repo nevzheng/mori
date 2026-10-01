@@ -63,6 +63,8 @@ struct State {
     trees: BTreeMap<(PathBuf, String), FakeTree>,
     commits: BTreeSet<String>,
     pins: BTreeMap<String, String>,
+    /// Bookmarks the remote has that hold no tree's work, besides each tree's own.
+    elsewhere: Vec<RemoteBookmark>,
 }
 
 /// An in-memory VCS that makes real directories, so the flows' own disk checks still apply.
@@ -211,6 +213,20 @@ impl Vcs for FakeVcs {
         name: &str,
     ) -> std::result::Result<Vec<RemoteBookmark>, FakeError> {
         self.tree(clone, name, |tree| tree.bookmarks.clone())
+    }
+
+    fn remote_bookmarks(
+        &self,
+        clone: &Path,
+    ) -> std::result::Result<Vec<RemoteBookmark>, FakeError> {
+        let state = self.state.borrow();
+        Ok(state
+            .trees
+            .iter()
+            .filter(|((of, _), _)| of == clone)
+            .flat_map(|(_, tree)| tree.bookmarks.iter().cloned())
+            .chain(state.elsewhere.iter().cloned())
+            .collect())
     }
 
     fn last_change(&self, _clone: &Path, _name: &str) -> std::result::Result<u64, FakeError> {
@@ -513,5 +529,63 @@ fn gc_without_yes_removes_nothing() -> Result<()> {
 
     assert_eq!(error.reason(), "CONFIRMATION_NEEDED");
     assert!(fixture.tree_names()?.contains(&name));
+    Ok(())
+}
+
+/// The reason the gc report gives for the tree `name`.
+fn gc_reason(fixture: &Fixture, name: &str) -> Result<String> {
+    let report = gc::run(
+        &fixture.app,
+        &gc::GcArgs {
+            repo: None,
+            offline: true,
+            apply: None,
+        },
+    )
+    .map_err(to_std)?;
+    report
+        .items
+        .into_iter()
+        .find(|item| item.name == name)
+        .map(|item| item.reason)
+        .ok_or_else(|| format!("{name} not in the report").into())
+}
+
+#[test]
+fn a_bookmark_moved_off_the_tree_never_lands_it() -> Result<()> {
+    // Given a tree whose work mori saw pushed under a bookmark (say, stacked under another tree's).
+    let fixture = Fixture::new()?;
+    let name = fixture.create("fix-login")?;
+    let clone = fixture.clone_path();
+    let bookmark = |commit_id: String| RemoteBookmark {
+        name: "claude/fix-logout".to_owned(),
+        remote: "origin".to_owned(),
+        commit_id,
+    };
+    fixture.app.vcs.tree(&clone, &name, |tree| {
+        tree.unpushed = 1;
+        tree.bookmarks = vec![bookmark(tree.commit.clone())];
+    })?;
+    fixture.tree_names()?;
+
+    // When the bookmark moves off the tree's work (rebased onto trunk) but stays on the remote,
+    fixture
+        .app
+        .vcs
+        .tree(&clone, &name, |tree| tree.bookmarks.clear())?;
+    fixture
+        .app
+        .vcs
+        .state
+        .borrow_mut()
+        .elsewhere
+        .push(bookmark("c-rebased".to_owned()));
+
+    // then the tree's work hasn't landed,
+    assert_eq!(gc_reason(&fixture, &name)?, "NOT_YET");
+
+    // and it still hasn't when the moved bookmark later lands and the remote deletes it.
+    fixture.app.vcs.state.borrow_mut().elsewhere.clear();
+    assert_eq!(gc_reason(&fixture, &name)?, "NOT_YET");
     Ok(())
 }

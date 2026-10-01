@@ -237,6 +237,27 @@ impl Database {
             .map_err(|source| self.sqlite(source))
     }
 
+    /// Forgets that `bookmark` on `remote` was pushed from the tree with ID `tree_id`. Forgetting
+    /// one that isn't recorded does nothing.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error.
+    pub fn forget_tree_bookmark(
+        &mut self,
+        tree_id: &str,
+        remote: &str,
+        bookmark: &str,
+    ) -> Result<(), StoreError> {
+        self.conn
+            .execute(
+                "DELETE FROM tree_bookmarks WHERE tree_id = ?1 AND remote = ?2 AND bookmark = ?3",
+                params![tree_id, remote, bookmark],
+            )
+            .map(|_| ())
+            .map_err(|source| self.sqlite(source))
+    }
+
     /// Every bookmark mori has seen pushed from the tree with ID `tree_id`, sorted.
     ///
     /// # Errors
@@ -604,6 +625,14 @@ mod tests {
         assert_eq!(seen.len(), 1);
         assert_eq!(seen[0].bookmark, "claude/fix-login");
         assert_eq!(seen[0].commit_id, "bbbb");
+
+        db.record_tree_bookmark(&tree.id, "origin", "claude/other", "cccc")
+            .unwrap();
+        db.forget_tree_bookmark(&tree.id, "origin", "claude/other")
+            .unwrap();
+        db.forget_tree_bookmark(&tree.id, "origin", "claude/never-seen")
+            .unwrap();
+        assert_eq!(db.tree_bookmarks(&tree.id).unwrap(), seen);
 
         assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
         assert_eq!(db.tree_bookmarks(&tree.id).unwrap(), []);

@@ -168,8 +168,9 @@ mori restore <entry-id>
 ### What mori records about pushed bookmarks
 
 Schema v3 adds one table. Whenever `mori ls`, `mori gc` or `mori tree remove` looks at a tree, it
-notes every remote bookmark pointing into the tree's own history (its changes not in trunk),
-before any fetch:
+notes every remote bookmark whose history holds the tree's own work (its changes not in trunk),
+before any fetch. That is the bookmarks pointing into that work and the ones on changes stacked
+on top of it, so a stack pushed as one bookmark lands every tree in it. Trunk is never one.
 
 ```sql
 CREATE TABLE tree_bookmarks (
@@ -183,14 +184,17 @@ CREATE TABLE tree_bookmarks (
 ```
 
 A row is updated when the bookmark moves and kept when it disappears: its disappearance is the
-fact that matters.
+fact that matters. A row whose bookmark the remote still has, but that no longer holds the tree's
+work (say, rebased onto trunk), is deleted: the bookmark says nothing about the tree any more, and
+its later disappearance must not land the tree.
 
 ### Landing facts
 
 - **`pr-merged`**: for a bookmark recorded for the tree, `gh pr view <bookmark> --json state` says
   `MERGED`. Uses the person's existing `gh` login; without `gh`, this fact is unknown.
-- **`pushed-bookmark-deleted`**: a bookmark recorded for the tree is gone from the remote after
-  the fetch. After a fetch jj no longer shows it at all, which is why mori records it first.
+- **`pushed-bookmark-deleted`**: a bookmark recorded for the tree is gone from the remote after the
+  fetch, checked against every bookmark the remote has. After a fetch jj no longer shows it at all,
+  which is why mori records it first.
 
 A bookmark that landed either way is a **landed bookmark**; its recorded `commit_id` marks the
 work that landed.

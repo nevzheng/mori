@@ -107,6 +107,13 @@ pub trait Vcs: Workspaces {
         name: &str,
     ) -> Result<Vec<RemoteBookmark>, Self::Error>;
 
+    /// Every bookmark the clone knows the remotes have, wherever it points.
+    ///
+    /// # Errors
+    ///
+    /// If the VCS fails or its answer can't be read.
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, Self::Error>;
+
     /// When the tree's working copy last changed, in seconds since the Unix epoch.
     ///
     /// # Errors

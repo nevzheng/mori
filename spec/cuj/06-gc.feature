@@ -45,6 +45,19 @@ Feature: CUJ 6 - clean up safely: the report
     Then the report has "claude-fix-logout" as "remove" because "LANDED"
     And the report has "claude-fix-login" as "remove" because "LANDED"
 
+  Scenario: A bookmark that moved off a tree's work never lands it
+    Given someone commits work in "claude-fix-login"
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-logout"
+    And someone stacks work in "claude-fix-logout" on top of "claude-fix-login"
+    And pushes the top of "claude-fix-logout" to the remote as "claude/fix-logout"
+    And I have run "mori ls"
+    And someone rebases "claude-fix-logout" onto trunk and pushes "claude/fix-logout"
+    And I have run "mori ls"
+    And the remote deletes "claude/fix-logout" after a squash merge
+    When I run "mori gc --json"
+    Then the report has "claude-fix-logout" as "remove" because "LANDED"
+    And the report has "claude-fix-login" as "keep" because "NOT_YET"
+
   Scenario: An open bookmark with no answer from GitHub isn't a candidate
     Given someone commits work in "claude-fix-login"
     And pushes it to the remote as "claude/fix-login"

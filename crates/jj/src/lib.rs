@@ -327,6 +327,26 @@ impl JjCli {
         parse_remote_bookmarks(&stdout)
     }
 
+    /// Every remote bookmark the clone knows, wherever it points. The colocated `git`
+    /// pseudo-remote is left out.
+    ///
+    /// # Errors
+    ///
+    /// When jj can't be run or its answer can't be read.
+    pub fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, JjError> {
+        let stdout = self.read(
+            clone,
+            &[
+                "bookmark",
+                "list",
+                "--all-remotes",
+                "-T",
+                REMOTE_BOOKMARK_TEMPLATE,
+            ],
+        )?;
+        parse_remote_bookmarks(&stdout)
+    }
+
     /// When the tree last changed: the latest committer time among its own changes and its
     /// working copy, in seconds since the Unix epoch.
     ///
@@ -500,6 +520,10 @@ impl Vcs for JjCli {
 
     fn pushed_bookmarks(&self, clone: &Path, name: &str) -> Result<Vec<RemoteBookmark>, JjError> {
         Self::pushed_bookmarks(self, clone, name)
+    }
+
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, JjError> {
+        Self::remote_bookmarks(self, clone)
     }
 
     fn last_change(&self, clone: &Path, name: &str) -> Result<u64, JjError> {
@@ -1137,6 +1161,14 @@ mod tests {
         assert_eq!(pushed[0].name, "claude/fix-login");
         assert_eq!(pushed[0].remote, "origin");
         assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 0);
+        let names = |jj: &JjCli| -> Result<Vec<String>, JjError> {
+            Ok(jj
+                .remote_bookmarks(&clone)?
+                .into_iter()
+                .map(|b| format!("{}@{}", b.name, b.remote))
+                .collect())
+        };
+        assert_eq!(names(&jj)?, ["claude/fix-login@origin", "main@origin"]);
 
         // The remote deletes the bookmark (as after a squash merge): the work is only local again,
         // unless the commit the bookmark last pointed to counts as landed.
@@ -1156,6 +1188,7 @@ mod tests {
         )?;
         jj.fetch(&clone)?;
         assert_eq!(jj.pushed_bookmarks(&clone, "claude-fix-login")?, []);
+        assert_eq!(names(&jj)?, ["main@origin"]);
         assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 1);
         let landed = [pushed[0].commit_id.clone()];
         assert_eq!(
