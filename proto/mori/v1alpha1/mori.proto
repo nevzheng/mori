@@ -239,6 +239,29 @@ message TreeRow {
 
   // The VCS state; unset for a missing tree.
   TreeState state = 3;
+
+  // The bookmarks mori has seen pushed from the tree (task trees only), and whether each landed.
+  repeated PushedBookmark bookmarks = 4;
+}
+
+// A bookmark mori saw pushed from a tree.
+message PushedBookmark {
+  // The remote, e.g. "origin".
+  string remote = 1;
+
+  // The bookmark, e.g. "claude/fix-login".
+  string name = 2;
+
+  // Where it pointed when mori last saw it.
+  string commit_id = 3;
+
+  // Whether the remote still has it, as far as the clone knows.
+  bool on_remote = 4;
+
+  // Whether its work landed: it is gone from the remote after being pushed (as after a squash
+  // merge). `ls` doesn't ask GitHub, so a merged pull request whose bookmark still exists shows as
+  // not landed here.
+  bool landed = 5;
 }
 
 // A tree's state as of the VCS's last snapshot of it.

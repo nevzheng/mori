@@ -4,7 +4,8 @@
 use std::collections::BTreeSet;
 
 use mori_api::v1alpha1::{
-    ListTreesResponse, RepoTrees, Tree, TreeRow, TreeState, UnmanagedRepo, tree_row::Status,
+    ListTreesResponse, PushedBookmark, RepoTrees, Tree, TreeRow, TreeState, UnmanagedRepo,
+    tree_row::Status,
 };
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
 use mori_core::error::{ErrorDetails, RepoError};
@@ -74,9 +75,9 @@ fn list_repo(
         // A task tree's landed work counts as saved, so a squash-merged tree isn't shown as
         // unpushed; looking also records the bookmarks it pushed, for when the remote deletes
         // them.
-        let landed = match &entry {
+        let (landed, seen) = match &entry {
             Entry::Tree { record, workspace } if record.role == Role::Task.as_str() => {
-                landing::observe(
+                let (landing, seen) = landing::observe_each(
                     db,
                     jj,
                     None,
@@ -86,12 +87,23 @@ fn list_repo(
                         id: &record.id,
                         name: &workspace.name,
                     },
-                )?
-                .commits
+                )?;
+                (landing.commits, seen)
             }
-            _ => Vec::new(),
+            _ => (Vec::new(), Vec::new()),
         };
-        trees.push(row(paths, jj, repo, &clone, entry, &landed)?);
+        let mut tree = row(paths, jj, repo, &clone, entry, &landed)?;
+        tree.bookmarks = seen
+            .into_iter()
+            .map(|seen| PushedBookmark {
+                remote: seen.remote,
+                name: seen.bookmark,
+                commit_id: seen.commit_id,
+                on_remote: seen.on_remote,
+                landed: seen.landed,
+            })
+            .collect();
+        trees.push(tree);
     }
     Ok(RepoTrees {
         repo: repo.remote.clone(),
@@ -126,6 +138,7 @@ fn row(
                 workspace.root.display().to_string(),
             )),
             status: Status::Tree.into(),
+            bookmarks: Vec::new(),
         },
         Entry::Missing { record } => {
             let path = if record.name == BASE_TREE_NAME {
@@ -136,6 +149,7 @@ fn row(
             TreeRow {
                 tree: Some(recorded_tree(repo, record, path.display().to_string())),
                 status: Status::Missing.into(),
+                bookmarks: Vec::new(),
                 state: None,
             }
         }
@@ -148,6 +162,7 @@ fn row(
                 ..Tree::default()
             }),
             status: Status::Foreign.into(),
+            bookmarks: Vec::new(),
         },
     })
 }
