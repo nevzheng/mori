@@ -58,12 +58,17 @@ def env(tmp_path: Path) -> dict[str, str]:
     jj_dir = Path(os.environ["MORI_TEST_JJ"]).resolve().parent
     jj_config = tmp_path / "jj.toml"
     jj_config.write_text('user.name = "Test"\nuser.email = "test@example.com"\n')
-    return {
+    env = {
         "PATH": f"{jj_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
         "JJ_CONFIG": str(jj_config),
         # Never ask the real GitHub: with no gh, "PR merged" is unknown, as offline.
         "MORI_GH": "/nonexistent/gh",
     }
+    # Under the coverage job, an instrumented binary writes its profile here instead of into HOME,
+    # where it would count as a file the command created.
+    if "LLVM_PROFILE_FILE" in os.environ:
+        env["LLVM_PROFILE_FILE"] = os.environ["LLVM_PROFILE_FILE"]
+    return env
 
 
 @pytest.fixture
