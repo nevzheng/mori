@@ -1,0 +1,96 @@
+name: release
+
+# The release channel (docs/install.md). Pushing a tag vX.Y.Z builds mori for macOS and Linux and
+# attaches the archives and their checksums to a draft GitHub release, which a maintainer reviews
+# and publishes by hand. Running it by hand, or a pull request that changes this workflow or the
+# version, builds the same archives without releasing anything.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/release.yml", "version.bzl", "Cargo.toml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    # A release's version has no -dev suffix and matches the tag, in Cargo.toml and version.bzl.
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: check
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          cargo_version=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -1)
+          bzl_version=$(sed -n 's/^MORI_VERSION = "\([^"]*\)"/\1/p' version.bzl)
+          if [[ "$cargo_version" != "$bzl_version" ]]; then
+            echo "::error::Cargo.toml says $cargo_version but version.bzl says $bzl_version"
+            exit 1
+          fi
+          if [[ -n "$TAG" ]]; then
+            if [[ "$TAG" != "v$cargo_version" ]]; then
+              echo "::error::tag $TAG doesn't match version $cargo_version"
+              exit 1
+            fi
+            if [[ "$cargo_version" == *-dev ]]; then
+              echo "::error::$cargo_version is a head version; a release drops -dev"
+              exit 1
+            fi
+          fi
+          echo "version=$cargo_version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+    runs-on: ${{ matrix.os }}
+    env:
+      ARCHIVE: mori-v${{ needs.version.outputs.version }}-${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
+        with:
+          toolchain: 1.94.1
+          targets: ${{ matrix.target }}
+      - run: cargo build --release --locked -p mori-cli --target ${{ matrix.target }}
+      - name: Package
+        run: |
+          set -euo pipefail
+          mkdir "$ARCHIVE"
+          cp "target/${{ matrix.target }}/release/mori" LICENSE README.md "$ARCHIVE/"
+          tar -czf "$ARCHIVE.tar.gz" "$ARCHIVE"
+          shasum -a 256 "$ARCHIVE.tar.gz" > "$ARCHIVE.tar.gz.sha256"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ARCHIVE }}
+          path: ${{ env.ARCHIVE }}.tar.gz*
+
+  release:
+    # Only for a tag: a draft, so nothing is public until a maintainer publishes it.
+    if: github.ref_type == 'tag'
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+            --title "mori $TAG" --generate-notes

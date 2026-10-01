@@ -8,7 +8,7 @@ Feature: Harness smoke test
   Scenario: The binary reports its version
     When I run "mori --version"
     Then it succeeds
-    And stdout matches "mori \d+\.\d+\.\d+"
+    And stdout matches "mori \d+\.\d+\.\d+(-dev)?"
 
   Scenario: Unknown arguments are a usage error
     When I run "mori plant a-tree"

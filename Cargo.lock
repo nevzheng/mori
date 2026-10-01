@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "mori-api"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "pbjson",
  "prost",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "mori-app"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "mori-api",
  "mori-core",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "mori-cli"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "clap",
  "mori-api",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "mori-core"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "serde",
  "sha2",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "mori-git"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "mori-core",
  "tempfile",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "mori-github"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "mori-core",
  "tempfile",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "mori-jj"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "mori-core",
  "serde_json",
@@ -580,11 +580,11 @@ dependencies = [
 
 [[package]]
 name = "mori-mcp"
-version = "0.0.0"
+version = "0.1.0-dev"
 
 [[package]]
 name = "mori-protogen"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "pbjson-build",
  "prost",
@@ -594,7 +594,7 @@ dependencies = [
 
 [[package]]
 name = "mori-store"
-version = "0.0.0"
+version = "0.1.0-dev"
 dependencies = [
  "mori-core",
  "rusqlite",
