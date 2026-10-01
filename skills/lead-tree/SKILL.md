@@ -83,6 +83,28 @@ working copies, so handing over means naming commits:
 4. **Push** with the person's yes: `git push -u origin <branch>`. The agents' trees become
    removable then, and stay removable after the branch is squash-merged and deleted.
 
+## Handing finished work to the person
+
+People stay on their root checkout (the clone itself, the `default` tree) and look only at finished,
+reviewable work. They can open any tree, but a forest of half-done trees gets confusing fast, so
+the lead hands them one thing per finished piece of work.
+
+1. **Integrate and test** in the lead tree first. Nothing half-done goes to the person.
+2. **Name the result** `ready/<topic>`, local only:
+   - jj: `jj bookmark create ready/<topic> -r <last change>`;
+   - git: `git branch ready/<topic>` in the lead tree.
+3. **Say what it is:** `mori tree set <repo> <lead tree> --purpose "ready for review: <topic>"`.
+4. **Tell the person** in one message: the name `ready/<topic>`, what it does, how you tested it,
+   and anything they must decide.
+5. **Don't touch their root,** and don't push or open a pull request without their yes. Every tree
+   shares the clone's commits, so they can already see it:
+   - jj: `jj diff -r ready/<topic>` to read it, `jj new ready/<topic>` to try it;
+   - git: `git switch --detach ready/<topic>`, and back with `git switch -`.
+6. **After their review,** push it and open the pull request when they say so. Once it lands,
+   delete the `ready/` name; `mori gc` cleans up the worker trees and, when they ask, the lead tree.
+
+A patch or a pushed branch is only for another machine (see `agent-workflows`).
+
 ## When it's done
 
 A pinned tree stays until someone removes it on purpose. When the effort has landed, tell the
