@@ -42,7 +42,9 @@ its fix.
 
 ## Habits that keep trees small
 
-- Remove a tree when its work has landed: `mori tree remove <repo> <name>`.
+- Remove a tree when its work has landed: `mori tree remove <repo> <name>`. If you started Docker
+  Compose in it, run `docker compose down --volumes --rmi local` in the tree first: Compose names
+  its project after the tree's directory, so its containers, volumes and images outlive the tree.
 - In a huge repo where your task touches one corner, a sparse checkout shrinks the working copy:
   `jj sparse set --clear --add <dir>` in a jj tree, `git sparse-checkout set <dir>` in a git tree.
   It changes only your tree. Skip it if the build needs the whole repo.

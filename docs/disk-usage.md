@@ -88,6 +88,35 @@ Turn on the build cache in `~/.gradle/gradle.properties` with `org.gradle.cachin
 reuse outputs from other trees. mori doesn't check it, since builds and plugins can set it in too
 many ways.
 
+## Docker and OrbStack
+
+Containers add to the cost, and they live outside your trees, so removing a tree doesn't free them.
+The biggest catch is Docker Compose: it names a project after the directory it runs in, and every
+mori tree has its own directory. So each tree that runs `docker compose up` gets its own containers,
+networks, named volumes and locally built images, and they stay after the tree is gone.
+
+- **Before removing a tree,** stop what it started, from inside the tree:
+  `docker compose down --volumes --rmi local`.
+- **After the tree is gone,** the project still has its name (the tree's directory name), so
+  `docker compose -p claude-fix-login down --volumes --rmi local` works from anywhere.
+- **See what is using space:** `docker system df -v`. Compose labels everything it makes, so
+  `docker volume ls --filter label=com.docker.compose.project` lists the volumes by project.
+- **Clean up:** `docker system prune` removes stopped containers, unused networks, dangling images
+  and build cache. Add `--all` for every image no container uses. Named volumes, which Compose
+  makes, need `docker volume prune --all`, and their data is gone for good. `docker builder prune`
+  clears only the build cache.
+- **Cap the build cache** so it trims itself: BuildKit's garbage collection is set under
+  `builder.gc` in the daemon's `daemon.json` (in Docker Desktop: Settings, Docker Engine).
+
+Docker Desktop keeps everything in one disk image with a size limit you can change under Settings,
+Resources. OrbStack works with the same `docker` commands. Its disk is a
+sparse file that shrinks when you delete data, so pruning frees space on your Mac too; its large
+apparent size isn't real use. References:
+[pruning](https://docs.docker.com/engine/manage-resources/pruning/),
+[`docker system df`](https://docs.docker.com/reference/cli/docker/system/df/),
+[build cache garbage collection](https://docs.docker.com/build/cache/garbage-collection/), and
+[OrbStack's FAQ](https://docs.orbstack.dev/faq).
+
 ## Sparse checkouts
 
 A huge repo where each task touches one corner can check out only that corner. Sparse patterns are
