@@ -192,8 +192,12 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
         }
         let _ = writeln!(text);
     }
-    if !response.repos.is_empty() {
-        let _ = writeln!(text, "WORK is as of jj's last snapshot in each tree.");
+    // git reads working trees live; jj's view is as of its last snapshot.
+    if response.repos.iter().any(|repo| repo.vcs() != Vcs::Git) {
+        let _ = writeln!(
+            text,
+            "WORK in jj trees is as of jj's last snapshot in each tree."
+        );
     }
     text
 }

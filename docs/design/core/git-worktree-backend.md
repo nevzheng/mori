@@ -6,7 +6,7 @@
 | **Status**  | accepted   |
 | **Area**    | core       |
 | **Issue**   | none       |
-| **PR**      | this PR    |
+| **PR**      | #69        |
 | **Created** | 2026-10-01 |
 | **Updated** | 2026-10-01 |
 

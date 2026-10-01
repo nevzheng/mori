@@ -66,8 +66,21 @@ work between trees; you point at it.
 4. **Test the combined result** in the lead tree before anything goes up.
 5. **Publish only with the person's yes:** bookmarks, pushes and pull requests leave the machine.
 
-With git the same idea holds, and matters more: a branch can be checked out in only one worktree,
-so the lead tree is the one place the combined branch lives.
+## On a git clone
+
+In a git clone (`mori clone --vcs git`) the trees are git worktrees, and they share commits but not
+working copies, so handing over means naming commits:
+
+1. **Agents** commit on their detached HEAD and report the SHAs
+   (`git log --oneline origin/HEAD..HEAD`). They don't make branches; a branch can be checked out
+   in only one worktree.
+2. **The lead** makes the combined branch in its own tree (`git switch -c <branch>`) and merges
+   each agent's commit (`git merge <sha>`). The lead tree is the one place that branch lives.
+3. **Merge rather than rebase or cherry-pick:** a copy leaves the agent's original commits on no
+   remote branch, so its tree reads as unsaved until the agent runs
+   `git switch --detach <lead's tip>`.
+4. **Push** with the person's yes: `git push -u origin <branch>`. The agents' trees become
+   removable then, and stay removable after the branch is squash-merged and deleted.
 
 ## When it's done
 

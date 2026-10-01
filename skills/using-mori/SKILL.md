@@ -75,10 +75,13 @@ Clones a repo into `repos/<host>/<owner>/<repo>` and records it with a pinned ba
   `git@host:owner/repo.git`, or the short `host/owner/repo` (fetched over https). Plain `http://`,
   `file://` and nested groups are refused.
 - **`--dry-run`** shows the path, fetch URL and `trees/` directory, and clones nothing.
-- **`--no-colocate`** makes a jj-only clone. By default the clone is a git repo too.
+- **`--vcs jj|git`**: `jj` (the default) makes trees as jj workspaces; `git` makes a plain git
+  clone whose trees are detached git worktrees, where git and `gh` work. Without the flag,
+  `[vcs] default` in `config.toml` decides. See the `vcs-in-mori` skill.
+- **`--no-colocate`** makes a jj-only clone (jj only). By default a jj clone is a git repo too.
 - It refuses a repo mori already has, and any path that already exists.
 
-Run `mori init` first. mori needs `jj` on `PATH`.
+Run `mori init` first. mori needs `jj` on `PATH` for jj clones, and `git` for git clones.
 
 ### `mori ls [repo]`
 
@@ -86,21 +89,23 @@ Lists every repo mori manages (or just one) and every tree in it: name, status, 
 lifetime, and the work in it. It only reads; it never snapshots a working copy, so it is always
 safe to run, even while others work.
 
-- **Status:** `tree` (mori made it and jj has it), `missing` (mori recorded it but jj has no such
-  workspace), or `foreign` (jj has it but mori didn't make it: leave it alone).
+- **Status:** `tree` (mori made it and the VCS has it), `missing` (mori recorded it but the VCS
+  has no such workspace or worktree), or `foreign` (the VCS has it but mori didn't make it: leave
+  it alone).
 - **Work:** `edited` (the working-copy change has edits) and `N unpushed` (changes that exist only
-  on this machine). It is as of jj's last snapshot in that tree, so run `jj status` in your own
-  tree first if you need it current.
+  on this machine). In a jj clone it is as of jj's last snapshot in that tree, so run `jj status`
+  in your own tree first if you need it current; a git clone's is always current.
 - Clones under `repos/` that mori didn't make are listed apart, and left alone.
-- With `--json`, rows are in `repos[].trees[]`, with `status` (`STATUS_TREE`, `STATUS_MISSING`,
-  `STATUS_FOREIGN`), `tree`, `state`, and `bookmarks`: each bookmark mori has seen the tree push,
-  with `onRemote` and `landed` (gone from the remote after a push, as after a squash merge). Fields
-  at their default (`false`, `0`) are left out.
+- With `--json`, each repo has `vcs` (`VCS_JJ` or `VCS_GIT`); rows are in `repos[].trees[]`, with
+  `status` (`STATUS_TREE`, `STATUS_MISSING`, `STATUS_FOREIGN`), `tree`, `state`, and `bookmarks`:
+  each bookmark mori has seen the tree push, with `onRemote` and `landed` (gone from the remote
+  after a push, as after a squash merge). Fields at their default (`false`, `0`) are left out.
 
 ### `mori tree create <repo> --task <slug>`
 
-Gives one piece of work its own tree: a jj workspace at `trees/<repo>/<name>`, on a new change on
-top of trunk, recorded with its owner, task and lifetime. Work in that directory; it is yours.
+Gives one piece of work its own tree at `trees/<repo>/<name>`: a jj workspace on a new change on top
+of trunk, or in a git clone a detached git worktree at trunk; recorded with its owner, task and
+lifetime. Work in that directory; it is yours.
 
 - **`<repo>`** is the full `host/owner/repo` that `mori ls` prints, e.g.
   `github.com/acme/widget`; `widget` alone is refused.
@@ -178,30 +183,33 @@ error is a `google.rpc.Status`:
               "domain": "repo.mori", "metadata": {"repo": "github.com/acme/widget"}}]}
 ```
 
-| Exit | Reason                  | What it means, and what to do                                                  |
-| ---- | ----------------------- | ------------------------------------------------------------------------------ |
-| 3    | `INVALID_USAGE`         | Bad flags or arguments. Check `mori <command> --help`.                         |
-| 3    | `CLONE_URL_INVALID`     | The URL isn't a form mori accepts. Use one of the forms above.                 |
-| 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.     |
-| 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.        |
-| 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                         |
-| 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc --apply`.                  |
-| 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.         |
-| 6    | `PATH_EXISTS`           | Something mori didn't make is at the path. Leave it; tell the person.          |
-| 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.     |
-| 6    | `WORKSPACE_EXISTS`      | A workspace mori didn't make has that name. Leave it; pick another slug.       |
-| 9    | `TREE_HAS_UNSAVED_WORK` | The tree has edits or unpushed changes. Push them, or ask the person.          |
-| 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.       |
-| 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                |
-| 9    | `CONFIRMATION_NEEDED`   | `mori gc --apply` needs `--yes`: only when the person asked for it.            |
-| 9    | `RESTORE_COMMIT_GONE`   | The removed tree's commit is gone; it can't come back. Tell the person.        |
-| 9    | `NOT_INITIALIZED`       | mori isn't set up. Run `mori init` if the task allows, else ask.               |
-| 9    | `ROOT_MISMATCH`         | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.     |
-| 9    | `JJ_NOT_FOUND`          | jj isn't installed or on `PATH`. Ask the person to install it.                 |
-| 9    | `OWNER_UNKNOWN`         | No owner: pass `--agent <name>`.                                               |
-| 13   | `JJ_FAILED`             | jj failed (network, auth, missing repo). Nothing was left behind; see message. |
-| 13   | `CLONE_NOT_RECORDED`    | The clone worked but wasn't recorded. It is kept; don't delete it. Report it.  |
-| 13   | `TREE_NOT_RECORDED`     | The tree was made but not recorded. It is kept; don't delete it. Report it.    |
+| Exit | Reason                  | What it means, and what to do                                                   |
+| ---- | ----------------------- | ------------------------------------------------------------------------------- |
+| 3    | `INVALID_USAGE`         | Bad flags or arguments. Check `mori <command> --help`.                          |
+| 3    | `CLONE_URL_INVALID`     | The URL isn't a form mori accepts. Use one of the forms above.                  |
+| 3    | `COLOCATE_NEEDS_JJ`     | `--no-colocate` with `--vcs git`. A git clone is always git; drop one flag.     |
+| 3    | `TREE_NAME_INVALID`     | The task slug makes a bad name. Use lowercase letters, digits and hyphens.      |
+| 5    | `REPO_NOT_MANAGED`      | mori didn't clone this repo. `mori clone` it first, if the task allows.         |
+| 5    | `TREE_NOT_FOUND`        | No tree of that name. Check `mori ls`.                                          |
+| 5    | `ENTRY_NOT_FOUND`       | No such journal entry. Check the output of `mori gc --apply`.                   |
+| 6    | `REPO_EXISTS`           | mori already has this repo. Use the existing clone; don't clone again.          |
+| 6    | `PATH_EXISTS`           | Something mori didn't make is at the path. Leave it; tell the person.           |
+| 6    | `TREE_EXISTS`           | A tree of that name exists. Use a different task slug; don't take it over.      |
+| 6    | `WORKSPACE_EXISTS`      | A workspace mori didn't make has that name. Leave it; pick another slug.        |
+| 9    | `TREE_HAS_UNSAVED_WORK` | The tree has edits or unpushed changes. Push them, or ask the person.           |
+| 9    | `TREE_PINNED`           | A pinned tree. Remove it only if the person asked; then pass `--pinned`.        |
+| 9    | `BASE_TREE`             | That's the clone itself. mori never removes it.                                 |
+| 9    | `CONFIRMATION_NEEDED`   | `mori gc --apply` needs `--yes`: only when the person asked for it.             |
+| 9    | `RESTORE_COMMIT_GONE`   | The removed tree's commit is gone; it can't come back. Tell the person.         |
+| 9    | `NOT_INITIALIZED`       | mori isn't set up. Run `mori init` if the task allows, else ask.                |
+| 9    | `ROOT_MISMATCH`         | `MORI_ROOT` differs from the recorded root. Don't move it; ask the person.      |
+| 9    | `JJ_NOT_FOUND`          | jj isn't installed or on `PATH`. Ask the person to install it.                  |
+| 9    | `GIT_NOT_FOUND`         | git isn't installed or on `PATH`. Ask the person to install it.                 |
+| 9    | `OWNER_UNKNOWN`         | No owner: pass `--agent <name>`.                                                |
+| 13   | `JJ_FAILED`             | jj failed (network, auth, missing repo). Nothing was left behind; see message.  |
+| 13   | `GIT_FAILED`            | git failed (network, auth, bad revision). Nothing was left behind; see message. |
+| 13   | `CLONE_NOT_RECORDED`    | The clone worked but wasn't recorded. It is kept; don't delete it. Report it.   |
+| 13   | `TREE_NOT_RECORDED`     | The tree was made but not recorded. It is kept; don't delete it. Report it.     |
 
 Other reasons (`CONFIG_INVALID`, `DATABASE_NOT_MORI`, `DATABASE_SCHEMA_TOO_NEW`, `IO_ERROR`,
 `DATABASE_ERROR`, …) mean something outside the task is wrong: stop and report the message and
