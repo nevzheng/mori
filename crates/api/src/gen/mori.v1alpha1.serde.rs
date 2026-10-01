@@ -566,6 +566,9 @@ impl serde::Serialize for CreateTreeResponse {
         if self.vcs != 0 {
             len += 1;
         }
+        if !self.warnings.is_empty() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("mori.v1alpha1.CreateTreeResponse", len)?;
         if let Some(v) = self.tree.as_ref() {
@@ -582,6 +585,9 @@ impl serde::Serialize for CreateTreeResponse {
                 .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.vcs)))?;
             struct_ser.serialize_field("vcs", &v)?;
         }
+        if !self.warnings.is_empty() {
+            struct_ser.serialize_field("warnings", &self.warnings)?;
+        }
         struct_ser.end()
     }
 }
@@ -591,7 +597,14 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["tree", "from", "validate_only", "validateOnly", "vcs"];
+        const FIELDS: &[&str] = &[
+            "tree",
+            "from",
+            "validate_only",
+            "validateOnly",
+            "vcs",
+            "warnings",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -599,6 +612,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
             From,
             ValidateOnly,
             Vcs,
+            Warnings,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -627,6 +641,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             "from" => Ok(GeneratedField::From),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
                             "vcs" => Ok(GeneratedField::Vcs),
+                            "warnings" => Ok(GeneratedField::Warnings),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -650,6 +665,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                 let mut from__ = None;
                 let mut validate_only__ = None;
                 let mut vcs__ = None;
+                let mut warnings__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -676,6 +692,12 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                             }
                             vcs__ = Some(map_.next_value::<Vcs>()? as i32);
                         }
+                        GeneratedField::Warnings => {
+                            if warnings__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("warnings"));
+                            }
+                            warnings__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CreateTreeResponse {
@@ -683,6 +705,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeResponse {
                     from: from__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
                     vcs: vcs__.unwrap_or_default(),
+                    warnings: warnings__.unwrap_or_default(),
                 })
             }
         }
@@ -871,6 +894,128 @@ impl<'de> serde::Deserialize<'de> for created_path::Kind {
             }
         }
         deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for Disk {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.free_bytes != 0 {
+            len += 1;
+        }
+        if self.total_bytes != 0 {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.Disk", len)?;
+        if self.free_bytes != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser
+                .serialize_field("freeBytes", ToString::to_string(&self.free_bytes).as_str())?;
+        }
+        if self.total_bytes != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field(
+                "totalBytes",
+                ToString::to_string(&self.total_bytes).as_str(),
+            )?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for Disk {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["free_bytes", "freeBytes", "total_bytes", "totalBytes"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            FreeBytes,
+            TotalBytes,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "freeBytes" | "free_bytes" => Ok(GeneratedField::FreeBytes),
+                            "totalBytes" | "total_bytes" => Ok(GeneratedField::TotalBytes),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = Disk;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.Disk")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<Disk, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut free_bytes__ = None;
+                let mut total_bytes__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::FreeBytes => {
+                            if free_bytes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("freeBytes"));
+                            }
+                            free_bytes__ = Some(
+                                map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                        GeneratedField::TotalBytes => {
+                            if total_bytes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("totalBytes"));
+                            }
+                            total_bytes__ = Some(
+                                map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                    }
+                }
+                Ok(Disk {
+                    free_bytes: free_bytes__.unwrap_or_default(),
+                    total_bytes: total_bytes__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.Disk", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for DoctorRequest {
@@ -2287,9 +2432,21 @@ impl serde::Serialize for ListTreesRequest {
         if !self.repo.is_empty() {
             len += 1;
         }
+        if self.include_sizes {
+            len += 1;
+        }
+        if self.skip_size_cache {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ListTreesRequest", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if self.include_sizes {
+            struct_ser.serialize_field("includeSizes", &self.include_sizes)?;
+        }
+        if self.skip_size_cache {
+            struct_ser.serialize_field("skipSizeCache", &self.skip_size_cache)?;
         }
         struct_ser.end()
     }
@@ -2300,11 +2457,19 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["repo"];
+        const FIELDS: &[&str] = &[
+            "repo",
+            "include_sizes",
+            "includeSizes",
+            "skip_size_cache",
+            "skipSizeCache",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repo,
+            IncludeSizes,
+            SkipSizeCache,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2330,6 +2495,10 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                     {
                         match value {
                             "repo" => Ok(GeneratedField::Repo),
+                            "includeSizes" | "include_sizes" => Ok(GeneratedField::IncludeSizes),
+                            "skipSizeCache" | "skip_size_cache" => {
+                                Ok(GeneratedField::SkipSizeCache)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2350,6 +2519,8 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut repo__ = None;
+                let mut include_sizes__ = None;
+                let mut skip_size_cache__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -2358,10 +2529,24 @@ impl<'de> serde::Deserialize<'de> for ListTreesRequest {
                             }
                             repo__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::IncludeSizes => {
+                            if include_sizes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("includeSizes"));
+                            }
+                            include_sizes__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::SkipSizeCache => {
+                            if skip_size_cache__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("skipSizeCache"));
+                            }
+                            skip_size_cache__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ListTreesRequest {
                     repo: repo__.unwrap_or_default(),
+                    include_sizes: include_sizes__.unwrap_or_default(),
+                    skip_size_cache: skip_size_cache__.unwrap_or_default(),
                 })
             }
         }
@@ -2382,12 +2567,24 @@ impl serde::Serialize for ListTreesResponse {
         if !self.unmanaged_repos.is_empty() {
             len += 1;
         }
+        if self.disk.is_some() {
+            len += 1;
+        }
+        if !self.warnings.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.ListTreesResponse", len)?;
         if !self.repos.is_empty() {
             struct_ser.serialize_field("repos", &self.repos)?;
         }
         if !self.unmanaged_repos.is_empty() {
             struct_ser.serialize_field("unmanagedRepos", &self.unmanaged_repos)?;
+        }
+        if let Some(v) = self.disk.as_ref() {
+            struct_ser.serialize_field("disk", v)?;
+        }
+        if !self.warnings.is_empty() {
+            struct_ser.serialize_field("warnings", &self.warnings)?;
         }
         struct_ser.end()
     }
@@ -2398,12 +2595,20 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["repos", "unmanaged_repos", "unmanagedRepos"];
+        const FIELDS: &[&str] = &[
+            "repos",
+            "unmanaged_repos",
+            "unmanagedRepos",
+            "disk",
+            "warnings",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Repos,
             UnmanagedRepos,
+            Disk,
+            Warnings,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2432,6 +2637,8 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                             "unmanagedRepos" | "unmanaged_repos" => {
                                 Ok(GeneratedField::UnmanagedRepos)
                             }
+                            "disk" => Ok(GeneratedField::Disk),
+                            "warnings" => Ok(GeneratedField::Warnings),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2453,6 +2660,8 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
             {
                 let mut repos__ = None;
                 let mut unmanaged_repos__ = None;
+                let mut disk__ = None;
+                let mut warnings__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repos => {
@@ -2467,11 +2676,25 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
                             }
                             unmanaged_repos__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Disk => {
+                            if disk__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("disk"));
+                            }
+                            disk__ = map_.next_value()?;
+                        }
+                        GeneratedField::Warnings => {
+                            if warnings__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("warnings"));
+                            }
+                            warnings__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(ListTreesResponse {
                     repos: repos__.unwrap_or_default(),
                     unmanaged_repos: unmanaged_repos__.unwrap_or_default(),
+                    disk: disk__,
+                    warnings: warnings__.unwrap_or_default(),
                 })
             }
         }
@@ -3949,6 +4172,15 @@ impl serde::Serialize for TreeRow {
         if !self.bookmarks.is_empty() {
             len += 1;
         }
+        if self.size_bytes != 0 {
+            len += 1;
+        }
+        if self.size_partial {
+            len += 1;
+        }
+        if !self.size_measured_at.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.TreeRow", len)?;
         if let Some(v) = self.tree.as_ref() {
             struct_ser.serialize_field("tree", v)?;
@@ -3965,6 +4197,18 @@ impl serde::Serialize for TreeRow {
         if !self.bookmarks.is_empty() {
             struct_ser.serialize_field("bookmarks", &self.bookmarks)?;
         }
+        if self.size_bytes != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser
+                .serialize_field("sizeBytes", ToString::to_string(&self.size_bytes).as_str())?;
+        }
+        if self.size_partial {
+            struct_ser.serialize_field("sizePartial", &self.size_partial)?;
+        }
+        if !self.size_measured_at.is_empty() {
+            struct_ser.serialize_field("sizeMeasuredAt", &self.size_measured_at)?;
+        }
         struct_ser.end()
     }
 }
@@ -3974,7 +4218,18 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["tree", "status", "state", "bookmarks"];
+        const FIELDS: &[&str] = &[
+            "tree",
+            "status",
+            "state",
+            "bookmarks",
+            "size_bytes",
+            "sizeBytes",
+            "size_partial",
+            "sizePartial",
+            "size_measured_at",
+            "sizeMeasuredAt",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -3982,6 +4237,9 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
             Status,
             State,
             Bookmarks,
+            SizeBytes,
+            SizePartial,
+            SizeMeasuredAt,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4010,6 +4268,11 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                             "status" => Ok(GeneratedField::Status),
                             "state" => Ok(GeneratedField::State),
                             "bookmarks" => Ok(GeneratedField::Bookmarks),
+                            "sizeBytes" | "size_bytes" => Ok(GeneratedField::SizeBytes),
+                            "sizePartial" | "size_partial" => Ok(GeneratedField::SizePartial),
+                            "sizeMeasuredAt" | "size_measured_at" => {
+                                Ok(GeneratedField::SizeMeasuredAt)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4033,6 +4296,9 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                 let mut status__ = None;
                 let mut state__ = None;
                 let mut bookmarks__ = None;
+                let mut size_bytes__ = None;
+                let mut size_partial__ = None;
+                let mut size_measured_at__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -4059,6 +4325,27 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                             }
                             bookmarks__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::SizeBytes => {
+                            if size_bytes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sizeBytes"));
+                            }
+                            size_bytes__ = Some(
+                                map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                        GeneratedField::SizePartial => {
+                            if size_partial__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sizePartial"));
+                            }
+                            size_partial__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::SizeMeasuredAt => {
+                            if size_measured_at__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sizeMeasuredAt"));
+                            }
+                            size_measured_at__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(TreeRow {
@@ -4066,6 +4353,9 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                     status: status__.unwrap_or_default(),
                     state: state__,
                     bookmarks: bookmarks__.unwrap_or_default(),
+                    size_bytes: size_bytes__.unwrap_or_default(),
+                    size_partial: size_partial__.unwrap_or_default(),
+                    size_measured_at: size_measured_at__.unwrap_or_default(),
                 })
             }
         }

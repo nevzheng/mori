@@ -6,6 +6,7 @@
 //! builds one with fakes.
 
 pub mod clone;
+mod disk;
 pub mod doctor;
 pub mod gc;
 mod gc_apply;

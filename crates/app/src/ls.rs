@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use mori_api::v1alpha1::{
-    ListTreesResponse, PushedBookmark, RepoTrees, Tree, TreeRow, TreeState, UnmanagedRepo,
+    Disk, ListTreesResponse, PushedBookmark, RepoTrees, Tree, TreeRow, TreeState, UnmanagedRepo,
     tree_row::Status,
 };
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
@@ -16,9 +16,21 @@ use mori_core::vcs::Forge;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::disk;
 use crate::landing;
 use crate::state::{self, boxed};
 use crate::{App, Backend};
+
+/// What `mori ls` was asked for.
+#[derive(Clone, Debug, Default)]
+pub struct LsArgs {
+    /// Only this repo.
+    pub repo: Option<String>,
+    /// Measure each tree's size (`--size`).
+    pub sizes: bool,
+    /// Measure again instead of reusing recent sizes (`--fresh`).
+    pub fresh: bool,
+}
 
 /// Runs `ls` for every repo mori manages, or only `repo`.
 ///
@@ -28,8 +40,9 @@ use crate::{App, Backend};
 /// reason.
 pub fn run<V: Backend, F: Forge>(
     app: &App<V, F>,
-    repo: Option<&str>,
+    args: &LsArgs,
 ) -> Result<ListTreesResponse, Box<dyn ErrorDetails>> {
+    let repo = args.repo.as_deref();
     let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
     let mut records = db.repos().map_err(boxed)?;
@@ -41,10 +54,16 @@ pub fn run<V: Backend, F: Forge>(
         }
     }
     let managed: BTreeSet<String> = records.iter().map(|repo| repo.remote.clone()).collect();
-    let repos = records
+    let mut repos: Vec<RepoTrees> = records
         .iter()
         .map(|repo| list_repo(&paths, &mut db, &app.vcs, repo))
         .collect::<Result<_, _>>()?;
+    if args.sizes {
+        for row in repos.iter_mut().flat_map(|repo| repo.trees.iter_mut()) {
+            add_size(&mut db, row, app.host.now, args.fresh);
+        }
+    }
+    let space = disk::space(&paths);
     let unmanaged_repos = if repo.is_some() {
         Vec::new()
     } else {
@@ -60,7 +79,26 @@ pub fn run<V: Backend, F: Forge>(
     Ok(ListTreesResponse {
         repos,
         unmanaged_repos,
+        disk: space.map(|space| Disk {
+            free_bytes: space.free,
+            total_bytes: space.total,
+        }),
+        warnings: disk::low_space(&paths, space).into_iter().collect(),
     })
+}
+
+/// Measures a tree that exists on disk, or reuses its recent size.
+fn add_size(db: &mut Database, row: &mut TreeRow, now: u64, fresh: bool) {
+    if row.status() == Status::Missing {
+        return;
+    }
+    let Some(tree) = &row.tree else {
+        return;
+    };
+    let size = disk::tree_size(db, &tree.id, std::path::Path::new(&tree.path), now, fresh);
+    row.size_bytes = size.bytes;
+    row.size_partial = size.partial;
+    row.size_measured_at = disk::measured_at(&size);
 }
 
 fn list_repo(
@@ -152,6 +190,7 @@ fn row(
             )),
             status: Status::Tree.into(),
             bookmarks: Vec::new(),
+            ..TreeRow::default()
         },
         Entry::Missing { record } => {
             let path = if record.name == BASE_TREE_NAME {
@@ -164,6 +203,7 @@ fn row(
                 status: Status::Missing.into(),
                 bookmarks: Vec::new(),
                 state: None,
+                ..TreeRow::default()
             }
         }
         Entry::Foreign { workspace } => TreeRow {
@@ -176,6 +216,7 @@ fn row(
             }),
             status: Status::Foreign.into(),
             bookmarks: Vec::new(),
+            ..TreeRow::default()
         },
     })
 }

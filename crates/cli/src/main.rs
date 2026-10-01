@@ -95,6 +95,15 @@ enum Command {
     Ls {
         /// Only this repo, in any form `mori clone` accepts.
         repo: Option<String>,
+
+        /// Show how much disk each tree uses. Walks every file, so it can take a while; sizes
+        /// measured in the last 15 minutes are reused.
+        #[arg(long)]
+        size: bool,
+
+        /// With --size: measure every tree again instead of reusing recent sizes.
+        #[arg(long, requires = "size")]
+        fresh: bool,
     },
 
     /// Check the root, every clone and every tree against the VCS and the disk, and list each
@@ -246,17 +255,36 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
         Command::Restore { entry } => {
             respond(json, restore::run(app, &entry), output::restore_text)
         }
-        Command::Ls { repo } => respond(json, ls::run(app, repo.as_deref()), output::ls_text),
-        Command::Tree {
-            command:
-                TreeCommand::Create {
+        Command::Ls { repo, size, fresh } => respond(
+            json,
+            ls::run(
+                app,
+                &ls::LsArgs {
                     repo,
-                    task,
-                    agent,
-                    lifetime,
-                    from,
-                    dry_run,
+                    sizes: size,
+                    fresh,
                 },
+            ),
+            output::ls_text,
+        ),
+        Command::Tree { command } => dispatch_tree(app, json, command),
+    }
+}
+
+/// Runs a `mori tree` command and prints its result.
+fn dispatch_tree(
+    app: &App<Routed<JjCli, GitCli>, GhCli>,
+    json: bool,
+    command: TreeCommand,
+) -> ExitCode {
+    match command {
+        TreeCommand::Create {
+            repo,
+            task,
+            agent,
+            lifetime,
+            from,
+            dry_run,
         } => respond(
             json,
             tree::create(
@@ -272,14 +300,11 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
             ),
             output::tree_create_text,
         ),
-        Command::Tree {
-            command:
-                TreeCommand::Remove {
-                    repo,
-                    name,
-                    pinned,
-                    dry_run,
-                },
+        TreeCommand::Remove {
+            repo,
+            name,
+            pinned,
+            dry_run,
         } => respond(
             json,
             tree_remove::run(

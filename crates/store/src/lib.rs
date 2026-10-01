@@ -2,6 +2,7 @@
 //! This is an adapter: it carries out what `mori-core` decides, and does no deciding itself.
 
 pub mod database;
+pub mod disk;
 mod error;
 pub mod gc;
 pub mod init;

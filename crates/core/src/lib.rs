@@ -6,6 +6,7 @@
 
 pub mod clone;
 pub mod config;
+pub mod disk;
 pub mod doctor;
 pub mod error;
 pub mod forest;

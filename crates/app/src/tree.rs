@@ -70,7 +70,11 @@ pub fn create<V: Backend, F: Forge>(
             .map_err(boxed)?;
         id = record(&mut db, repo_id.as_deref().unwrap_or_default(), &plan)?;
     }
-    Ok(response(&plan, id, args.dry_run, kind_of(&clone)))
+    let mut response = response(&plan, id, args.dry_run, kind_of(&clone));
+    response.warnings = crate::disk::low_space(&paths, crate::disk::space(&paths))
+        .into_iter()
+        .collect();
+    Ok(response)
 }
 
 /// Who is acting: `--agent` if given, else `$MORI_AGENT`, else the login name.
@@ -172,5 +176,6 @@ fn response(plan: &TreePlan, id: String, dry_run: bool, kind: VcsKind) -> Create
         from: plan.from.clone(),
         validate_only: dry_run,
         vcs: api_vcs(kind).into(),
+        warnings: Vec::new(),
     }
 }
