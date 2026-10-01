@@ -22,7 +22,8 @@ pub struct Workspace {
 pub struct TreeState {
     /// The working-copy change's short ID.
     pub change: String,
-    /// True if the working-copy change has edits.
+    /// True if the working-copy change has edits that are on no remote bookmark, not in trunk
+    /// and not landed: once the working copy itself is pushed, its edits are saved.
     pub changed: bool,
     /// How many non-empty changes in the tree's history are on no remote bookmark and not in
     /// trunk: work that exists only on this machine.

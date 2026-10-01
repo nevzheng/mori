@@ -10,10 +10,10 @@ use mori_core::clone::RepoId;
 use mori_core::error::{Code, ErrorDetails};
 use mori_core::forest::{TreeState, Workspace, Workspaces};
 use mori_core::paths::Env;
-use mori_core::vcs::{Forge, Merged, RemoteBookmark, Vcs};
+use mori_core::vcs::{Forge, Merged, RemoteBookmark, Vcs, VcsKind};
 use tempfile::TempDir;
 
-use crate::{App, Host, clone, gc, init, ls, restore, tree, tree_remove};
+use crate::{App, Backend, Host, clone, gc, init, ls, restore, tree, tree_remove};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -256,6 +256,18 @@ impl Vcs for FakeVcs {
 
     fn fetch(&self, _clone: &Path) -> std::result::Result<(), FakeError> {
         Ok(())
+    }
+}
+
+impl Backend for FakeVcs {
+    fn clone_as(
+        &self,
+        _kind: VcsKind,
+        url: &str,
+        path: &Path,
+        colocate: bool,
+    ) -> std::result::Result<(), FakeError> {
+        self.clone_repo(url, path, colocate)
     }
 }
 

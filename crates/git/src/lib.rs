@@ -15,8 +15,17 @@ use mori_core::error::{Code, ErrorDetails};
 use mori_core::forest::{TreeState, Workspace, Workspaces};
 use mori_core::vcs::{RemoteBookmark, Vcs};
 
-/// The remote's default branch, as `git clone` records it.
-const TRUNK: &str = "refs/remotes/origin/HEAD";
+/// Where trunk may be, in order, as jj's `trunk()` looks: the remote's default branch as
+/// `git clone` recorded it, then the usual names.
+const TRUNKS: [&str; 4] = [
+    "refs/remotes/origin/HEAD",
+    "refs/remotes/origin/main",
+    "refs/remotes/origin/master",
+    "refs/remotes/origin/trunk",
+];
+
+/// mori's default starting revision, jj's name for trunk; here it means the first of [`TRUNKS`].
+const JJ_TRUNK: &str = "trunk()";
 
 /// Runs the `git` program.
 #[derive(Clone, Debug)]
@@ -77,6 +86,14 @@ impl GitCli {
                 source,
             },
         }
+    }
+
+    /// The first of [`TRUNKS`] the repo at `dir` has.
+    fn trunk(&self, dir: &Path) -> Option<&'static str> {
+        TRUNKS.into_iter().find(|trunk| {
+            self.run(dir, &["rev-parse", "--verify", "--quiet", trunk])
+                .is_ok()
+        })
     }
 
     /// The working directory of the tree `name`.
@@ -171,7 +188,13 @@ impl Vcs for GitCli {
         cloned.map(|_| ())
     }
 
+    /// `from` is a git revision; mori's default, `trunk()`, means the remote's default branch.
     fn add_tree(&self, clone: &Path, _name: &str, path: &Path, from: &str) -> Result<(), GitError> {
+        let from = if from == JJ_TRUNK {
+            self.trunk(clone).unwrap_or(TRUNKS[0])
+        } else {
+            from
+        };
         self.add_worktree(clone, path, from)
     }
 
@@ -228,17 +251,15 @@ impl Vcs for GitCli {
     /// Remote branches whose tip is in the tree's history but not in trunk's.
     fn pushed_bookmarks(&self, clone: &Path, name: &str) -> Result<Vec<RemoteBookmark>, GitError> {
         let root = self.root(clone, name)?;
-        let has_trunk = self
-            .run(&root, &["rev-parse", "--verify", "--quiet", TRUNK])
-            .is_ok();
+        let trunk = self.trunk(&root);
         let mut args = vec![
             "for-each-ref",
             "--format=%(refname:lstrip=2)%09%(objectname)%09%(symref)",
             "--merged",
             "HEAD",
         ];
-        if has_trunk {
-            args.extend(["--no-merged", TRUNK]);
+        if let Some(trunk) = trunk {
+            args.extend(["--no-merged", trunk]);
         }
         args.push("refs/remotes");
         parse_remote_branches(&self.run(&root, &args)?)

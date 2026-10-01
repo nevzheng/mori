@@ -47,6 +47,20 @@ pub fn tree_policy(paths: &Paths) -> Result<TreePolicy, Box<dyn ErrorDetails>> {
         .trees)
 }
 
+/// Deletes a forgotten tree's directory. Already gone counts as done: some backends delete it
+/// when they forget the tree (`git worktree remove`).
+pub fn remove_tree_dir(path: &std::path::Path) -> Result<(), Box<dyn ErrorDetails>> {
+    match std::fs::remove_dir_all(path) {
+        Err(source) if source.kind() != std::io::ErrorKind::NotFound => {
+            Err(boxed(StoreError::Io {
+                path: path.to_path_buf(),
+                source,
+            }))
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Boxes an error for the edges to render.
 pub fn boxed(error: impl ErrorDetails + 'static) -> Box<dyn ErrorDetails> {
     Box::new(error)

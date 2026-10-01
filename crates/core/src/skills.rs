@@ -182,6 +182,8 @@ pub fn context_index(skills: &[SkillInfo], repos: &[RepoContext]) -> String {
          > mori's and anyone else's side by side; each `projects/<repo>/` folder holds notes and context for\n\
          > one cloned repo, for people and every agent alike. mori generates this index and changes\n\
          > only the files it wrote.\n\n\
+         New here? Start with [using-mori](skills/using-mori/SKILL.md), then read the notes for the\n\
+         repo you're working on.\n\n\
          ## Skills\n\n",
     );
     for skill in &skills {
@@ -334,6 +336,13 @@ mod tests {
                 "- [using-mori](skills/using-mori/SKILL.md): Use mori.",
                 "- [widget](projects/widget/): github.com/acme/widget",
             ]
+        );
+    }
+
+    #[test]
+    fn the_context_index_says_to_start_with_using_mori() {
+        assert!(
+            context_index(&[], &[]).contains("Start with [using-mori](skills/using-mori/SKILL.md)")
         );
     }
 

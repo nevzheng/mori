@@ -6,8 +6,21 @@
 
 use std::path::Path;
 
+use serde::Deserialize;
+
 use crate::clone::RepoId;
 use crate::forest::{TreeState, Workspaces};
+
+/// Which VCS a clone and its trees use.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VcsKind {
+    /// jj: trees are jj workspaces.
+    #[default]
+    Jj,
+    /// git: trees are detached git worktrees.
+    Git,
+}
 
 /// A bookmark (branch) on a remote, as the VCS sees it.
 #[derive(Clone, Debug, PartialEq, Eq)]

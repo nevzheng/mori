@@ -18,6 +18,7 @@ rust_binary(
         "//crates/api:mori_api",
         "//crates/app:mori_app",
         "//crates/core:mori_core",
+        "//crates/git:mori_git",
         "//crates/github:mori_github",
         "//crates/jj:mori_jj",
     ],

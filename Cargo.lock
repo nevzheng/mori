@@ -533,6 +533,7 @@ dependencies = [
  "mori-api",
  "mori-app",
  "mori-core",
+ "mori-git",
  "mori-github",
  "mori-jj",
  "serde",
