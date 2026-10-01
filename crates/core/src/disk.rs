@@ -17,6 +17,92 @@ pub struct DiskPolicy {
     pub warn_below: Floor,
     /// Where Bazel keeps output bases, if not the platform default (`--output_user_root`).
     pub bazel_output_user_root: Option<PathBuf>,
+    /// Warn when mori has more task trees than this, across every repo. Unset: no limit.
+    pub max_trees: Option<u32>,
+    /// Warn when one repo has more task trees than this. Unset: no limit.
+    pub max_trees_per_repo: Option<u32>,
+    /// Warn when mori's trees use more than this, across every repo. Unset: no limit.
+    pub max_size: Option<Size>,
+    /// Warn when one repo's trees use more than this. Unset: no limit.
+    pub max_size_per_repo: Option<Size>,
+}
+
+/// A size in `config.toml`, such as `"2T"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "String")]
+pub struct Size(pub u64);
+
+impl TryFrom<String> for Size {
+    type Error = String;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        parse_size(&text).map(Self)
+    }
+}
+
+/// What one repo uses, for checking limits.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepoUsage {
+    /// The repo, e.g. `github.com/acme/widget`.
+    pub repo: String,
+    /// Its task trees (the base tree doesn't count).
+    pub task_trees: u32,
+    /// Bytes its trees use, if they were measured.
+    pub bytes: Option<u64>,
+}
+
+/// A warning for every `[disk]` limit `usage` is over. Limits only warn; each warning says what
+/// would bring it back under. Size limits are checked only when sizes were measured.
+#[must_use]
+pub fn limit_warnings(policy: &DiskPolicy, usage: &[RepoUsage]) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let trees_hint = "`mori gc` lists the trees that are safe to remove";
+    if let Some(max) = policy.max_trees_per_repo {
+        for repo in usage.iter().filter(|repo| repo.task_trees > max) {
+            warnings.push(format!(
+                "{} has {} task trees, over [disk] max_trees_per_repo = {max}; {trees_hint}",
+                repo.repo, repo.task_trees
+            ));
+        }
+    }
+    let total_trees: u32 = usage.iter().map(|repo| repo.task_trees).sum();
+    if let Some(max) = policy.max_trees
+        && total_trees > max
+    {
+        warnings.push(format!(
+            "mori has {total_trees} task trees, over [disk] max_trees = {max}; {trees_hint}"
+        ));
+    }
+    let over_size = |used: u64, max: u64, what: String, key: &str| {
+        format!(
+            "{what} use {}, over [disk] {key} = {}; `mori gc --free {}` frees the difference \
+             from trees that are safe to remove",
+            format_size(used),
+            format_size(max),
+            format_size(used - max),
+        )
+    };
+    if let Some(Size(max)) = policy.max_size_per_repo {
+        for repo in usage {
+            if let Some(bytes) = repo.bytes
+                && bytes > max
+            {
+                warnings.push(over_size(
+                    bytes,
+                    max,
+                    format!("{}'s trees", repo.repo),
+                    "max_size_per_repo",
+                ));
+            }
+        }
+    }
+    let measured: Option<u64> = usage.iter().map(|repo| repo.bytes).sum();
+    if let (Some(Size(max)), Some(total)) = (policy.max_size, measured)
+        && total > max
+    {
+        warnings.push(over_size(total, max, "mori's trees".to_owned(), "max_size"));
+    }
+    warnings
 }
 
 /// How little free space is too little: a share of the disk, or a size.
@@ -444,6 +530,72 @@ mod tests {
         ));
         assert!(!leftover("/home/acme/mori/treesx/widget/a", false, false));
         assert!(!leftover("/home/acme/mori/trees", false, false));
+    }
+
+    fn usage(repo: &str, task_trees: u32, bytes: Option<u64>) -> RepoUsage {
+        RepoUsage {
+            repo: repo.to_owned(),
+            task_trees,
+            bytes,
+        }
+    }
+
+    #[test]
+    fn no_limits_by_default() {
+        let usage = [usage("github.com/acme/widget", 500, Some(4000 * G))];
+
+        assert_eq!(
+            limit_warnings(&DiskPolicy::default(), &usage),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn tree_limits_warn_per_repo_and_overall() {
+        let policy = DiskPolicy {
+            max_trees: Some(5),
+            max_trees_per_repo: Some(3),
+            ..DiskPolicy::default()
+        };
+        let usage = [
+            usage("github.com/acme/widget", 4, None),
+            usage("github.com/acme/gadget", 2, None),
+        ];
+
+        let warnings = limit_warnings(&policy, &usage);
+
+        assert_eq!(warnings.len(), 2, "{warnings:?}");
+        assert!(warnings[0].starts_with(
+            "github.com/acme/widget has 4 task trees, over [disk] max_trees_per_repo = 3"
+        ));
+        assert!(warnings[1].starts_with("mori has 6 task trees, over [disk] max_trees = 5"));
+    }
+
+    #[test]
+    fn size_limits_warn_only_when_measured_and_say_how_much_to_free() {
+        let policy = DiskPolicy {
+            max_size: Some(Size(100 * G)),
+            max_size_per_repo: Some(Size(60 * G)),
+            ..DiskPolicy::default()
+        };
+        let measured = [
+            usage("github.com/acme/widget", 1, Some(80 * G)),
+            usage("github.com/acme/gadget", 1, Some(40 * G)),
+        ];
+        let unmeasured = [usage("github.com/acme/widget", 1, None)];
+
+        let warnings = limit_warnings(&policy, &measured);
+
+        assert_eq!(warnings.len(), 2, "{warnings:?}");
+        assert!(warnings[0].contains("github.com/acme/widget's trees use 80G, over [disk] max_size_per_repo = 60G; `mori gc --free 20G`"), "{}", warnings[0]);
+        assert!(
+            warnings[1].contains(
+                "mori's trees use 120G, over [disk] max_size = 100G; `mori gc --free 20G`"
+            ),
+            "{}",
+            warnings[1]
+        );
+        assert_eq!(limit_warnings(&policy, &unmeasured), Vec::<String>::new());
     }
 
     #[test]

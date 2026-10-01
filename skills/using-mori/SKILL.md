@@ -109,8 +109,9 @@ safe to run, even while others work.
   each bookmark mori has seen the tree push, with `onRemote` and `landed` (gone from the remote
   after a push, as after a squash merge). Fields at their default (`false`, `0`) are left out.
 - Every `ls` ends with free space on the disk (`disk.freeBytes`, `disk.totalBytes`) and any
-  `warnings`, such as free space below the `[disk] warn_below` floor (10% by default). Tell the
-  person about a warning; don't delete anything because of it.
+  `warnings`, such as free space below the `[disk] warn_below` floor (10% by default), or a limit
+  the person set in `[disk]` (`max_trees`, `max_trees_per_repo`, `max_size`, `max_size_per_repo`;
+  none by default). Tell the person about a warning; don't delete anything because of it.
 - **`--size`** adds each tree's disk use (`sizeBytes`, `sizePartial`, `sizeMeasuredAt`). It walks
   every file, so use it when disk matters, not on every call. Sizes from the last 15 minutes are
   reused; **`--fresh`** measures again.

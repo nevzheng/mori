@@ -93,6 +93,17 @@ def bazel_output_base(placeholders: Placeholders, workspace: str) -> None:
     (base / "DO_NOT_BUILD_HERE").write_text(f"{placeholders.path(workspace)}\n")
 
 
+@given(parsers.parse('config.toml sets the disk limit "{key}" to "{value}"'))
+def disk_limit(placeholders: Placeholders, key: str, value: str) -> None:
+    config = placeholders.path("$XDG_CONFIG_HOME/mori/config.toml")
+    config.write_text(config.read_text() + f"\n[disk]\n{key} = {value}\n")
+
+
+@given(parsers.parse('config.toml sets the disk limit "{key}" to the size "{size}"'))
+def disk_size_limit(placeholders: Placeholders, key: str, size: str) -> None:
+    disk_limit(placeholders, key, f'"{size}"')
+
+
 # Sizes
 
 
@@ -198,6 +209,12 @@ def size_column(mori: Mori) -> None:
 def says_summary(mori: Mori) -> None:
     assert_that(mori.last.stdout, contains_string("Trees use "))
     assert_that(mori.last.stdout, contains_string(" free of "))
+
+
+@then(parsers.parse('the output warns that "{what}" is over "{key}"'))
+def warns_over(mori: Mori, what: str, key: str) -> None:
+    lines = [line for line in mori.last.stdout.splitlines() if line.startswith("warning: ")]
+    assert any(what in line and f"over [disk] {key}" in line for line in lines), mori.last.stdout
 
 
 @then(parsers.parse('the output warns that free space is below the "{floor}" floor'))
