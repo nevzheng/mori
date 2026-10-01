@@ -153,7 +153,7 @@ enum TreeCommand {
         #[arg(long)]
         task: String,
 
-        /// Who the tree is for, e.g. claude. Defaults to your login name.
+        /// Who the tree is for, e.g. claude. Defaults to `$MORI_AGENT`, then your login name.
         #[arg(long)]
         agent: Option<String>,
 
@@ -181,7 +181,7 @@ enum TreeCommand {
         /// The tree's name, e.g. claude-fix-login.
         name: String,
 
-        /// Who is asking; must be the tree's owner. Defaults to your login name.
+        /// Who is asking; must be the tree's owner. Defaults to `$MORI_AGENT`, then your login name.
         #[arg(long)]
         agent: Option<String>,
 
