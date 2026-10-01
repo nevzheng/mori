@@ -6,7 +6,7 @@
 | **Status**  | review     |
 | **Area**    | core       |
 | **Issue**   | none       |
-| **PR**      | TBD        |
+| **PR**      | #97        |
 | **Created** | 2026-10-01 |
 | **Updated** | 2026-10-01 |
 
