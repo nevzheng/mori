@@ -123,5 +123,6 @@ def old_layout(placeholders: Placeholders, disk: DiskWatch) -> None:
 def old_edit_kept(mori: Mori, placeholders: Placeholders) -> None:
     old = placeholders.path("<home>/mori/skills/using-mori/SKILL.md")
     assert old.read_text() == "my edit\n"
-    lines = [line for line in mori.last.stdout.splitlines() if str(old) in line]
+    shown = "~" + str(old).removeprefix(str(placeholders.path("<home>")))
+    lines = [line for line in mori.last.stdout.splitlines() if shown in line]
     assert lines and "kept" in lines[0], mori.last.stdout

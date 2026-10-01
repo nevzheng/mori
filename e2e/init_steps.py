@@ -7,6 +7,7 @@ from pathlib import Path
 
 from harness import DiskWatch, Mori, Placeholders, listed_paths, mode
 from precisely import (
+    all_of,
     assert_that,
     contains_exactly,
     contains_string,
@@ -116,17 +117,21 @@ def database_records_root(placeholders: Placeholders, bits: str, root: str) -> N
 # What mori says
 
 
-@then("the output lists every path it created")
-def lists_created(mori: Mori, home: Path, placeholders: Placeholders) -> None:
-    listed = listed_paths(mori.last.stdout, "created")
-    on_disk = set(home.rglob("*"))
-    assert_that(listed, equal_to(on_disk))
-    assert_that(listed, equal_to(set(first_run_creates(placeholders))))
+@then("the output sums up what it set up and what to do next")
+def sums_up(mori: Mori, placeholders: Placeholders) -> None:
+    created = len(first_run_creates(placeholders))
+    assert_that(
+        mori.last.stdout,
+        all_of(
+            contains_string(f"Set up mori at ~/mori: {created} new files and directories"),
+            contains_string("Next: `mori clone <repo>`"),
+        ),
+    )
 
 
 @then("the output lists the paths it would create")
-def lists_would_create(mori: Mori, placeholders: Placeholders) -> None:
-    listed = listed_paths(mori.last.stdout, "would create")
+def lists_would_create(mori: Mori, home: Path, placeholders: Placeholders) -> None:
+    listed = listed_paths(mori.last.stdout, home)
     assert_that(listed, equal_to(set(first_run_creates(placeholders))))
 
 

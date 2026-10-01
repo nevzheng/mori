@@ -104,7 +104,10 @@ def says_would_remove(mori: Mori, name: str) -> None:
 def says_kept_unsaved(mori: Mori, name: str) -> None:
     line = line_for(mori, name)
     assert_that(line, contains_string("kept: it has work only this machine has"))
-    assert line.strip().startswith("blocked"), line
+    # It is listed under the blocked group.
+    before = mori.last.stdout.split(line)[0]
+    groups = [l for l in before.splitlines() if l and not l.startswith(" ")]
+    assert groups and groups[-1].startswith("Blocked"), mori.last.stdout
 
 
 # Restoring

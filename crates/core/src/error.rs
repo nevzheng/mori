@@ -57,6 +57,11 @@ pub trait ErrorDetails: std::error::Error {
 
     /// The `ErrorInfo.metadata`, with lowerCamelCase keys.
     fn metadata(&self) -> Vec<(&'static str, String)>;
+
+    /// What to do next, for people, when the message doesn't already say. Not part of the API.
+    fn hint(&self) -> Option<String> {
+        None
+    }
 }
 
 /// Where a root was recorded.
@@ -252,8 +257,8 @@ pub enum TreeError {
 
     /// The tree has work that exists only on this machine.
     #[error(
-        "{name:?} has work only this machine has (working copy edited: {edited}, unpushed \
-         changes: {unpushed}); push it or abandon it first"
+        "{name} has work only this machine has: {}",
+        unsaved_parts(*edited, *unpushed)
     )]
     Unsaved {
         /// The name.
@@ -285,7 +290,31 @@ impl TreeError {
     pub const DOMAIN: &'static str = "tree.mori";
 }
 
+/// "1 unpushed change, working copy edited", for messages.
+fn unsaved_parts(edited: bool, unpushed: u32) -> String {
+    let mut parts = Vec::new();
+    match unpushed {
+        0 => {}
+        1 => parts.push("1 unpushed change".to_owned()),
+        n => parts.push(format!("{n} unpushed changes")),
+    }
+    if edited {
+        parts.push("working copy edited".to_owned());
+    }
+    parts.join(", ")
+}
+
 impl ErrorDetails for TreeError {
+    fn hint(&self) -> Option<String> {
+        match self {
+            Self::Unsaved { .. } => Some(
+                "push it (or abandon it), then try again; `mori ls` shows what is unsaved"
+                    .to_owned(),
+            ),
+            _ => None,
+        }
+    }
+
     fn code(&self) -> Code {
         match self {
             Self::NameInvalid { .. } => Code::InvalidArgument,

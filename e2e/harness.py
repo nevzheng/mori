@@ -106,7 +106,12 @@ def mode(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
 
 
-def listed_paths(output: str, verb: str) -> set[Path]:
-    """The paths on lines like `  created /x` (for `verb` "created") in mori's text output."""
-    pattern = re.compile(rf"^\s+{re.escape(verb)} (.+)$")
-    return {Path(m.group(1)) for line in output.splitlines() if (m := pattern.match(line))}
+def listed_paths(output: str, home: Path) -> set[Path]:
+    """The paths on indented lines like `  ~/mori/repos` in mori's text output, `~` expanded to
+    `home`."""
+    pattern = re.compile(r"^\s+(~?/\S*)$")
+    return {
+        Path(str(home) + m.group(1)[1:] if m.group(1).startswith("~") else m.group(1))
+        for line in output.splitlines()
+        if (m := pattern.match(line))
+    }

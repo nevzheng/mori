@@ -110,7 +110,7 @@ fn errors_as_text_go_to_stderr() {
     assert!(out.stdout.is_empty());
     let stderr = String::from_utf8(out.stderr).unwrap();
     assert!(
-        stderr.contains("reason: NOT_A_DIRECTORY (store.mori)"),
+        stderr.contains("  NOT_A_DIRECTORY (store.mori), FAILED_PRECONDITION exit 9"),
         "{stderr}"
     );
 }
