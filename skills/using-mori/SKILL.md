@@ -180,6 +180,11 @@ marks them `OUTCOME_WOULD_REMOVE`; with `--apply --yes` it removes exactly those
 unless `--max`). Picking measures the removable trees again, so it can take a while. When the disk
 is nearly full, show the person the `--free` plan and let them decide.
 
+gc also lists Bazel output left by deleted trees (`kind` `KIND_BAZEL_LEFTOVER`, reason `ORPHANED`,
+`path` the output base): Bazel keeps it outside the tree, and once the tree is gone nothing can use
+it. It is only cache, so it is removable, goes first in a `--free` plan, and isn't journalled.
+Only output bases of workspaces inside mori's `trees/` are ever listed.
+
 ### `mori restore <entry>`
 
 Brings back a tree `mori gc --apply` removed, from the journal entry it printed: its

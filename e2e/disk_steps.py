@@ -1,5 +1,6 @@
 """Steps for CUJ 10, seeing what the forest costs (spec/cuj/10-disk-usage.feature)."""
 
+import hashlib
 import json
 import subprocess
 
@@ -71,6 +72,27 @@ def free_space_floor(placeholders: Placeholders, floor: str) -> None:
     config.write_text(config.read_text() + f'\n[disk]\nwarn_below = "{floor}"\n')
 
 
+@given(parsers.parse('config.toml points the Bazel output user root at "{root}"'))
+def bazel_root(placeholders: Placeholders, root: str) -> None:
+    config = placeholders.path("$XDG_CONFIG_HOME/mori/config.toml")
+    path = placeholders.path(root)
+    config.write_text(config.read_text() + f'\n[disk]\nbazel_output_user_root = "{path}"\n')
+
+
+def output_base(placeholders: Placeholders, workspace: str):
+    root = placeholders.path("<home>/bazel-root")
+    path = str(placeholders.path(workspace))
+    return root / hashlib.md5(path.encode()).hexdigest()
+
+
+@given(parsers.parse('Bazel has an output base for "{workspace}"'))
+def bazel_output_base(placeholders: Placeholders, workspace: str) -> None:
+    base = output_base(placeholders, workspace)
+    (base / "execroot" / "_main").mkdir(parents=True)
+    (base / "execroot" / "_main" / "out.o").write_bytes(b"\0" * 65536)
+    (base / "DO_NOT_BUILD_HERE").write_text(f"{placeholders.path(workspace)}\n")
+
+
 # Sizes
 
 
@@ -122,6 +144,38 @@ def gc_would_remove(mori: Mori, count: int) -> None:
         if item.get("outcome") == "OUTCOME_WOULD_REMOVE"
     ]
     assert_that(len(picked), equal_to(count))
+
+
+def leftovers(mori: Mori) -> dict[str, dict]:
+    return {
+        item["name"]: item
+        for item in json.loads(mori.last.stdout).get("items", [])
+        if item.get("kind") == "KIND_BAZEL_LEFTOVER"
+    }
+
+
+@then(parsers.parse('gc lists the Bazel output of "{name}" as safe to remove'))
+def lists_leftover(mori: Mori, name: str) -> None:
+    found = leftovers(mori)
+    assert name in found, found
+    assert_that(found[name]["class"], equal_to("CLASS_REMOVE"))
+    assert_that(found[name]["reason"], equal_to("ORPHANED"))
+    assert_that(int(found[name].get("sizeBytes", "0")), greater_than_or_equal_to(65536))
+
+
+@then(parsers.parse('gc lists no Bazel output of "{name}"'))
+def lists_no_leftover(mori: Mori, name: str) -> None:
+    assert name not in leftovers(mori), leftovers(mori)
+
+
+@then(parsers.parse('the Bazel output base for "{workspace}" is gone'))
+def base_gone(placeholders: Placeholders, workspace: str) -> None:
+    assert not output_base(placeholders, workspace).exists()
+
+
+@then(parsers.parse('the Bazel output base for "{workspace}" is still there'))
+def base_kept(placeholders: Placeholders, workspace: str) -> None:
+    assert (output_base(placeholders, workspace) / "DO_NOT_BUILD_HERE").exists()
 
 
 @then(parsers.parse('only one of "{first}" and "{second}" is left'))

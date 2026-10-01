@@ -5,6 +5,7 @@
 //! data, and the VCS and code host as traits. The binary builds one from the real process; a test
 //! builds one with fakes.
 
+mod bazel;
 pub mod clone;
 mod disk;
 pub mod doctor;

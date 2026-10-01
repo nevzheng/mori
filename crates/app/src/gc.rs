@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
+use mori_api::v1alpha1::gc_item::{Class as ItemClass, Kind, Outcome};
 use mori_api::v1alpha1::{Disk, GcItem, GcResponse};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
 use mori_core::disk::{Candidate, pick_to_free};
@@ -20,6 +20,7 @@ use mori_core::vcs::Forge;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::bazel;
 use crate::disk;
 use crate::gc_apply;
 use crate::landing::{self, TreeRef};
@@ -95,6 +96,10 @@ pub fn run<V: Backend, F: Forge>(
             idle.push(idle_seconds);
         }
     }
+    for leftover in bazel::leftovers(&app.host, &paths, &repos) {
+        items.push(leftover);
+        idle.push(None);
+    }
     let picked = free.map(|target| pick(&items, &idle, target));
     if args.apply.is_none()
         && let Some(picked) = &picked
@@ -104,27 +109,17 @@ pub fn run<V: Backend, F: Forge>(
         }
     }
     if let Some(apply) = &args.apply {
-        let max = match (apply.max.filter(|max| *max > 0), &picked) {
-            (Some(max), _) => usize::try_from(max).unwrap_or(usize::MAX),
-            (None, Some(_)) => usize::MAX,
-            (None, None) => usize::try_from(DEFAULT_MAX).unwrap_or(usize::MAX),
-        };
-        let batch: Vec<usize> = match &picked {
-            Some(picked) => picked.iter().copied().take(max).collect(),
-            None => items
-                .iter()
-                .enumerate()
-                .filter(|(_, item)| item.class() == ItemClass::Remove)
-                .filter(|(_, item)| apply.names.is_empty() || apply.names.contains(&item.name))
-                .map(|(index, _)| index)
-                .take(max)
-                .collect(),
-        };
+        let batch = batch(&items, apply, picked.as_deref());
         if !apply.yes && !apply.dry_run && !batch.is_empty() {
             return Err(boxed(CleanupError::NotConfirmed { count: batch.len() }));
         }
         for index in batch {
             let item = &items[index];
+            if item.kind() == Kind::BazelLeftover {
+                let outcome = bazel::remove(&app.host, &paths, &repos, item, apply.dry_run)?;
+                items[index].set_outcome(outcome);
+                continue;
+            }
             // This run already fetched; checking again works from what it saw.
             let (outcome, reason, entry_id) = gc_apply::apply_one(
                 &context,
@@ -154,6 +149,30 @@ pub fn run<V: Backend, F: Forge>(
     })
 }
 
+/// The items `--apply` removes, as indexes into `items`: what `--free` picked, else the removable
+/// ones (only those named by `--only`, which names trees, not leftovers), at most `--max`.
+fn batch(items: &[GcItem], apply: &Apply, picked: Option<&[usize]>) -> Vec<usize> {
+    let max = match (apply.max.filter(|max| *max > 0), picked) {
+        (Some(max), _) => usize::try_from(max).unwrap_or(usize::MAX),
+        (None, Some(_)) => usize::MAX,
+        (None, None) => usize::try_from(DEFAULT_MAX).unwrap_or(usize::MAX),
+    };
+    match picked {
+        Some(picked) => picked.iter().copied().take(max).collect(),
+        None => items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.class() == ItemClass::Remove)
+            .filter(|(_, item)| {
+                apply.names.is_empty()
+                    || (item.kind() != Kind::BazelLeftover && apply.names.contains(&item.name))
+            })
+            .map(|(index, _)| index)
+            .take(max)
+            .collect(),
+    }
+}
+
 /// Measures a tree that may go and exists on disk, or reuses its recent size.
 fn add_size(db: &mut Database, item: &mut GcItem, tree_id: Option<&String>, now: u64, fresh: bool) {
     let may_go = matches!(
@@ -177,7 +196,7 @@ fn pick(items: &[GcItem], idle: &[Option<u64>], target: u64) -> Vec<usize> {
         .map(|&index| Candidate {
             bytes: items[index].size_bytes,
             idle_seconds: idle[index],
-            cache_only: false,
+            cache_only: items[index].kind() == Kind::BazelLeftover,
         })
         .collect();
     pick_to_free(&candidates, target)
@@ -272,6 +291,7 @@ fn judge_repo<V: Backend>(
                 path: row.path.display().to_string(),
                 class: item_class(class).into(),
                 reason: reason.code().to_owned(),
+                kind: Kind::Tree.into(),
                 ..GcItem::default()
             };
             (item, idle_seconds)

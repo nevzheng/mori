@@ -427,7 +427,7 @@ pub fn skills_text(response: &SyncSkillsResponse) -> String {
 /// The text `gc` prints: every tree with its class and reason (and, with --apply, what happened
 /// to it), then what to do next.
 pub fn gc_text(response: &GcResponse) -> String {
-    use mori_api::v1alpha1::gc_item::{Class, Outcome};
+    use mori_api::v1alpha1::gc_item::{Class, Kind, Outcome};
     let mut text = String::new();
     let applied = response.validate_only
         || response
@@ -453,7 +453,13 @@ pub fn gc_text(response: &GcResponse) -> String {
             };
             vec![
                 mori_app::gc::class_name(item.class()).to_owned(),
-                format!("{} {}", item.repo, item.name),
+                if item.kind() == Kind::BazelLeftover {
+                    format!("{} {} (Bazel output)", item.repo, item.name)
+                        .trim_start()
+                        .to_owned()
+                } else {
+                    format!("{} {}", item.repo, item.name)
+                },
                 size,
                 item.reason.clone(),
                 what,
@@ -479,14 +485,14 @@ pub fn gc_text(response: &GcResponse) -> String {
     } else if picked > 0 {
         writeln!(
             text,
-            "Picked {picked} of {removable} removable tree(s), freeing {}: add `--apply --yes` \
+            "Picked {picked} of {removable} removable item(s), freeing {}: add `--apply --yes` \
              to remove them, checking each again first.",
             format_size(picked_bytes)
         )
     } else {
         writeln!(
             text,
-            "{removable} tree(s) can go, freeing {}: `mori gc --apply --yes` removes them, \
+            "{removable} item(s) can go, freeing {}: `mori gc --apply --yes` removes them, \
              checking each again first; `--free <size>` picks only enough to free that much.",
             format_size(removable_bytes)
         )
