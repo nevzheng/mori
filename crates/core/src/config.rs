@@ -67,7 +67,11 @@ impl Config {
             "# mori configuration, written by `mori init`.\n\
              schema = {SCHEMA}\n\
              # Changing the root is a misconfiguration until root migrations exist.\n\
-             root = {root}\n"
+             root = {root}\n\
+             \n\
+             # What `mori clone` makes without --vcs: \"jj\" (the default) or \"git\".\n\
+             # [vcs]\n\
+             # default = \"jj\"\n"
         ))
     }
 }

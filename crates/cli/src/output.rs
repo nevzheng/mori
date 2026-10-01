@@ -169,7 +169,12 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
         );
     }
     for repo in &response.repos {
-        let _ = writeln!(text, "{}  {}", repo.repo, repo.path);
+        let vcs = match repo.vcs() {
+            Vcs::Git => " (git)",
+            Vcs::Jj => " (jj)",
+            Vcs::Unspecified => "",
+        };
+        let _ = writeln!(text, "{}{vcs}  {}", repo.repo, repo.path);
         let rows: Vec<[String; 6]> = repo.trees.iter().map(ls_row).collect();
         let header = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"].map(str::to_owned);
         let mut widths = header.clone().map(|cell| cell.len());
