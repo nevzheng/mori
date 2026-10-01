@@ -3,7 +3,7 @@
 |             |            |
 | ----------- | ---------- |
 | **Author**  | @nevzheng  |
-| **Status**  | review     |
+| **Status**  | accepted   |
 | **Area**    | core       |
 | **Issue**   | none       |
 | **PR**      | #97        |
