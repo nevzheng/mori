@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use crate::clone::RepoId;
 use crate::error::{Code, ErrorDetails, RepoError, TreeError};
 use crate::paths::Paths;
-use crate::tree::{Lifetime, Role, TreePolicy};
+use crate::tree::{Lifetime, Role, TreePolicy, validate_purpose};
 
 /// Where a new tree starts when no revision is given: a new change on top of trunk.
 pub const DEFAULT_FROM: &str = "trunk()";
@@ -29,6 +29,8 @@ pub struct Request {
     pub lifetime: Option<Lifetime>,
     /// The revision the new tree starts from (a jj revset).
     pub from: String,
+    /// What the tree is for, if given.
+    pub purpose: Option<String>,
 }
 
 /// What exists before `tree create` runs, as seen by an adapter.
@@ -63,6 +65,8 @@ pub struct TreePlan {
     pub lifetime: Lifetime,
     /// The revision it starts from.
     pub from: String,
+    /// What it is for, checked and trimmed.
+    pub purpose: Option<String>,
 }
 
 /// The owner to use when none is given: the person's login name, lowercased, so it can be part
@@ -119,6 +123,11 @@ pub fn plan(
         task: request.task,
         lifetime: policy.lifetime(Role::Task, request.lifetime),
         from: request.from,
+        purpose: request
+            .purpose
+            .as_deref()
+            .map(validate_purpose)
+            .transpose()?,
     })
 }
 
@@ -184,6 +193,7 @@ mod tests {
             owner: "claude".to_owned(),
             lifetime: None,
             from: DEFAULT_FROM.to_owned(),
+            purpose: None,
         }
     }
 

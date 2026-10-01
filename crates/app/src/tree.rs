@@ -27,6 +27,7 @@ pub struct CreateArgs {
     pub agent: Option<String>,
     pub lifetime: Option<Lifetime>,
     pub from: Option<String>,
+    pub purpose: Option<String>,
     pub dry_run: bool,
 }
 
@@ -52,6 +53,7 @@ pub fn create<V: Backend, F: Forge>(
         owner,
         lifetime: args.lifetime,
         from: args.from.unwrap_or_else(|| DEFAULT_FROM.to_owned()),
+        purpose: args.purpose,
     };
     let plan = plan(&paths, &policy, request, &observed).map_err(boxed)?;
     let mut id = String::new();
@@ -148,6 +150,7 @@ fn record(
             owner: &plan.owner,
             task: Some(&plan.task),
             lifetime: &lifetime,
+            purpose: plan.purpose.as_deref(),
         },
     )
     .map(|tree| tree.id)
@@ -170,6 +173,7 @@ fn response(plan: &TreePlan, id: String, dry_run: bool, kind: VcsKind) -> Create
             owner: plan.owner.clone(),
             task: plan.task.clone(),
             lifetime: plan.lifetime.to_string(),
+            purpose: plan.purpose.clone().unwrap_or_default(),
         }),
         from: plan.from.clone(),
         validate_only: dry_run,

@@ -133,6 +133,7 @@ pub(crate) fn remove<V: Backend>(
         owner: record.owner.clone(),
         task: record.task.clone(),
         lifetime: record.lifetime.clone(),
+        purpose: record.purpose.clone(),
         commit_id,
         pin,
         bookmarks,

@@ -87,6 +87,7 @@ pub fn run<V: Backend, F: Forge>(
                 owner: &entry.owner,
                 task: entry.task.as_deref(),
                 lifetime: &entry.lifetime,
+                purpose: entry.purpose.as_deref(),
             },
         )
         .map_err(|error| {
@@ -114,6 +115,7 @@ pub fn run<V: Backend, F: Forge>(
             owner: restored.owner,
             task: restored.task.unwrap_or_default(),
             lifetime: restored.lifetime,
+            purpose: restored.purpose.unwrap_or_default(),
         }),
         commit_id: entry.commit_id,
     })

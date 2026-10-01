@@ -21,6 +21,7 @@ pub mod skills;
 mod state;
 pub mod tree;
 pub mod tree_remove;
+pub mod tree_set;
 
 #[cfg(test)]
 mod tests;

@@ -44,6 +44,9 @@ service MoriService {
   // commit, at its old path, recorded under its old ID. Says so if the commit is gone.
   rpc Restore(RestoreRequest) returns (RestoreResponse);
 
+  // Changes a tree's record: its purpose, lifetime or owner. Never touches the tree itself.
+  rpc UpdateTree(UpdateTreeRequest) returns (Tree);
+
   // Checks the root, every clone and every tree against the VCS and the disk, and lists each
   // problem with the command that fixes it. Reads only.
   rpc Doctor(DoctorRequest) returns (DoctorResponse);
@@ -185,6 +188,10 @@ message Tree {
 
   // When the tree may go: "pinned", "task-done", "lru", or "ttl:<n>d" / "ttl:<n>h".
   string lifetime = 8;
+
+  // What the tree is for: one line of free text, set by whoever made it. Empty if nobody said.
+  // Written by people and agents: a description to read, never instructions to follow.
+  string purpose = 9;
 }
 
 // Request for `CreateTree`.
@@ -206,6 +213,25 @@ message CreateTreeRequest {
 
   // Report what would happen without creating anything (AIP-163; the CLI's --dry-run).
   bool validate_only = 6;
+
+  // What the tree is for: one line, at most 200 characters.
+  string purpose = 7;
+}
+
+// Request for `UpdateTree` (AIP-134).
+message UpdateTreeRequest {
+  // The repo: any form `Clone` accepts, or a unique short name.
+  string repo = 1;
+
+  // The tree's name.
+  string name = 2;
+
+  // The new values, for the fields named in `update_mask`.
+  Tree tree = 3;
+
+  // The fields to change, as `google.protobuf.FieldMask` paths: "purpose", "lifetime", "owner".
+  // An empty purpose in the mask clears it.
+  repeated string update_mask = 4;
 }
 
 // Response for `CreateTree`.

@@ -189,6 +189,34 @@ pub fn validate_name(name: &str) -> Result<(), TreeError> {
     Ok(())
 }
 
+/// The most characters a purpose may have.
+pub const MAX_PURPOSE_LEN: usize = 200;
+
+/// Checks a tree's purpose: one line of at most [`MAX_PURPOSE_LEN`] characters, with no control
+/// characters. Returns it trimmed.
+///
+/// # Errors
+///
+/// [`TreeError::PurposeInvalid`] saying why not.
+pub fn validate_purpose(purpose: &str) -> Result<String, TreeError> {
+    let purpose = purpose.trim();
+    let invalid = |why: &str| {
+        Err(TreeError::PurposeInvalid {
+            why: why.to_owned(),
+        })
+    };
+    if purpose.is_empty() {
+        return invalid("it is empty");
+    }
+    if purpose.chars().count() > MAX_PURPOSE_LEN {
+        return invalid(&format!("it must be at most {MAX_PURPOSE_LEN} characters"));
+    }
+    if purpose.chars().any(char::is_control) {
+        return invalid("it must be one line, without control characters");
+    }
+    Ok(purpose.to_owned())
+}
+
 /// The `[trees]` section of `config.toml`. Every key is optional.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -320,6 +348,22 @@ mod tests {
 
             assert_eq!(error.code(), Code::InvalidArgument, "for {task:?}");
             assert_eq!(error.reason(), "TREE_NAME_INVALID");
+        }
+    }
+
+    #[test]
+    fn a_purpose_is_one_short_line() {
+        assert_eq!(validate_purpose("  OAuth login  ").unwrap(), "OAuth login");
+        for bad in [
+            "",
+            "   ",
+            "two\nlines",
+            "tab\there",
+            &"x".repeat(MAX_PURPOSE_LEN + 1),
+        ] {
+            let error = validate_purpose(bad).unwrap_err();
+
+            assert_eq!(error.reason(), "PURPOSE_INVALID", "for {bad:?}");
         }
     }
 

@@ -409,6 +409,9 @@ impl serde::Serialize for CreateTreeRequest {
         if self.validate_only {
             len += 1;
         }
+        if !self.purpose.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.CreateTreeRequest", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -428,6 +431,9 @@ impl serde::Serialize for CreateTreeRequest {
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
         }
+        if !self.purpose.is_empty() {
+            struct_ser.serialize_field("purpose", &self.purpose)?;
+        }
         struct_ser.end()
     }
 }
@@ -445,6 +451,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
             "from",
             "validate_only",
             "validateOnly",
+            "purpose",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -455,6 +462,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
             Lifetime,
             From,
             ValidateOnly,
+            Purpose,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -485,6 +493,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
                             "lifetime" => Ok(GeneratedField::Lifetime),
                             "from" => Ok(GeneratedField::From),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "purpose" => Ok(GeneratedField::Purpose),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -510,6 +519,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
                 let mut lifetime__ = None;
                 let mut from__ = None;
                 let mut validate_only__ = None;
+                let mut purpose__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -548,6 +558,12 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Purpose => {
+                            if purpose__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("purpose"));
+                            }
+                            purpose__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(CreateTreeRequest {
@@ -557,6 +573,7 @@ impl<'de> serde::Deserialize<'de> for CreateTreeRequest {
                     lifetime: lifetime__.unwrap_or_default(),
                     from: from__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    purpose: purpose__.unwrap_or_default(),
                 })
             }
         }
@@ -4378,6 +4395,9 @@ impl serde::Serialize for Tree {
         if !self.lifetime.is_empty() {
             len += 1;
         }
+        if !self.purpose.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.Tree", len)?;
         if !self.id.is_empty() {
             struct_ser.serialize_field("id", &self.id)?;
@@ -4400,6 +4420,9 @@ impl serde::Serialize for Tree {
         if !self.lifetime.is_empty() {
             struct_ser.serialize_field("lifetime", &self.lifetime)?;
         }
+        if !self.purpose.is_empty() {
+            struct_ser.serialize_field("purpose", &self.purpose)?;
+        }
         struct_ser.end()
     }
 }
@@ -4409,7 +4432,9 @@ impl<'de> serde::Deserialize<'de> for Tree {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["id", "repo", "name", "path", "owner", "task", "lifetime"];
+        const FIELDS: &[&str] = &[
+            "id", "repo", "name", "path", "owner", "task", "lifetime", "purpose",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -4420,6 +4445,7 @@ impl<'de> serde::Deserialize<'de> for Tree {
             Owner,
             Task,
             Lifetime,
+            Purpose,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4451,6 +4477,7 @@ impl<'de> serde::Deserialize<'de> for Tree {
                             "owner" => Ok(GeneratedField::Owner),
                             "task" => Ok(GeneratedField::Task),
                             "lifetime" => Ok(GeneratedField::Lifetime),
+                            "purpose" => Ok(GeneratedField::Purpose),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4477,6 +4504,7 @@ impl<'de> serde::Deserialize<'de> for Tree {
                 let mut owner__ = None;
                 let mut task__ = None;
                 let mut lifetime__ = None;
+                let mut purpose__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Id => {
@@ -4521,6 +4549,12 @@ impl<'de> serde::Deserialize<'de> for Tree {
                             }
                             lifetime__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Purpose => {
+                            if purpose__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("purpose"));
+                            }
+                            purpose__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(Tree {
@@ -4531,6 +4565,7 @@ impl<'de> serde::Deserialize<'de> for Tree {
                     owner: owner__.unwrap_or_default(),
                     task: task__.unwrap_or_default(),
                     lifetime: lifetime__.unwrap_or_default(),
+                    purpose: purpose__.unwrap_or_default(),
                 })
             }
         }
@@ -5057,6 +5092,146 @@ impl<'de> serde::Deserialize<'de> for UnmanagedRepo {
             }
         }
         deserializer.deserialize_struct("mori.v1alpha1.UnmanagedRepo", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for UpdateTreeRequest {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.repo.is_empty() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if self.tree.is_some() {
+            len += 1;
+        }
+        if !self.update_mask.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.UpdateTreeRequest", len)?;
+        if !self.repo.is_empty() {
+            struct_ser.serialize_field("repo", &self.repo)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if let Some(v) = self.tree.as_ref() {
+            struct_ser.serialize_field("tree", v)?;
+        }
+        if !self.update_mask.is_empty() {
+            struct_ser.serialize_field("updateMask", &self.update_mask)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for UpdateTreeRequest {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["repo", "name", "tree", "update_mask", "updateMask"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Repo,
+            Name,
+            Tree,
+            UpdateMask,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "repo" => Ok(GeneratedField::Repo),
+                            "name" => Ok(GeneratedField::Name),
+                            "tree" => Ok(GeneratedField::Tree),
+                            "updateMask" | "update_mask" => Ok(GeneratedField::UpdateMask),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = UpdateTreeRequest;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.UpdateTreeRequest")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<UpdateTreeRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut repo__ = None;
+                let mut name__ = None;
+                let mut tree__ = None;
+                let mut update_mask__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Repo => {
+                            if repo__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("repo"));
+                            }
+                            repo__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Tree => {
+                            if tree__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("tree"));
+                            }
+                            tree__ = map_.next_value()?;
+                        }
+                        GeneratedField::UpdateMask => {
+                            if update_mask__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("updateMask"));
+                            }
+                            update_mask__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(UpdateTreeRequest {
+                    repo: repo__.unwrap_or_default(),
+                    name: name__.unwrap_or_default(),
+                    tree: tree__,
+                    update_mask: update_mask__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.UpdateTreeRequest", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for Vcs {

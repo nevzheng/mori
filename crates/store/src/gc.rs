@@ -44,6 +44,9 @@ pub struct JournalEntry {
     pub task: Option<String>,
     /// Its lifetime.
     pub lifetime: String,
+    /// What it was for. Absent in entries written before trees had a purpose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
     /// The commit its working copy was on.
     pub commit_id: String,
     /// The ref that pins that commit, e.g. `refs/mori/removed/j-1790532359-4f2a0001`.
@@ -161,6 +164,7 @@ mod tests {
             owner: "claude".to_owned(),
             task: Some("fix-login".to_owned()),
             lifetime: "task-done".to_owned(),
+            purpose: None,
             commit_id: "aaaa".to_owned(),
             pin: format!("refs/mori/removed/{id}"),
             bookmarks: vec![JournalBookmark {

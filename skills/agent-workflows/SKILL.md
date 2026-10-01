@@ -18,9 +18,10 @@ how agents combine their work is plain jj (and git), described here. Read `using
 One agent (the coordinator) splits a task; worker agents each do a piece in their own tree.
 
 1. **Coordinator** makes a long-lived tree for combining work:
-   `mori tree create <repo> --agent <me> --task lead --lifetime pinned`. See `lead-tree`.
-2. **Each worker** gets its own tree: `mori tree create <repo> --agent <name> --task <slug>`
-   (or set `MORI_AGENT` once). One tree per piece of work.
+   `mori tree create <repo> --owner <me> --task lead --lifetime pinned`. See `lead-tree`.
+2. **Each worker** gets its own tree:
+   `mori tree create <repo> --owner <name> --task <slug> --purpose "<one line>"` (or set
+   `MORI_AGENT` once). One tree per piece of work.
 3. **A worker finishing** runs `jj commit -m "…"` (not `jj describe`, which leaves the work as the
    working copy and the tree reading as edited), stops editing, and reports its change IDs
    (`jj log -r '::<tree>@- ~ ::trunk()'`) with a line on what they do. Notes for the
