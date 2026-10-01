@@ -77,6 +77,17 @@ pub struct TreeBookmark {
     pub seen_at: String,
 }
 
+/// A tree's size as last measured.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TreeSize {
+    /// Bytes on disk.
+    pub bytes: u64,
+    /// True if some files couldn't be read.
+    pub partial: bool,
+    /// When it was measured (seconds since the Unix epoch).
+    pub measured_at: u64,
+}
+
 // Opaque, random, never reused: a prefix and 128 random bits.
 const NEW_ID: &str = "lower(hex(randomblob(16)))";
 const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
@@ -194,12 +205,16 @@ impl Database {
             source,
         };
         let tx = self.conn.transaction().map_err(sqlite)?;
-        tx.execute(
-            "DELETE FROM tree_bookmarks WHERE tree_id IN
-                 (SELECT id FROM trees WHERE repo_id = ?1 AND name = ?2)",
-            params![repo_id, name],
-        )
-        .map_err(sqlite)?;
+        for table in ["tree_bookmarks", "tree_sizes"] {
+            tx.execute(
+                &format!(
+                    "DELETE FROM {table} WHERE tree_id IN
+                         (SELECT id FROM trees WHERE repo_id = ?1 AND name = ?2)"
+                ),
+                params![repo_id, name],
+            )
+            .map_err(sqlite)?;
+        }
         let deleted = tx
             .execute(
                 "DELETE FROM trees WHERE repo_id = ?1 AND name = ?2",
@@ -283,6 +298,52 @@ impl Database {
             })
             .map_err(sqlite)?;
         rows.collect::<Result<_, _>>().map_err(sqlite)
+    }
+
+    /// Saves the size just measured for the tree with ID `tree_id`, at `measured_at` (seconds
+    /// since the Unix epoch).
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error, including when no tree has that ID.
+    pub fn record_tree_size(&mut self, tree_id: &str, size: &TreeSize) -> Result<(), StoreError> {
+        self.conn
+            .execute(
+                "INSERT INTO tree_sizes (tree_id, bytes, partial, measured_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (tree_id) DO UPDATE SET bytes = excluded.bytes,
+                     partial = excluded.partial, measured_at = excluded.measured_at",
+                params![
+                    tree_id,
+                    i64::try_from(size.bytes).unwrap_or(i64::MAX),
+                    size.partial,
+                    i64::try_from(size.measured_at).unwrap_or(i64::MAX),
+                ],
+            )
+            .map(|_| ())
+            .map_err(|source| self.sqlite(source))
+    }
+
+    /// The last size saved for the tree with ID `tree_id`, if any.
+    ///
+    /// # Errors
+    ///
+    /// A SQLite error.
+    pub fn tree_size(&self, tree_id: &str) -> Result<Option<TreeSize>, StoreError> {
+        self.conn
+            .query_row(
+                "SELECT bytes, partial, measured_at FROM tree_sizes WHERE tree_id = ?1",
+                [tree_id],
+                |row| {
+                    Ok(TreeSize {
+                        bytes: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0),
+                        partial: row.get(1)?,
+                        measured_at: u64::try_from(row.get::<_, i64>(2)?).unwrap_or(0),
+                    })
+                },
+            )
+            .optional()
+            .map_err(|source| self.sqlite(source))
     }
 
     /// Records a restored tree under its old ID, so it is the same tree coming back.
@@ -636,6 +697,28 @@ mod tests {
 
         assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
         assert_eq!(db.tree_bookmarks(&tree.id).unwrap(), []);
+    }
+
+    #[test]
+    fn a_tree_size_is_saved_replaced_and_dropped_with_the_tree() {
+        let (_dir, mut db) = database().unwrap();
+        let (repo, _) = db.record_clone(&widget(), &base()).unwrap();
+        let tree = db
+            .record_tree(&repo.id, &task_tree("claude-fix-login"))
+            .unwrap();
+        let size = |bytes, measured_at| TreeSize {
+            bytes,
+            partial: false,
+            measured_at,
+        };
+        assert_eq!(db.tree_size(&tree.id).unwrap(), None);
+
+        db.record_tree_size(&tree.id, &size(100, 1)).unwrap();
+        db.record_tree_size(&tree.id, &size(200, 2)).unwrap();
+
+        assert_eq!(db.tree_size(&tree.id).unwrap(), Some(size(200, 2)));
+        assert!(db.delete_tree(&repo.id, "claude-fix-login").unwrap());
+        assert_eq!(db.tree_size(&tree.id).unwrap(), None);
     }
 
     #[test]

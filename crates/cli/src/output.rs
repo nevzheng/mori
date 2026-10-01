@@ -12,6 +12,7 @@ use mori_api::v1alpha1::{
     RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs, finding::Severity,
     skill_file::Action, tree_row::Status,
 };
+use mori_core::disk::{Space, format_size};
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
 
@@ -156,7 +157,15 @@ pub fn tree_create_text(response: &CreateTreeResponse) -> String {
         "  a jj workspace: use jj here, not git (see the vcs-in-mori skill)"
     };
     let _ = writeln!(text, "{hint}");
+    warnings_text(&mut text, &response.warnings);
     text
+}
+
+/// Appends each warning on its own line.
+fn warnings_text(text: &mut String, warnings: &[String]) {
+    for warning in warnings {
+        let _ = writeln!(text, "warning: {warning}");
+    }
 }
 
 /// The text `ls` prints: a table of trees per repo, then the clones mori didn't make.
@@ -168,29 +177,48 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
             "mori manages no repos yet; add one with `mori clone`."
         );
     }
+    let rows = || response.repos.iter().flat_map(|repo| &repo.trees);
+    let sized = rows().any(|row| !row.size_measured_at.is_empty());
+    // RFC 3339 in UTC sorts as text: anything older than the newest was reused.
+    let newest = rows()
+        .map(|row| row.size_measured_at.as_str())
+        .max()
+        .unwrap_or_default();
+    let reused =
+        |row: &TreeRow| !row.size_measured_at.is_empty() && row.size_measured_at.as_str() < newest;
     for repo in &response.repos {
         let vcs = match repo.vcs() {
             Vcs::Git => " (git)",
             Vcs::Jj => " (jj)",
             Vcs::Unspecified => "",
         };
-        let _ = writeln!(text, "{}{vcs}  {}", repo.repo, repo.path);
-        let rows: Vec<[String; 6]> = repo.trees.iter().map(ls_row).collect();
-        let header = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"].map(str::to_owned);
-        let mut widths = header.clone().map(|cell| cell.len());
-        for row in &rows {
-            for (width, cell) in widths.iter_mut().zip(row) {
-                *width = (*width).max(cell.len());
-            }
+        let size = if sized {
+            format!(
+                " {}",
+                format_size(repo.trees.iter().map(|row| row.size_bytes).sum())
+            )
+        } else {
+            String::new()
+        };
+        let _ = writeln!(text, "{}{vcs}{size}  {}", repo.repo, repo.path);
+        let mut header: Vec<String> = ["NAME", "STATUS", "OWNER", "TASK", "LIFETIME", "WORK"]
+            .map(str::to_owned)
+            .to_vec();
+        if sized {
+            header.push("SIZE".to_owned());
         }
-        for row in std::iter::once(&header).chain(&rows) {
-            let cells: Vec<String> = row
-                .iter()
-                .zip(widths)
-                .map(|(cell, width)| format!("{cell:width$}"))
-                .collect();
-            let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
-        }
+        let cells: Vec<Vec<String>> = repo
+            .trees
+            .iter()
+            .map(|row| {
+                let mut cells = ls_row(row).to_vec();
+                if sized {
+                    cells.push(size_cell(row, reused(row)));
+                }
+                cells
+            })
+            .collect();
+        table(&mut text, &header, &cells);
         let _ = writeln!(text);
     }
     if !response.unmanaged_repos.is_empty() {
@@ -207,7 +235,76 @@ pub fn ls_text(response: &ListTreesResponse) -> String {
             "WORK in jj trees is as of jj's last snapshot in each tree."
         );
     }
+    if rows().any(|row| row.size_partial) {
+        let _ = writeln!(text, "+ some files couldn't be read, so the size is short.");
+    }
+    if rows().any(reused) {
+        let _ = writeln!(
+            text,
+            "* a size measured in the last 15 minutes, reused; `--fresh` measures again."
+        );
+    }
+    if let Some(disk) = &response.disk {
+        let used = if sized {
+            format!(
+                "Trees use {}; ",
+                format_size(rows().map(|row| row.size_bytes).sum())
+            )
+        } else {
+            String::new()
+        };
+        let _ = writeln!(
+            text,
+            "{used}{}.",
+            space_text(disk.free_bytes, disk.total_bytes)
+        );
+    }
+    warnings_text(&mut text, &response.warnings);
     text
+}
+
+/// "310G free of 3.9T (8%)".
+fn space_text(free: u64, total: u64) -> String {
+    let space = Space { free, total };
+    format!(
+        "{} free of {} ({}%)",
+        format_size(space.free),
+        format_size(space.total),
+        space.free_percent()
+    )
+}
+
+/// Appends an indented table with aligned columns.
+fn table(text: &mut String, header: &[String], rows: &[Vec<String>]) {
+    let mut widths: Vec<usize> = header.iter().map(String::len).collect();
+    for row in rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.len());
+        }
+    }
+    for row in std::iter::once(header).chain(rows.iter().map(Vec::as_slice)) {
+        let cells: Vec<String> = row
+            .iter()
+            .zip(&widths)
+            .map(|(cell, width)| format!("{cell:width$}"))
+            .collect();
+        let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
+    }
+}
+
+/// A tree's size, marked when it was reused, or `-` when it wasn't measured.
+fn size_cell(row: &TreeRow, reused: bool) -> String {
+    if row.size_measured_at.is_empty() {
+        return "-".to_owned();
+    }
+    let mut cell = format_size(row.size_bytes);
+    if row.size_partial {
+        cell.push('+');
+    }
+    if reused {
+        cell.push('*');
+    }
+    cell
 }
 
 fn ls_row(row: &TreeRow) -> [String; 6] {

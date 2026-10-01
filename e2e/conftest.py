@@ -18,6 +18,7 @@ from pytest_bdd import given, parsers, then, when
 pytest_plugins = [
     "init_steps",
     "clone_steps",
+    "disk_steps",
     "doctor_steps",
     "gc_steps",
     "git_steps",

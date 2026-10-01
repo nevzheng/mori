@@ -13,6 +13,7 @@ scenarios(
     "../spec/cuj/07-restore.feature",
     "../spec/cuj/08-git-backend.feature",
     "../spec/cuj/09-doctor.feature",
+    "../spec/cuj/10-disk-usage.feature",
     "../spec/cuj/skills.feature",
     "features/smoke.feature",
 )

@@ -25,11 +25,11 @@ const APPLICATION_ID: i32 = 0x6d6f_7269;
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The schema version this mori writes, and the newest it reads.
-pub const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// The steps from an empty file to each version: `MIGRATIONS[n]` takes version `n` to `n + 1`.
 /// Append only: a released step never changes.
-const MIGRATIONS: [&str; 4] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
+const MIGRATIONS: [&str; 5] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
 
 const SCHEMA_V1: &str = "
     CREATE TABLE meta (
@@ -81,6 +81,17 @@ const SCHEMA_V3: &str = "
 // other tree mori records is a task tree.
 const SCHEMA_V4: &str = "
     ALTER TABLE trees DROP COLUMN role;
+";
+
+// The last measured size of each tree, so `ls --size` and `gc` needn't walk every file each time.
+// Only a cache: losing a row only means measuring again.
+const SCHEMA_V5: &str = "
+    CREATE TABLE tree_sizes (
+        tree_id     TEXT PRIMARY KEY NOT NULL REFERENCES trees (id),
+        bytes       INTEGER NOT NULL,
+        partial     INTEGER NOT NULL,
+        measured_at INTEGER NOT NULL
+    ) STRICT;
 ";
 
 /// An open mori database.
@@ -394,8 +405,8 @@ mod tests {
         assert!(matches!(
             error,
             StoreError::SchemaTooNew {
-                found: 5,
-                supported: 4,
+                found: 6,
+                supported: 5,
                 ..
             }
         ));
@@ -404,8 +415,8 @@ mod tests {
             error.metadata(),
             vec![
                 ("path", path.display().to_string()),
-                ("foundVersion", "5".to_owned()),
-                ("supportedVersion", "4".to_owned()),
+                ("foundVersion", "6".to_owned()),
+                ("supportedVersion", "5".to_owned()),
             ]
         );
     }
@@ -417,7 +428,7 @@ mod tests {
 
         assert_eq!(
             tables(&db).unwrap(),
-            ["meta", "repos", "tree_bookmarks", "trees"]
+            ["meta", "repos", "tree_bookmarks", "tree_sizes", "trees"]
         );
     }
 
@@ -431,7 +442,7 @@ mod tests {
         assert_eq!(db.root().unwrap(), PathBuf::from(ROOT));
         assert_eq!(
             tables(&db).unwrap(),
-            ["meta", "repos", "tree_bookmarks", "trees"]
+            ["meta", "repos", "tree_bookmarks", "tree_sizes", "trees"]
         );
     }
 

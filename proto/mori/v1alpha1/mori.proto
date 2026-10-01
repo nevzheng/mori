@@ -217,12 +217,23 @@ message CreateTreeResponse {
 
   // Which VCS the tree uses: its clone's.
   Vcs vcs = 4;
+
+  // Things worth knowing, such as free disk space below the `[disk] warn_below` floor. They never
+  // stop the tree being created.
+  repeated string warnings = 5;
 }
 
 // Request for `ListTrees`.
 message ListTreesRequest {
   // Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
   string repo = 1;
+
+  // Measure how much disk each tree uses. Walks every file, so it is off by default.
+  bool include_sizes = 2;
+
+  // With `include_sizes`: measure every tree again instead of reusing a size measured in the last
+  // 15 minutes.
+  bool skip_size_cache = 3;
 }
 
 // Response for `ListTrees`.
@@ -232,6 +243,21 @@ message ListTreesResponse {
 
   // Clones under the root that mori didn't make. Listed only when no repo was asked for.
   repeated UnmanagedRepo unmanaged_repos = 2;
+
+  // Free and total space on the disk under the root.
+  Disk disk = 3;
+
+  // Things worth knowing, such as free disk space below the `[disk] warn_below` floor.
+  repeated string warnings = 4;
+}
+
+// Space on one disk.
+message Disk {
+  // Bytes an unprivileged user can still write.
+  uint64 free_bytes = 1;
+
+  // The disk's size in bytes.
+  uint64 total_bytes = 2;
 }
 
 // One repo mori manages, and its trees.
@@ -274,6 +300,17 @@ message TreeRow {
 
   // The bookmarks mori has seen pushed from the tree (task trees only), and whether each landed.
   repeated PushedBookmark bookmarks = 4;
+
+  // Bytes the tree's directory holds on disk, with each hard-linked file counted once. Set only
+  // when sizes were asked for, and never for a missing tree. An upper bound: blocks shared by
+  // copy-on-write clones count in full.
+  uint64 size_bytes = 5;
+
+  // True if some files couldn't be read, so `size_bytes` is short of the truth.
+  bool size_partial = 6;
+
+  // When the size was measured (RFC 3339, UTC). Older than this run if it was reused.
+  string size_measured_at = 7;
 }
 
 // A bookmark mori saw pushed from a tree.

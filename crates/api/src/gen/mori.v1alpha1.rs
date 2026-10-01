@@ -189,6 +189,10 @@ pub struct CreateTreeResponse {
     /// Which VCS the tree uses: its clone's.
     #[prost(enumeration = "Vcs", tag = "4")]
     pub vcs: i32,
+    /// Things worth knowing, such as free disk space below the `\[disk\] warn_below` floor. They never
+    /// stop the tree being created.
+    #[prost(string, repeated, tag = "5")]
+    pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Request for `ListTrees`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -196,6 +200,13 @@ pub struct ListTreesRequest {
     /// Only this repo, in any form `Clone` accepts. Empty for every repo mori manages.
     #[prost(string, tag = "1")]
     pub repo: ::prost::alloc::string::String,
+    /// Measure how much disk each tree uses. Walks every file, so it is off by default.
+    #[prost(bool, tag = "2")]
+    pub include_sizes: bool,
+    /// With `include_sizes`: measure every tree again instead of reusing a size measured in the last
+    /// 15 minutes.
+    #[prost(bool, tag = "3")]
+    pub skip_size_cache: bool,
 }
 /// Response for `ListTrees`.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -206,6 +217,22 @@ pub struct ListTreesResponse {
     /// Clones under the root that mori didn't make. Listed only when no repo was asked for.
     #[prost(message, repeated, tag = "2")]
     pub unmanaged_repos: ::prost::alloc::vec::Vec<UnmanagedRepo>,
+    /// Free and total space on the disk under the root.
+    #[prost(message, optional, tag = "3")]
+    pub disk: ::core::option::Option<Disk>,
+    /// Things worth knowing, such as free disk space below the `\[disk\] warn_below` floor.
+    #[prost(string, repeated, tag = "4")]
+    pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+/// Space on one disk.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct Disk {
+    /// Bytes an unprivileged user can still write.
+    #[prost(uint64, tag = "1")]
+    pub free_bytes: u64,
+    /// The disk's size in bytes.
+    #[prost(uint64, tag = "2")]
+    pub total_bytes: u64,
 }
 /// One repo mori manages, and its trees.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -238,6 +265,17 @@ pub struct TreeRow {
     /// The bookmarks mori has seen pushed from the tree (task trees only), and whether each landed.
     #[prost(message, repeated, tag = "4")]
     pub bookmarks: ::prost::alloc::vec::Vec<PushedBookmark>,
+    /// Bytes the tree's directory holds on disk, with each hard-linked file counted once. Set only
+    /// when sizes were asked for, and never for a missing tree. An upper bound: blocks shared by
+    /// copy-on-write clones count in full.
+    #[prost(uint64, tag = "5")]
+    pub size_bytes: u64,
+    /// True if some files couldn't be read, so `size_bytes` is short of the truth.
+    #[prost(bool, tag = "6")]
+    pub size_partial: bool,
+    /// When the size was measured (RFC 3339, UTC). Older than this run if it was reused.
+    #[prost(string, tag = "7")]
+    pub size_measured_at: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `TreeRow`.
 pub mod tree_row {

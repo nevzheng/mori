@@ -344,7 +344,14 @@ impl Fixture {
     }
 
     fn tree_names(&self) -> Result<Vec<String>> {
-        let listed = ls::run(&self.app, Some(REPO)).map_err(to_std)?;
+        let listed = ls::run(
+            &self.app,
+            &ls::LsArgs {
+                repo: Some(REPO.to_owned()),
+                ..ls::LsArgs::default()
+            },
+        )
+        .map_err(to_std)?;
         Ok(listed
             .repos
             .into_iter()

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::disk::DiskPolicy;
 use crate::error::ConfigError;
 use crate::tree::TreePolicy;
 use crate::vcs::VcsPolicy;
@@ -26,6 +27,9 @@ pub struct Config {
     /// Which VCS new clones use. Optional; jj by default.
     #[serde(default)]
     pub vcs: VcsPolicy,
+    /// When to warn about disk space. Optional; below 10% free by default.
+    #[serde(default)]
+    pub disk: DiskPolicy,
 }
 
 impl Config {
@@ -71,7 +75,12 @@ impl Config {
              \n\
              # What `mori clone` makes without --vcs: \"jj\" (the default) or \"git\".\n\
              # [vcs]\n\
-             # default = \"jj\"\n"
+             # default = \"jj\"\n\
+             \n\
+             # Warn when free space on the disk under the root drops below this: a share of the\n\
+             # disk or a size such as \"200G\". \"0%\" turns the warning off.\n\
+             # [disk]\n\
+             # warn_below = \"10%\"\n"
         ))
     }
 }
@@ -96,6 +105,7 @@ mod tests {
                 root: PathBuf::from("/home/acme/mori"),
                 trees: TreePolicy::default(),
                 vcs: VcsPolicy::default(),
+                disk: DiskPolicy::default(),
             }
         );
     }
@@ -154,6 +164,23 @@ mod tests {
         );
         assert_eq!(trees.lifetime.task.to_string(), "ttl:14d");
         assert_eq!(trees.lru.max, Some(5));
+    }
+
+    #[test]
+    fn the_disk_floor_defaults_to_ten_percent() {
+        let path = Path::new(PATH);
+        let base = "schema = 1\nroot = \"/home/acme/mori\"\n";
+
+        let unset = Config::parse(base, path).unwrap();
+        let set = Config::parse(&format!("{base}[disk]\nwarn_below = \"200G\"\n"), path).unwrap();
+
+        assert_eq!(unset.disk.warn_below, crate::disk::Floor::Percent(10));
+        assert_eq!(
+            set.disk.warn_below,
+            crate::disk::Floor::Bytes(200 * 1024 * 1024 * 1024)
+        );
+        assert!(Config::parse(&format!("{base}[disk]\nwarn_below = \"lots\"\n"), path).is_err());
+        assert!(Config::parse(&format!("{base}[disk]\nmax = 1\n"), path).is_err());
     }
 
     #[test]

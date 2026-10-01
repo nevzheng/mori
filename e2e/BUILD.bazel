@@ -11,6 +11,7 @@ py_test(
     srcs = [
         "clone_steps.py",
         "conftest.py",
+        "disk_steps.py",
         "doctor_steps.py",
         "gc_steps.py",
         "git_steps.py",

@@ -108,6 +108,12 @@ safe to run, even while others work.
   `status` (`STATUS_TREE`, `STATUS_MISSING`, `STATUS_FOREIGN`), `tree`, `state`, and `bookmarks`:
   each bookmark mori has seen the tree push, with `onRemote` and `landed` (gone from the remote
   after a push, as after a squash merge). Fields at their default (`false`, `0`) are left out.
+- Every `ls` ends with free space on the disk (`disk.freeBytes`, `disk.totalBytes`) and any
+  `warnings`, such as free space below the `[disk] warn_below` floor (10% by default). Tell the
+  person about a warning; don't delete anything because of it.
+- **`--size`** adds each tree's disk use (`sizeBytes`, `sizePartial`, `sizeMeasuredAt`). It walks
+  every file, so use it when disk matters, not on every call. Sizes from the last 15 minutes are
+  reused; **`--fresh`** measures again.
 
 ### `mori tree create <repo> --task <slug>`
 

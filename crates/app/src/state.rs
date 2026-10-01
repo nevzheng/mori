@@ -2,6 +2,7 @@
 //! `[trees]` policy from `config.toml`.
 
 use mori_core::config::Config;
+use mori_core::disk::DiskPolicy;
 use mori_core::error::{ConfigError, ErrorDetails, RootSource};
 use mori_core::paths::Paths;
 use mori_core::tree::TreePolicy;
@@ -38,6 +39,11 @@ pub fn open_database(paths: &Paths) -> Result<Database, Box<dyn ErrorDetails>> {
 /// The `[trees]` policy from `config.toml`: every key has a default.
 pub fn tree_policy(paths: &Paths) -> Result<TreePolicy, Box<dyn ErrorDetails>> {
     Ok(config(paths)?.trees)
+}
+
+/// The `[disk]` policy from `config.toml`: every key has a default.
+pub fn disk_policy(paths: &Paths) -> Result<DiskPolicy, Box<dyn ErrorDetails>> {
+    Ok(config(paths)?.disk)
 }
 
 /// The VCS a new clone uses: `requested` if given, else `[vcs] default`, else jj.
