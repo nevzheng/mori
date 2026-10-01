@@ -15,6 +15,7 @@ mod gc_apply;
 pub mod init;
 mod landing;
 pub mod ls;
+pub mod place;
 pub mod restore;
 pub mod routed;
 pub mod skills;

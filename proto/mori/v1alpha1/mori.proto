@@ -47,6 +47,10 @@ service MoriService {
   // Changes a tree's record: its purpose, lifetime or owner. Never touches the tree itself.
   rpc UpdateTree(UpdateTreeRequest) returns (Tree);
 
+  // Says where a path is in the forest: which repo, which tree, its record and the repo's context
+  // folder. Reads only mori's records and the root layout; no VCS call.
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+
   // Checks the root, every clone and every tree against the VCS and the disk, and lists each
   // problem with the command that fixes it. Reads only.
   rpc Doctor(DoctorRequest) returns (DoctorResponse);
@@ -670,3 +674,47 @@ message Finding {
   // True if `mori doctor --fix --yes` repairs it.
   bool auto_fixable = 6;
 }
+
+// Request for `Resolve`.
+message ResolveRequest {
+  // An absolute path; the CLI sends the current directory when none is given.
+  string path = 1;
+}
+
+// Response for `Resolve`.
+message ResolveResponse {
+  // What part of the forest the path is in.
+  enum Kind {
+    // Not set.
+    KIND_UNSPECIFIED = 0;
+    // The root itself, or a part of it that belongs to no repo.
+    KIND_ROOT = 1;
+    // A repo's clone, which is also its base tree.
+    KIND_CLONE = 2;
+    // A task tree.
+    KIND_TREE = 3;
+    // The context folder.
+    KIND_CONTEXT = 4;
+  }
+
+  // What part of the forest the path is in.
+  Kind kind = 1;
+
+  // The root, absolute.
+  string root = 2;
+
+  // The repo, e.g. "github.com/acme/widget"; empty when the path belongs to no repo.
+  string repo = 3;
+
+  // The tree the path is in, as mori recorded it. For a foreign tree, only its name and path are
+  // set.
+  Tree tree = 4;
+
+  // STATUS_TREE when mori has a record of the tree; STATUS_FOREIGN for a directory under `trees/`
+  // that mori didn't make, which it leaves alone, as `ListTrees` reports a foreign workspace.
+  TreeRow.Status status = 5;
+
+  // The repo's context folder, `context/projects/<dir>/`; empty without a repo.
+  string context_dir = 6;
+}
+

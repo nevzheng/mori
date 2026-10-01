@@ -821,6 +821,81 @@ pub mod finding {
         }
     }
 }
+/// Request for `Resolve`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ResolveRequest {
+    /// An absolute path; the CLI sends the current directory when none is given.
+    #[prost(string, tag = "1")]
+    pub path: ::prost::alloc::string::String,
+}
+/// Response for `Resolve`.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ResolveResponse {
+    /// What part of the forest the path is in.
+    #[prost(enumeration = "resolve_response::Kind", tag = "1")]
+    pub kind: i32,
+    /// The root, absolute.
+    #[prost(string, tag = "2")]
+    pub root: ::prost::alloc::string::String,
+    /// The repo, e.g. "github.com/acme/widget"; empty when the path belongs to no repo.
+    #[prost(string, tag = "3")]
+    pub repo: ::prost::alloc::string::String,
+    /// The tree the path is in, as mori recorded it. For a foreign tree, only its name and path are
+    /// set.
+    #[prost(message, optional, tag = "4")]
+    pub tree: ::core::option::Option<Tree>,
+    /// STATUS_TREE when mori has a record of the tree; STATUS_FOREIGN for a directory under `trees/`
+    /// that mori didn't make, which it leaves alone, as `ListTrees` reports a foreign workspace.
+    #[prost(enumeration = "tree_row::Status", tag = "5")]
+    pub status: i32,
+    /// The repo's context folder, `context/projects/<dir>/`; empty without a repo.
+    #[prost(string, tag = "6")]
+    pub context_dir: ::prost::alloc::string::String,
+}
+/// Nested message and enum types in `ResolveResponse`.
+pub mod resolve_response {
+    /// What part of the forest the path is in.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+    #[repr(i32)]
+    pub enum Kind {
+        /// Not set.
+        Unspecified = 0,
+        /// The root itself, or a part of it that belongs to no repo.
+        Root = 1,
+        /// A repo's clone, which is also its base tree.
+        Clone = 2,
+        /// A task tree.
+        Tree = 3,
+        /// The context folder.
+        Context = 4,
+    }
+    impl Kind {
+        /// String value of the enum field names used in the ProtoBuf definition.
+        ///
+        /// The values are not transformed in any way and thus are considered stable
+        /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+        pub fn as_str_name(&self) -> &'static str {
+            match self {
+                Self::Unspecified => "KIND_UNSPECIFIED",
+                Self::Root => "KIND_ROOT",
+                Self::Clone => "KIND_CLONE",
+                Self::Tree => "KIND_TREE",
+                Self::Context => "KIND_CONTEXT",
+            }
+        }
+        /// Creates an enum from field names used in the ProtoBuf definition.
+        pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+            match value {
+                "KIND_UNSPECIFIED" => Some(Self::Unspecified),
+                "KIND_ROOT" => Some(Self::Root),
+                "KIND_CLONE" => Some(Self::Clone),
+                "KIND_TREE" => Some(Self::Tree),
+                "KIND_CONTEXT" => Some(Self::Context),
+                _ => None,
+            }
+        }
+    }
+}
 /// The VCS a clone and its trees use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
