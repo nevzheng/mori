@@ -10,12 +10,14 @@ use mori_core::error::{ErrorDetails, TreeError};
 use mori_core::paths::Paths;
 use mori_core::tree::Lifetime;
 use mori_core::tree_create::{DEFAULT_FROM, Observed, Request, TreePlan, default_owner, plan};
+use mori_core::vcs::VcsKind;
 use mori_store::StoreError;
 use mori_store::database::Database;
 use mori_store::records::NewTree;
 
+use crate::routed::kind_of;
 use crate::state::{self, boxed};
-use crate::{App, Backend, Host};
+use crate::{App, Backend, Host, api_vcs};
 use mori_core::vcs::Forge;
 
 /// What `mori tree create` was asked for.
@@ -53,8 +55,8 @@ pub fn create<V: Backend, F: Forge>(
     };
     let plan = plan(&paths, &policy, request, &observed).map_err(boxed)?;
     let mut id = String::new();
+    let clone = clone_path(&paths, &plan.repo);
     if !args.dry_run {
-        let clone = clone_path(&paths, &plan.repo);
         if let Some(parent) = plan.path.parent() {
             std::fs::create_dir_all(parent).map_err(|source| {
                 boxed(StoreError::Io {
@@ -68,7 +70,7 @@ pub fn create<V: Backend, F: Forge>(
             .map_err(boxed)?;
         id = record(&mut db, repo_id.as_deref().unwrap_or_default(), &plan)?;
     }
-    Ok(response(&plan, id, args.dry_run))
+    Ok(response(&plan, id, args.dry_run, kind_of(&clone)))
 }
 
 /// Who is acting: `--agent` if given, else `$MORI_AGENT`, else the login name.
@@ -156,7 +158,7 @@ fn record(
     })
 }
 
-fn response(plan: &TreePlan, id: String, dry_run: bool) -> CreateTreeResponse {
+fn response(plan: &TreePlan, id: String, dry_run: bool, kind: VcsKind) -> CreateTreeResponse {
     CreateTreeResponse {
         tree: Some(Tree {
             id,
@@ -169,5 +171,6 @@ fn response(plan: &TreePlan, id: String, dry_run: bool) -> CreateTreeResponse {
         }),
         from: plan.from.clone(),
         validate_only: dry_run,
+        vcs: api_vcs(kind).into(),
     }
 }

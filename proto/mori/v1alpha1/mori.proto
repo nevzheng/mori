@@ -210,6 +210,9 @@ message CreateTreeResponse {
 
   // Echoes the request: true if nothing was actually created.
   bool validate_only = 3;
+
+  // Which VCS the tree uses: its clone's.
+  Vcs vcs = 4;
 }
 
 // Request for `ListTrees`.

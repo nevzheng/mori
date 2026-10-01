@@ -25,6 +25,11 @@ Feature: CUJ 8 - trees as git worktrees
     And git works in "claude-fix-login" on a detached HEAD
     And the forest shows "claude-fix-login" as claude's task "fix-login", lifetime "task-done"
 
+  Scenario: tree create says a git tree is a git worktree
+    When I run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    Then it succeeds
+    And the output says the tree is a git worktree on a detached HEAD
+
   Scenario: A git tree with a commit on no remote branch is kept
     Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
     And someone commits work with git in "claude-fix-login"
