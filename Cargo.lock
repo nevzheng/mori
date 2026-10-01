@@ -558,6 +558,7 @@ dependencies = [
  "mori-git",
  "mori-github",
  "mori-jj",
+ "mori-mcp",
  "serde",
  "serde_json",
  "tempfile",
@@ -603,6 +604,14 @@ dependencies = [
 [[package]]
 name = "mori-mcp"
 version = "0.1.0-dev"
+dependencies = [
+ "mori-api",
+ "mori-app",
+ "mori-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "mori-protogen"

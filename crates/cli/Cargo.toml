@@ -19,6 +19,7 @@ mori-core = { path = "../core" }
 mori-git = { path = "../git" }
 mori-github = { path = "../github" }
 mori-jj = { path = "../jj" }
+mori-mcp = { path = "../mcp" }
 serde.workspace = true
 serde_json.workspace = true
 

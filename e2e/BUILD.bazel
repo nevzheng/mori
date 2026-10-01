@@ -19,6 +19,7 @@ py_test(
         "init_steps.py",
         "ls_steps.py",
         "matchers.py",
+        "mcp_steps.py",
         "pytest_main.py",
         "remove_steps.py",
         "skills_steps.py",

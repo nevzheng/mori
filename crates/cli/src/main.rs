@@ -212,6 +212,13 @@ enum Command {
         command: SkillsCommand,
     },
 
+    /// Serve mori's tools to agents over MCP (stdio).
+    ///
+    /// Six tools: `mori_where`, `mori_projects`, `mori_trees` and `mori_doctor` read;
+    /// `mori_tree_create` and `mori_tree_set` write mori's records. Removing, collecting and
+    /// repairing stay in the CLI. Add it to your agent, e.g. `claude mcp add mori -- mori mcp`.
+    Mcp,
+
     /// Print shell completions.
     ///
     /// For example: `mori completions zsh > ~/.zfunc/_mori`.
@@ -425,6 +432,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, json: bool, command: Comman
             (fix || dry_run).then_some(doctor::Fix { yes, dry_run }),
         ),
         Command::Completions { shell } => print_completions(shell),
+        Command::Mcp => serve_mcp(app),
         Command::Man => print_man(),
         Command::Where { path } => respond(json, run_where(app, path), output::where_text),
         Command::Restore { entry } => {
@@ -567,6 +575,14 @@ impl StatusArg {
             Self::Missing => ls::StatusFilter::Missing,
             Self::Foreign => ls::StatusFilter::Foreign,
         }
+    }
+}
+
+/// Serves MCP on stdin and stdout until stdin ends.
+fn serve_mcp(app: &App<Routed<JjCli, GitCli>, GhCli>) -> ExitCode {
+    match mori_mcp::serve(app, std::io::stdin().lock(), std::io::stdout().lock()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(_) => ExitCode::FAILURE,
     }
 }
 
