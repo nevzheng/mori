@@ -303,6 +303,7 @@ impl Fixture {
             user: Some("tester".to_owned()),
             agent: None,
             now: NOW,
+            cache_vars: BTreeMap::new(),
         };
         let app = App::new(host, FakeVcs::default(), NoForge);
         init::run(&app.host, false).map_err(to_std)?;

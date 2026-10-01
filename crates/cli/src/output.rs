@@ -130,6 +130,7 @@ pub fn clone_text(response: &CloneResponse) -> String {
     let _ = writeln!(text, "  base tree: default (pinned; the clone itself)");
     let _ = writeln!(text, "  task trees: trees/{}/", response.tree_dir);
     let _ = writeln!(text, "  context: {}/", response.context_dir);
+    warnings_text(&mut text, &response.warnings);
     text
 }
 

@@ -1,7 +1,7 @@
 //! `mori doctor`: gather the facts read-only, let `mori-core` judge them, and report.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use mori_api::v1alpha1::{DoctorResponse, Finding as ApiFinding, finding::Severity as ApiSeverity};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, clone_path};
@@ -15,7 +15,7 @@ use mori_store::records::RepoRecord;
 
 use crate::routed::kind_of;
 use crate::state::{self, boxed};
-use crate::{App, Backend, skills};
+use crate::{App, Backend, Host, cache, skills};
 
 /// Runs `mori doctor` for the whole root, or only `repo`. Reads only.
 ///
@@ -39,7 +39,7 @@ pub fn run<V: Backend, F: Forge>(
     }
     let repos = records
         .iter()
-        .map(|record| repo_facts(&paths, &db, &app.vcs, record))
+        .map(|record| repo_facts(&app.host, &paths, &db, &app.vcs, record))
         .collect::<Result<Vec<_>, _>>()?;
     let needed: Vec<VcsKind> = records
         .iter()
@@ -65,6 +65,10 @@ pub fn run<V: Backend, F: Forge>(
         repos,
         unrecorded_clones,
         index_stale: skills::index_stale(&paths)?,
+        ccache_without_base_dir: cache::ccache_lacks_base_dir(
+            &app.host,
+            &cache::SYSTEM_CCACHE_CONFS.map(PathBuf::from),
+        ),
     };
     let findings = check(&facts);
     Ok(DoctorResponse {
@@ -75,6 +79,7 @@ pub fn run<V: Backend, F: Forge>(
 
 /// What doctor needs to know about one recorded repo. A missing clone stops the reading there.
 fn repo_facts(
+    host: &Host,
     paths: &Paths,
     db: &Database,
     vcs: &impl Backend,
@@ -97,6 +102,7 @@ fn repo_facts(
         return Ok(facts);
     }
     facts.backend_changed = clone.join(".jj").is_dir() && has_git_worktrees(&clone);
+    facts.cache_gaps = cache::repo_gaps(host, &clone, Path::new(cache::SYSTEM_BAZELRC));
     let workspaces = vcs.list(&clone).map_err(boxed)?;
     let tree_dir = paths.trees().join(&record.dir_name);
     let in_use: BTreeSet<_> = workspaces

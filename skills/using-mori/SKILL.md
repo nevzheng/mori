@@ -47,7 +47,9 @@ Every tree builds from scratch unless the build tools share their caches, so man
 disk. Caches belong in the person's user-level config (`~/.bazelrc`, `~/.cargo/config.toml`), never
 in the repo or a tree: see [Shared caches](https://nevzheng.github.io/mori/shared-caches/). If a
 build is slow in every new tree, or the disk is filling, tell the person and point them there;
-don't change their config yourself.
+don't change their config yourself. `mori clone` and `mori doctor` warn when they can tell for sure
+that a cache is missing: `NO_SHARED_CACHE` for Bazel or Cargo, `CACHE_NOT_SHARED_ACROSS_TREES` for
+ccache without `base_dir`. Pass the warning and its fix on to the person.
 
 ## The layout
 
@@ -200,7 +202,8 @@ with the command that fixes it. It only reads, so run it whenever a jj or git co
 mori tree, or before handing out work. It exits 9 if it finds a problem.
 
 - Each finding has a code (`TREE_DIR_GONE`, `WORKSPACE_GONE`, `CONFLICTED_BOOKMARK`,
-  `BACKEND_CHANGED`, …), a severity (`problem`, `warn`, `info`), what it is about, and a `fix`.
+  `BACKEND_CHANGED`, `NO_SHARED_CACHE`, …), a severity (`problem`, `warn`, `info`), what it is
+  about, and a `fix`. Only problems change the exit code; warnings don't.
 - Run the fix it gives, or tell the person if it involves someone else's work. Findings marked
   auto-fixable are the safe, single-answer ones.
 - With `--json`, findings are in `findings[]` with `code`, `severity`, `subject`, `message`, `fix`
