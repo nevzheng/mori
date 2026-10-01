@@ -92,5 +92,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+          # A version with a suffix (v0.1.0-alpha.1) is a pre-release.
+          prerelease=()
+          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft "${prerelease[@]}" \
             --title "mori $TAG" --generate-notes
