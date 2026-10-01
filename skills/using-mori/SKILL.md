@@ -28,11 +28,11 @@ Follow these even when a command would let you do otherwise.
 4. **Use `--json` and read the error.** Decide what to do from the exit code and the `reason`,
    not from the message text.
 
-## Skills
+## Context
 
-mori's skills live in `skills/<name>/SKILL.md`, indexed by `skills/llms.txt`, both in mori's
-source repo and in every root (`~/mori/skills/`), where `mori init` installs them. Read the index
-to find the skill for a task. Skills of your own go beside mori's; the index lists them too.
+Everything agents should know lives under `context/` in the root, indexed by `context/llms.txt`
+(start from the root's `llms.txt`). mori's skills are in `context/skills/<name>/SKILL.md`, where
+`mori init` installs them; skills of your own go beside them, and the index lists them too.
 
 ## The layout
 
@@ -40,7 +40,9 @@ to find the skill for a task. Skills of your own go beside mori's; the index lis
 $MORI_ROOT/                        default ~/mori
   repos/<host>/<owner>/<repo>/     one clone per repo; also its base tree (yours, pinned)
   trees/<repo>/<name>/             task trees, one per piece of work
-  skills/  projects/  llms.txt     reserved for people and LLMs; no stability guarantee
+  context/                         skills and notes, indexed in context/llms.txt; no stability
+                                   guarantee
+  llms.txt                         start here
 ```
 
 Repo identities are all lowercase: `github.com/Acme/Widget` and `github.com/acme/widget` are the
@@ -150,7 +152,8 @@ again, it refuses like `tree create`.
 
 ### `mori skills sync`
 
-Updates mori's skills in the root (`skills/`, and the `skills/llms.txt` and `llms.txt` indexes) to
+Updates mori's skills in the root (`context/skills/`, and the `context/llms.txt` and `llms.txt`
+indexes) to
 this mori's version. It changes only files mori wrote and nobody edited since; an edited skill is
 kept, and a skill mori never wrote is left alone. `mori init` installs missing skills but never
 updates them. `--dry-run` shows what would change.

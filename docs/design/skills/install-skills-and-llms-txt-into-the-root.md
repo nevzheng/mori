@@ -8,7 +8,12 @@
 | **Issue**   | none       |
 | **PR**      | this PR    |
 | **Created** | 2026-09-30 |
-| **Updated** | 2026-09-30 |
+| **Updated** | 2026-10-01 |
+
+> **Changed after acceptance (2026-10-01):** The context half moved under `context/`:
+> `context/skills/`, a generated `context/llms.txt`, and one `context/<repo>/` folder of notes per
+> cloned repo; there is no `projects/`. `mori skills sync` moves an older root's files there. The
+> text below is the design as accepted.
 
 ## Q1. What are you trying to do?
 

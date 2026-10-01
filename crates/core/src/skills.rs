@@ -1,4 +1,4 @@
-//! Skills in the root: what mori writes into `skills/` and the two `llms.txt` indexes, and what it
+//! Context in the root: what mori writes into `context/` and the two `llms.txt` indexes, and what it
 //! leaves alone.
 //!
 //! mori only changes what it wrote. The manifest records the hash of every file mori wrote; a
@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 /// A file mori wants in the root, as a path relative to the root and its contents.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wanted {
-    /// Relative to the root, e.g. `skills/using-mori/SKILL.md`.
+    /// Relative to the root, e.g. `context/skills/using-mori/SKILL.md`.
     pub path: String,
     /// What mori would write.
     pub contents: String,
@@ -105,7 +105,7 @@ pub fn plan(
 /// A skill's name and description, from the frontmatter of its `SKILL.md`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkillInfo {
-    /// Its directory under `skills/`.
+    /// Its directory under `context/skills/`.
     pub dir: String,
     /// The frontmatter `name`, or the directory name.
     pub name: String,
@@ -159,24 +159,43 @@ pub fn skill_info(dir: &str, skill_md: &str) -> SkillInfo {
     info
 }
 
-/// The contents of `skills/llms.txt`: every skill, sorted by name.
+/// A cloned repo's context folder, for the index.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepoContext {
+    /// Its directory under `context/`, e.g. `widget`.
+    pub dir: String,
+    /// The repo, e.g. `github.com/acme/widget`.
+    pub repo: String,
+}
+
+/// The contents of `context/llms.txt`: every skill, sorted by name, then every cloned repo's
+/// context folder.
 #[must_use]
-pub fn skills_index(skills: &[SkillInfo]) -> String {
+pub fn context_index(skills: &[SkillInfo], repos: &[RepoContext]) -> String {
     let mut skills = skills.to_vec();
     skills.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut repos = repos.to_vec();
+    repos.sort_by(|a, b| a.dir.cmp(&b.dir));
     let mut text = String::from(
-        "# Skills\n\n\
-         > Skills for agents working under this root. Each is a directory, `<name>/SKILL.md`, with\n\
-         > a `name` and a `description` in its frontmatter. mori's own skills and anyone else's sit\n\
-         > side by side; mori generates this index and updates only the skills it wrote.\n\n\
+        "# Context\n\n\
+         > What agents working under this root should know. `skills/<name>/SKILL.md` are skills,\n\
+         > mori's and anyone else's side by side; each `<repo>/` folder holds notes and context for\n\
+         > one cloned repo, for people and every agent alike. mori generates this index and changes\n\
+         > only the files it wrote.\n\n\
          ## Skills\n\n",
     );
     for skill in &skills {
         let _ = writeln!(
             text,
-            "- [{}]({}/SKILL.md): {}",
+            "- [{}](skills/{}/SKILL.md): {}",
             skill.name, skill.dir, skill.description
         );
+    }
+    if !repos.is_empty() {
+        text.push_str("\n## Repos\n\n");
+        for repo in &repos {
+            let _ = writeln!(text, "- [{}]({}/): {}", repo.dir, repo.dir, repo.repo);
+        }
     }
     text
 }
@@ -189,12 +208,19 @@ pub fn root_index() -> String {
      > people and their coding agents. mori records only what it created. Pre-alpha: anything may\n\
      > change in any release.\n\n\
      Layout:\n\n\
+     - `context/`: what agents should know: skills, and one folder of notes per cloned repo,\n\
+     \x20 indexed in `context/llms.txt`\n\
      - `repos/<host>/<owner>/<repo>/`: one clone per repo, managed by `mori clone`\n\
-     - `trees/<repo>/<name>/`: task trees, managed by `mori tree create` and `mori tree remove`\n\
-     - `skills/`: skills for agents, indexed in `skills/llms.txt`\n\n\
+     - `trees/<repo>/<name>/`: task trees, managed by `mori tree create` and `mori tree remove`\n\n\
      ## Start here\n\n\
-     - [Skills index](skills/llms.txt): how to use mori, and every other skill in this root\n\
-     - [mori](https://nevzheng.github.io/mori/): the project's site and design docs\n"
+     - [Context index](context/llms.txt): how to use mori, every skill, and each repo's notes\n\
+     - [mori](https://nevzheng.github.io/mori/): the project's site and design docs\n\n\
+     ## Getting started\n\n\
+     Point your agent here once. Any of these works:\n\n\
+     - Add \"Before working under ~/mori, read ~/mori/llms.txt\" to the instructions file your\n\
+     \x20 agent reads (AGENTS.md, CLAUDE.md, or your tool's rules).\n\
+     - Or link a skill into your tool's skills folder, e.g.\n\
+     \x20 `ln -s ~/mori/context/skills/using-mori ~/.claude/skills/using-mori`.\n"
         .to_owned()
 }
 
@@ -204,13 +230,13 @@ mod tests {
 
     fn wanted(contents: &str) -> Wanted {
         Wanted {
-            path: "skills/using-mori/SKILL.md".to_owned(),
+            path: "context/skills/using-mori/SKILL.md".to_owned(),
             contents: contents.to_owned(),
         }
     }
 
     fn action(on_disk: Option<&str>, written: Option<&str>, mode: Mode) -> Action {
-        let path = "skills/using-mori/SKILL.md".to_owned();
+        let path = "context/skills/using-mori/SKILL.md".to_owned();
         let on_disk: BTreeMap<_, _> = on_disk
             .map(|text| (path.clone(), hash(text)))
             .into_iter()
@@ -278,14 +304,20 @@ mod tests {
     }
 
     #[test]
-    fn the_skills_index_lists_every_skill_by_name() {
-        let index = skills_index(&[
-            skill_info(
-                "using-mori",
-                "---\nname: using-mori\ndescription: Use mori.\n---\n",
-            ),
-            skill_info("a-flow", "---\nname: a-flow\ndescription: Mine.\n---\n"),
-        ]);
+    fn the_context_index_lists_skills_then_repos() {
+        let index = context_index(
+            &[
+                skill_info(
+                    "using-mori",
+                    "---\nname: using-mori\ndescription: Use mori.\n---\n",
+                ),
+                skill_info("a-flow", "---\nname: a-flow\ndescription: Mine.\n---\n"),
+            ],
+            &[RepoContext {
+                dir: "widget".to_owned(),
+                repo: "github.com/acme/widget".to_owned(),
+            }],
+        );
 
         let lines: Vec<&str> = index
             .lines()
@@ -294,14 +326,21 @@ mod tests {
         assert_eq!(
             lines,
             [
-                "- [a-flow](a-flow/SKILL.md): Mine.",
-                "- [using-mori](using-mori/SKILL.md): Use mori.",
+                "- [a-flow](skills/a-flow/SKILL.md): Mine.",
+                "- [using-mori](skills/using-mori/SKILL.md): Use mori.",
+                "- [widget](widget/): github.com/acme/widget",
             ]
         );
     }
 
     #[test]
-    fn the_root_index_points_to_the_skills_index() {
-        assert!(root_index().contains("(skills/llms.txt)"));
+    fn no_repos_means_no_repos_section() {
+        assert!(!context_index(&[], &[]).contains("## Repos"));
+    }
+
+    #[test]
+    fn the_root_index_points_to_the_context_index() {
+        assert!(root_index().contains("(context/llms.txt)"));
+        assert!(root_index().contains("## Getting started"));
     }
 }
