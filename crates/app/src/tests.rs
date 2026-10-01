@@ -471,6 +471,7 @@ fn apply(fixture: &Fixture) -> Result<mori_api::v1alpha1::GcResponse> {
                 max: None,
                 dry_run: false,
             }),
+            free: None,
         },
     )
     .map_err(to_std)
@@ -541,6 +542,7 @@ fn gc_without_yes_removes_nothing() -> Result<()> {
                 max: None,
                 dry_run: false,
             }),
+            free: None,
         },
     )
     .err()
@@ -559,6 +561,7 @@ fn gc_reason(fixture: &Fixture, name: &str) -> Result<String> {
             repo: None,
             offline: true,
             apply: None,
+            free: None,
         },
     )
     .map_err(to_std)?;

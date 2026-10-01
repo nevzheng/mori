@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
-use mori_api::v1alpha1::{GcItem, GcResponse};
+use mori_api::v1alpha1::{Disk, GcItem, GcResponse};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
+use mori_core::disk::{Candidate, pick_to_free};
 use mori_core::error::{CleanupError, ErrorDetails, RepoError};
 use mori_core::forest::{Entry, reconcile};
 use mori_core::gc::{Class, Facts, Reason, classify, over_cap};
@@ -19,6 +20,7 @@ use mori_core::vcs::Forge;
 use mori_store::database::Database;
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::disk;
 use crate::gc_apply;
 use crate::landing::{self, TreeRef};
 use crate::state::{self, boxed};
@@ -30,6 +32,8 @@ pub struct GcArgs {
     pub offline: bool,
     /// Set with `--apply`.
     pub apply: Option<Apply>,
+    /// `--free <size>`: pick removable trees until they free this many bytes.
+    pub free: Option<u64>,
 }
 
 /// What `--apply` was asked for.
@@ -71,21 +75,51 @@ pub fn run<V: Backend, F: Forge>(
         now: app.host.now,
         lru_max,
     };
+    let free = args.free.filter(|bytes| *bytes > 0);
     let mut items = Vec::new();
+    let mut idle = Vec::new();
     for repo in &repos {
-        items.extend(report_repo(&context, &mut db, repo, args.offline)?);
+        let ids: BTreeMap<String, String> = db
+            .trees(&repo.id)
+            .map_err(boxed)?
+            .into_iter()
+            .map(|record| (record.name, record.id))
+            .collect();
+        for (mut item, idle_seconds) in judge_repo(&context, &mut db, repo, args.offline)? {
+            // Picking by size needs sizes that are current, so `--free` measures removable trees
+            // again.
+            let fresh = free.is_some() && item.class() == ItemClass::Remove;
+            let id = ids.get(&item.name).cloned();
+            add_size(&mut db, &mut item, id.as_ref(), app.host.now, fresh);
+            items.push(item);
+            idle.push(idle_seconds);
+        }
+    }
+    let picked = free.map(|target| pick(&items, &idle, target));
+    if args.apply.is_none()
+        && let Some(picked) = &picked
+    {
+        for &index in picked {
+            items[index].set_outcome(Outcome::WouldRemove);
+        }
     }
     if let Some(apply) = &args.apply {
-        let max = usize::try_from(apply.max.filter(|max| *max > 0).unwrap_or(DEFAULT_MAX))
-            .unwrap_or(usize::MAX);
-        let batch: Vec<usize> = items
-            .iter()
-            .enumerate()
-            .filter(|(_, item)| item.class() == ItemClass::Remove)
-            .filter(|(_, item)| apply.names.is_empty() || apply.names.contains(&item.name))
-            .map(|(index, _)| index)
-            .take(max)
-            .collect();
+        let max = match (apply.max.filter(|max| *max > 0), &picked) {
+            (Some(max), _) => usize::try_from(max).unwrap_or(usize::MAX),
+            (None, Some(_)) => usize::MAX,
+            (None, None) => usize::try_from(DEFAULT_MAX).unwrap_or(usize::MAX),
+        };
+        let batch: Vec<usize> = match &picked {
+            Some(picked) => picked.iter().copied().take(max).collect(),
+            None => items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item.class() == ItemClass::Remove)
+                .filter(|(_, item)| apply.names.is_empty() || apply.names.contains(&item.name))
+                .map(|(index, _)| index)
+                .take(max)
+                .collect(),
+        };
         if !apply.yes && !apply.dry_run && !batch.is_empty() {
             return Err(boxed(CleanupError::NotConfirmed { count: batch.len() }));
         }
@@ -108,10 +142,48 @@ pub fn run<V: Backend, F: Forge>(
             item.entry_id = entry_id;
         }
     }
+    let space = disk::space(&paths);
     Ok(GcResponse {
         items,
         validate_only: args.apply.as_ref().is_some_and(|apply| apply.dry_run),
+        disk: space.map(|space| Disk {
+            free_bytes: space.free,
+            total_bytes: space.total,
+        }),
+        warnings: disk::low_space(&paths, space).into_iter().collect(),
     })
+}
+
+/// Measures a tree that may go and exists on disk, or reuses its recent size.
+fn add_size(db: &mut Database, item: &mut GcItem, tree_id: Option<&String>, now: u64, fresh: bool) {
+    let may_go = matches!(
+        item.class(),
+        ItemClass::Remove | ItemClass::Blocked | ItemClass::Keep
+    );
+    if !may_go || item.reason == Reason::Missing.code() {
+        return;
+    }
+    let id = tree_id.map_or("", String::as_str);
+    item.size_bytes = disk::tree_size(db, id, std::path::Path::new(&item.path), now, fresh).bytes;
+}
+
+/// The removable items `--free` takes to free `target` bytes, as indexes into `items`.
+fn pick(items: &[GcItem], idle: &[Option<u64>], target: u64) -> Vec<usize> {
+    let removable: Vec<usize> = (0..items.len())
+        .filter(|&index| items[index].class() == ItemClass::Remove)
+        .collect();
+    let candidates: Vec<Candidate> = removable
+        .iter()
+        .map(|&index| Candidate {
+            bytes: items[index].size_bytes,
+            idle_seconds: idle[index],
+            cache_only: false,
+        })
+        .collect();
+    pick_to_free(&candidates, target)
+        .into_iter()
+        .map(|picked| removable[picked])
+        .collect()
 }
 
 /// What judging a repo's trees needs.
@@ -140,6 +212,22 @@ pub(crate) fn report_repo<V: Backend>(
     repo: &RepoRecord,
     offline: bool,
 ) -> Result<Vec<GcItem>, Box<dyn ErrorDetails>> {
+    Ok(judge_repo(context, db, repo, offline)?
+        .into_iter()
+        .map(|(item, _)| item)
+        .collect())
+}
+
+/// A tree in the report, and seconds since its latest change (none when unknown).
+type Judged = (GcItem, Option<u64>);
+
+/// As [`report_repo`], with each tree's seconds since its latest change.
+fn judge_repo<V: Backend>(
+    context: &Context<V>,
+    db: &mut Database,
+    repo: &RepoRecord,
+    offline: bool,
+) -> Result<Vec<Judged>, Box<dyn ErrorDetails>> {
     let id = CloneUrl::parse(&repo.remote).map_err(boxed)?.repo;
     let clone = clone_path(context.paths, &id);
     let records = db.trees(&repo.id).map_err(boxed)?;
@@ -176,7 +264,8 @@ pub(crate) fn report_repo<V: Backend>(
         .map(|mut row| {
             row.facts.over_cap = beyond.contains(&row.name);
             let (class, reason) = classify(&row.facts);
-            GcItem {
+            let idle_seconds = row.facts.idle_seconds;
+            let item = GcItem {
                 repo: repo.remote.clone(),
                 facts: describe(&row, reason),
                 name: row.name,
@@ -184,7 +273,8 @@ pub(crate) fn report_repo<V: Backend>(
                 class: item_class(class).into(),
                 reason: reason.code().to_owned(),
                 ..GcItem::default()
-            }
+            };
+            (item, idle_seconds)
         })
         .collect())
 }

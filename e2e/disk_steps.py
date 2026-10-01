@@ -1,9 +1,17 @@
 """Steps for CUJ 10, seeing what the forest costs (spec/cuj/10-disk-usage.feature)."""
 
 import json
+import subprocess
 
+import pytest
 from harness import Mori, Placeholders
-from precisely import assert_that, contains_string, greater_than_or_equal_to, less_than
+from precisely import (
+    assert_that,
+    contains_string,
+    equal_to,
+    greater_than_or_equal_to,
+    less_than,
+)
 from pytest_bdd import given, parsers, then
 
 TREES = "<home>/mori/trees/widget"
@@ -25,6 +33,36 @@ def big_file(placeholders: Placeholders, name: str, size: int) -> None:
     with (placeholders.path(f"{TREES}/{name}") / "big.bin").open("wb") as file:
         for _ in range(size):
             file.write(block)
+
+
+def jj(env: dict[str, str], tree: str, *args: str) -> None:
+    result = subprocess.run(
+        ["jj", "--repository", tree, *args],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"setup: jj {args} exited {result.returncode}\nstderr:\n{result.stderr}")
+
+
+@given(parsers.parse('"{name}" landed a {size:d} MB file'))
+def landed_big_file(
+    env: dict[str, str], mori: Mori, placeholders: Placeholders, name: str, size: int
+) -> None:
+    # Commit a big file, push it, let mori see the bookmark, then delete it as a squash merge does.
+    big_file(placeholders, name, size)
+    tree = str(placeholders.path(f"{TREES}/{name}"))
+    bookmark = f"claude/{name}"
+    jj(env, tree, "commit", "--message", "big")
+    jj(env, tree, "bookmark", "create", bookmark, "--revision", "@-")
+    jj(env, tree, "git", "push", "--bookmark", bookmark)
+    if mori.run("mori ls").returncode != 0:
+        pytest.fail(f"setup: mori ls failed\n{mori.last.stderr}")
+    jj(env, tree, "bookmark", "delete", bookmark)
+    jj(env, tree, "git", "push", "--deleted")
 
 
 @given(parsers.parse('config.toml sets the free-space floor to "{floor}"'))
@@ -60,6 +98,36 @@ def shows_disk(mori: Mori) -> None:
     disk = json.loads(mori.last.stdout)["disk"]
     total = int(disk["totalBytes"])
     assert 0 < int(disk.get("freeBytes", "0")) <= total, disk
+
+
+# gc
+
+
+def gc_items(mori: Mori) -> dict[str, dict]:
+    return {item["name"]: item for item in json.loads(mori.last.stdout).get("items", [])}
+
+
+@then(parsers.parse('gc shows "{name}" freeing at least {size:d} MB'))
+def gc_frees(mori: Mori, name: str, size: int) -> None:
+    item = gc_items(mori)[name]
+    assert_that(item.get("class"), equal_to("CLASS_REMOVE"))
+    assert_that(int(item.get("sizeBytes", "0")), greater_than_or_equal_to(size * MB))
+
+
+@then(parsers.parse("gc would remove {count:d} tree"))
+def gc_would_remove(mori: Mori, count: int) -> None:
+    picked = [
+        name
+        for name, item in gc_items(mori).items()
+        if item.get("outcome") == "OUTCOME_WOULD_REMOVE"
+    ]
+    assert_that(len(picked), equal_to(count))
+
+
+@then(parsers.parse('only one of "{first}" and "{second}" is left'))
+def one_left(placeholders: Placeholders, first: str, second: str) -> None:
+    left = [name for name in (first, second) if placeholders.path(f"{TREES}/{name}").exists()]
+    assert_that(len(left), equal_to(1))
 
 
 # Text

@@ -1510,6 +1510,9 @@ impl serde::Serialize for GcItem {
         if !self.entry_id.is_empty() {
             len += 1;
         }
+        if self.size_bytes != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcItem", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -1541,6 +1544,12 @@ impl serde::Serialize for GcItem {
         if !self.entry_id.is_empty() {
             struct_ser.serialize_field("entryId", &self.entry_id)?;
         }
+        if self.size_bytes != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser
+                .serialize_field("sizeBytes", ToString::to_string(&self.size_bytes).as_str())?;
+        }
         struct_ser.end()
     }
 }
@@ -1551,7 +1560,17 @@ impl<'de> serde::Deserialize<'de> for GcItem {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "repo", "name", "path", "class", "reason", "facts", "outcome", "entry_id", "entryId",
+            "repo",
+            "name",
+            "path",
+            "class",
+            "reason",
+            "facts",
+            "outcome",
+            "entry_id",
+            "entryId",
+            "size_bytes",
+            "sizeBytes",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1564,6 +1583,7 @@ impl<'de> serde::Deserialize<'de> for GcItem {
             Facts,
             Outcome,
             EntryId,
+            SizeBytes,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1596,6 +1616,7 @@ impl<'de> serde::Deserialize<'de> for GcItem {
                             "facts" => Ok(GeneratedField::Facts),
                             "outcome" => Ok(GeneratedField::Outcome),
                             "entryId" | "entry_id" => Ok(GeneratedField::EntryId),
+                            "sizeBytes" | "size_bytes" => Ok(GeneratedField::SizeBytes),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1623,6 +1644,7 @@ impl<'de> serde::Deserialize<'de> for GcItem {
                 let mut facts__ = None;
                 let mut outcome__ = None;
                 let mut entry_id__ = None;
+                let mut size_bytes__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -1673,6 +1695,15 @@ impl<'de> serde::Deserialize<'de> for GcItem {
                             }
                             entry_id__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::SizeBytes => {
+                            if size_bytes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("sizeBytes"));
+                            }
+                            size_bytes__ = Some(
+                                map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(GcItem {
@@ -1684,6 +1715,7 @@ impl<'de> serde::Deserialize<'de> for GcItem {
                     facts: facts__.unwrap_or_default(),
                     outcome: outcome__.unwrap_or_default(),
                     entry_id: entry_id__.unwrap_or_default(),
+                    size_bytes: size_bytes__.unwrap_or_default(),
                 })
             }
         }
@@ -1879,6 +1911,9 @@ impl serde::Serialize for GcRequest {
         if self.validate_only {
             len += 1;
         }
+        if self.free_target_bytes != 0 {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcRequest", len)?;
         if !self.repo.is_empty() {
             struct_ser.serialize_field("repo", &self.repo)?;
@@ -1901,6 +1936,14 @@ impl serde::Serialize for GcRequest {
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
         }
+        if self.free_target_bytes != 0 {
+            #[allow(clippy::needless_borrow)]
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            struct_ser.serialize_field(
+                "freeTargetBytes",
+                ToString::to_string(&self.free_target_bytes).as_str(),
+            )?;
+        }
         struct_ser.end()
     }
 }
@@ -1919,6 +1962,8 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
             "max",
             "validate_only",
             "validateOnly",
+            "free_target_bytes",
+            "freeTargetBytes",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1930,6 +1975,7 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
             Names,
             Max,
             ValidateOnly,
+            FreeTargetBytes,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1961,6 +2007,9 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
                             "names" => Ok(GeneratedField::Names),
                             "max" => Ok(GeneratedField::Max),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "freeTargetBytes" | "free_target_bytes" => {
+                                Ok(GeneratedField::FreeTargetBytes)
+                            }
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1987,6 +2036,7 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
                 let mut names__ = None;
                 let mut max__ = None;
                 let mut validate_only__ = None;
+                let mut free_target_bytes__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Repo => {
@@ -2034,6 +2084,15 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::FreeTargetBytes => {
+                            if free_target_bytes__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("freeTargetBytes"));
+                            }
+                            free_target_bytes__ = Some(
+                                map_.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(GcRequest {
@@ -2044,6 +2103,7 @@ impl<'de> serde::Deserialize<'de> for GcRequest {
                     names: names__.unwrap_or_default(),
                     max: max__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    free_target_bytes: free_target_bytes__.unwrap_or_default(),
                 })
             }
         }
@@ -2064,12 +2124,24 @@ impl serde::Serialize for GcResponse {
         if self.validate_only {
             len += 1;
         }
+        if self.disk.is_some() {
+            len += 1;
+        }
+        if !self.warnings.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.GcResponse", len)?;
         if !self.items.is_empty() {
             struct_ser.serialize_field("items", &self.items)?;
         }
         if self.validate_only {
             struct_ser.serialize_field("validateOnly", &self.validate_only)?;
+        }
+        if let Some(v) = self.disk.as_ref() {
+            struct_ser.serialize_field("disk", v)?;
+        }
+        if !self.warnings.is_empty() {
+            struct_ser.serialize_field("warnings", &self.warnings)?;
         }
         struct_ser.end()
     }
@@ -2080,12 +2152,14 @@ impl<'de> serde::Deserialize<'de> for GcResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["items", "validate_only", "validateOnly"];
+        const FIELDS: &[&str] = &["items", "validate_only", "validateOnly", "disk", "warnings"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Items,
             ValidateOnly,
+            Disk,
+            Warnings,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2112,6 +2186,8 @@ impl<'de> serde::Deserialize<'de> for GcResponse {
                         match value {
                             "items" => Ok(GeneratedField::Items),
                             "validateOnly" | "validate_only" => Ok(GeneratedField::ValidateOnly),
+                            "disk" => Ok(GeneratedField::Disk),
+                            "warnings" => Ok(GeneratedField::Warnings),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2133,6 +2209,8 @@ impl<'de> serde::Deserialize<'de> for GcResponse {
             {
                 let mut items__ = None;
                 let mut validate_only__ = None;
+                let mut disk__ = None;
+                let mut warnings__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Items => {
@@ -2147,11 +2225,25 @@ impl<'de> serde::Deserialize<'de> for GcResponse {
                             }
                             validate_only__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Disk => {
+                            if disk__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("disk"));
+                            }
+                            disk__ = map_.next_value()?;
+                        }
+                        GeneratedField::Warnings => {
+                            if warnings__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("warnings"));
+                            }
+                            warnings__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(GcResponse {
                     items: items__.unwrap_or_default(),
                     validate_only: validate_only__.unwrap_or_default(),
+                    disk: disk__,
+                    warnings: warnings__.unwrap_or_default(),
                 })
             }
         }

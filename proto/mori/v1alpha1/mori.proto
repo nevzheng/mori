@@ -449,6 +449,11 @@ message GcRequest {
 
   // With `apply`: check everything and remove nothing (AIP-163; the CLI's --dry-run).
   bool validate_only = 7;
+
+  // Free at least this many bytes: pick removable trees, least recently changed first, until
+  // their sizes add up to it. Without `apply` the picked trees are marked `OUTCOME_WOULD_REMOVE`;
+  // with `apply` they are the batch, and `max` limits it only if set. 0 means no target.
+  uint64 free_target_bytes = 8;
 }
 
 // Response for `Gc`.
@@ -461,6 +466,12 @@ message GcResponse {
 
   // Echoes the request: true if nothing was removed although `apply` was asked.
   bool validate_only = 3;
+
+  // Free and total space on the disk under the root.
+  Disk disk = 4;
+
+  // Things worth knowing, such as free disk space below the `[disk] warn_below` floor.
+  repeated string warnings = 5;
 }
 
 // One tree in a cleanup report.
@@ -516,6 +527,10 @@ message GcItem {
 
   // The journal entry for a removal, for `Restore`.
   string entry_id = 8;
+
+  // Bytes the tree's directory holds on disk: what removing it frees. Measured for trees that
+  // may go (classes remove, blocked and keep); 0 for the others and for missing trees.
+  uint64 size_bytes = 9;
 }
 
 // Request for `Restore`.

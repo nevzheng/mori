@@ -50,3 +50,21 @@ Feature: CUJ 10 - see what the forest costs
     Then it succeeds
     And "<home>/mori/trees/widget/claude-fix-signup" exists
     And the output warns that free space is below the "100%" floor
+
+  Scenario: gc shows what each removable tree frees
+    Given "claude-fix-login" landed a 2 MB file
+    When I run "mori gc --offline --json"
+    Then it succeeds
+    And gc shows "claude-fix-login" freeing at least 2 MB
+
+  Scenario: gc picks just enough safe trees to free a target, and removes only those
+    Given "claude-fix-login" landed a 2 MB file
+    And I have run "mori tree create github.com/acme/widget --agent claude --task fix-signup"
+    And "claude-fix-signup" landed a 2 MB file
+    When I run "mori gc --offline --free 1M --json"
+    Then it succeeds
+    And gc would remove 1 tree
+    And "<home>/mori/trees/widget/claude-fix-login" exists
+    When I run "mori gc --offline --free 1M --apply --yes"
+    Then it succeeds
+    And only one of "claude-fix-login" and "claude-fix-signup" is left
