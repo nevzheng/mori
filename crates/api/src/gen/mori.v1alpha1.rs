@@ -131,9 +131,6 @@ pub struct Tree {
     /// Absolute path of the tree.
     #[prost(string, tag = "4")]
     pub path: ::prost::alloc::string::String,
-    /// "base" (the clone itself) or "task".
-    #[prost(string, tag = "5")]
-    pub role: ::prost::alloc::string::String,
     /// Who the tree is for: an agent such as "claude", or a person's login name.
     #[prost(string, tag = "6")]
     pub owner: ::prost::alloc::string::String,

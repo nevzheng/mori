@@ -25,11 +25,11 @@ const APPLICATION_ID: i32 = 0x6d6f_7269;
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The schema version this mori writes, and the newest it reads.
-pub const SCHEMA_VERSION: i32 = 3;
+pub const SCHEMA_VERSION: i32 = 4;
 
 /// The steps from an empty file to each version: `MIGRATIONS[n]` takes version `n` to `n + 1`.
 /// Append only: a released step never changes.
-const MIGRATIONS: [&str; 3] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3];
+const MIGRATIONS: [&str; 4] = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
 
 const SCHEMA_V1: &str = "
     CREATE TABLE meta (
@@ -75,6 +75,12 @@ const SCHEMA_V3: &str = "
         seen_at   TEXT NOT NULL,
         PRIMARY KEY (tree_id, remote, bookmark)
     ) STRICT;
+";
+
+// A tree's role isn't stored: the base tree is the clone's own workspace (`default`), and every
+// other tree mori records is a task tree.
+const SCHEMA_V4: &str = "
+    ALTER TABLE trees DROP COLUMN role;
 ";
 
 /// An open mori database.
@@ -294,14 +300,13 @@ mod tests {
         db: &Database,
         repo: &str,
         name: &str,
-        role: &str,
         lifetime: &str,
     ) -> rusqlite::Result<usize> {
         db.conn.execute(
-            "INSERT INTO trees (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
-             VALUES (lower(hex(randomblob(8))), ?1, ?2, ?3, 'claude', 'fix-login', ?4,
+            "INSERT INTO trees (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
+             VALUES (lower(hex(randomblob(8))), ?1, ?2, 'claude', 'fix-login', ?3,
                      '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [repo, name, role, lifetime],
+            [repo, name, lifetime],
         )
     }
 
@@ -389,8 +394,8 @@ mod tests {
         assert!(matches!(
             error,
             StoreError::SchemaTooNew {
-                found: 4,
-                supported: 3,
+                found: 5,
+                supported: 4,
                 ..
             }
         ));
@@ -399,8 +404,8 @@ mod tests {
             error.metadata(),
             vec![
                 ("path", path.display().to_string()),
-                ("foundVersion", "4".to_owned()),
-                ("supportedVersion", "3".to_owned()),
+                ("foundVersion", "5".to_owned()),
+                ("supportedVersion", "4".to_owned()),
             ]
         );
     }
@@ -470,18 +475,18 @@ mod tests {
     }
 
     #[test]
-    fn trees_accept_the_known_roles_and_lifetimes() {
+    fn trees_accept_the_known_lifetimes() {
         let (_dir, path) = database_path().unwrap();
         let db = Database::create(&path, ROOT, 0o600).unwrap();
         insert_repo(&db, "widget").unwrap();
 
-        for (name, role, lifetime) in [
-            ("base", "base", "pinned"),
-            ("a", "task", "task-done"),
-            ("b", "task", "ttl:14d"),
-            ("c", "task", "lru"),
+        for (name, lifetime) in [
+            ("default", "pinned"),
+            ("a", "task-done"),
+            ("b", "ttl:14d"),
+            ("c", "lru"),
         ] {
-            insert_tree(&db, "widget", name, role, lifetime).unwrap();
+            insert_tree(&db, "widget", name, lifetime).unwrap();
         }
     }
 
@@ -490,12 +495,11 @@ mod tests {
         let (_dir, path) = database_path().unwrap();
         let db = Database::create(&path, ROOT, 0o600).unwrap();
         insert_repo(&db, "widget").unwrap();
-        insert_tree(&db, "widget", "claude-fix-login", "task", "pinned").unwrap();
+        insert_tree(&db, "widget", "claude-fix-login", "pinned").unwrap();
 
-        // An unknown role or lifetime, a second tree with the same name, a repo that isn't there.
-        assert!(insert_tree(&db, "widget", "x", "lead", "pinned").is_err());
-        assert!(insert_tree(&db, "widget", "x", "task", "forever").is_err());
-        assert!(insert_tree(&db, "widget", "claude-fix-login", "task", "pinned").is_err());
-        assert!(insert_tree(&db, "gadget", "x", "task", "pinned").is_err());
+        // An unknown lifetime, a second tree with the same name, a repo that isn't there.
+        assert!(insert_tree(&db, "widget", "x", "forever").is_err());
+        assert!(insert_tree(&db, "widget", "claude-fix-login", "pinned").is_err());
+        assert!(insert_tree(&db, "gadget", "x", "pinned").is_err());
     }
 }

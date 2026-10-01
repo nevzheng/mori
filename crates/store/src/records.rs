@@ -22,8 +22,6 @@ pub struct NewRepo<'a> {
 pub struct NewTree<'a> {
     /// Its name, which is also its workspace name.
     pub name: &'a str,
-    /// `base` or `task`.
-    pub role: &'a str,
     /// Who made it: `you`, or an agent such as `claude`.
     pub owner: &'a str,
     /// Its task, if any.
@@ -54,8 +52,6 @@ pub struct TreeRecord {
     pub repo_id: String,
     /// Its name, which is also its workspace name.
     pub name: String,
-    /// `base` or `task`.
-    pub role: String,
     /// Who made it.
     pub owner: String,
     /// Its task, if any.
@@ -129,17 +125,10 @@ impl Database {
         tx.execute(
             &format!(
                 "INSERT INTO trees
-                     (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
-                 VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})"
+                     (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
+                 VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, {NOW}, {NOW})"
             ),
-            params![
-                repo_id,
-                base.name,
-                base.role,
-                base.owner,
-                base.task,
-                base.lifetime
-            ],
+            params![repo_id, base.name, base.owner, base.task, base.lifetime],
         )
         .map_err(sqlite)?;
         tx.commit().map_err(sqlite)?;
@@ -182,18 +171,11 @@ impl Database {
             .query_row(
                 &format!(
                     "INSERT INTO trees
-                         (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
-                     VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})
+                         (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
+                     VALUES ('tree_' || {NEW_ID}, ?1, ?2, ?3, ?4, ?5, {NOW}, {NOW})
                      RETURNING {TREE_COLUMNS}"
                 ),
-                params![
-                    repo_id,
-                    tree.name,
-                    tree.role,
-                    tree.owner,
-                    tree.task,
-                    tree.lifetime
-                ],
+                params![repo_id, tree.name, tree.owner, tree.task, tree.lifetime],
                 tree_record,
             )
             .map_err(sqlite)
@@ -312,15 +294,14 @@ impl Database {
             .query_row(
                 &format!(
                     "INSERT INTO trees
-                         (id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, {NOW}, {NOW})
+                         (id, repo_id, name, owner, task, lifetime, created_at, last_used_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, {NOW}, {NOW})
                      RETURNING {TREE_COLUMNS}"
                 ),
                 params![
                     tree_id,
                     repo_id,
                     tree.name,
-                    tree.role,
                     tree.owner,
                     tree.task,
                     tree.lifetime
@@ -393,20 +374,18 @@ fn is_key_clash(error: &rusqlite::Error) -> bool {
     )
 }
 
-const TREE_COLUMNS: &str =
-    "id, repo_id, name, role, owner, task, lifetime, created_at, last_used_at";
+const TREE_COLUMNS: &str = "id, repo_id, name, owner, task, lifetime, created_at, last_used_at";
 
 fn tree_record(row: &rusqlite::Row) -> rusqlite::Result<TreeRecord> {
     Ok(TreeRecord {
         id: row.get(0)?,
         repo_id: row.get(1)?,
         name: row.get(2)?,
-        role: row.get(3)?,
-        owner: row.get(4)?,
-        task: row.get(5)?,
-        lifetime: row.get(6)?,
-        created_at: row.get(7)?,
-        last_used_at: row.get(8)?,
+        owner: row.get(3)?,
+        task: row.get(4)?,
+        lifetime: row.get(5)?,
+        created_at: row.get(6)?,
+        last_used_at: row.get(7)?,
     })
 }
 
@@ -443,7 +422,6 @@ mod tests {
     fn base() -> NewTree<'static> {
         NewTree {
             name: "default",
-            role: "base",
             owner: "you",
             task: None,
             lifetime: "pinned",
@@ -466,12 +444,8 @@ mod tests {
         assert_eq!(tree.repo_id, repo.id);
         assert!(tree.id.starts_with("tree_"), "{}", tree.id);
         assert_eq!(
-            (
-                tree.name.as_str(),
-                tree.role.as_str(),
-                tree.lifetime.as_str()
-            ),
-            ("default", "base", "pinned")
+            (tree.name.as_str(), tree.lifetime.as_str()),
+            ("default", "pinned")
         );
         assert_eq!(tree.created_at, tree.last_used_at);
         assert!(tree.created_at.ends_with('Z'), "{}", tree.created_at);
@@ -508,7 +482,7 @@ mod tests {
     fn a_failed_record_writes_nothing() {
         let (_dir, mut db) = database().unwrap();
         let bad_tree = NewTree {
-            role: "lead",
+            lifetime: "forever",
             ..base()
         };
 
@@ -517,7 +491,7 @@ mod tests {
         assert_eq!(
             error.reason(),
             "DATABASE_ERROR",
-            "a bad role is a bug, not a duplicate"
+            "a bad lifetime is a bug, not a duplicate"
         );
         assert_eq!(db.repos().unwrap(), []);
     }
@@ -541,7 +515,6 @@ mod tests {
     fn task_tree(name: &'static str) -> NewTree<'static> {
         NewTree {
             name,
-            role: "task",
             owner: "claude",
             task: Some("fix-login"),
             lifetime: "task-done",

@@ -95,10 +95,10 @@ def jj_only(placeholders: Placeholders) -> None:
 def records_repo(placeholders: Placeholders, repo: str) -> None:
     with database(placeholders) as db:
         rows = db.execute(
-            "SELECT repos.remote, trees.name, trees.role, trees.lifetime"
+            "SELECT repos.remote, trees.name, trees.lifetime"
             " FROM repos JOIN trees ON trees.repo_id = repos.id"
         ).fetchall()
-    assert_that(rows, equal_to([(repo, "default", "base", "pinned")]))
+    assert_that(rows, equal_to([(repo, "default", "pinned")]))
 
 
 @then(parsers.parse('the base tree of "{repo}" belongs to "{owner}"'))
@@ -106,7 +106,7 @@ def base_owner(placeholders: Placeholders, repo: str, owner: str) -> None:
     with database(placeholders) as db:
         (recorded,) = db.execute(
             "SELECT trees.owner FROM trees JOIN repos ON repos.id = trees.repo_id"
-            " WHERE repos.remote = ? AND trees.role = 'base'",
+            " WHERE repos.remote = ? AND trees.name = 'default'",
             (repo,),
         ).fetchone()
     assert_that(recorded, equal_to(owner))

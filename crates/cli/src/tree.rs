@@ -136,7 +136,6 @@ fn record(
         repo_id,
         &NewTree {
             name: &plan.name,
-            role: plan.role.as_str(),
             owner: &plan.owner,
             task: Some(&plan.task),
             lifetime: &lifetime,
@@ -159,7 +158,6 @@ fn response(plan: &TreePlan, id: String, dry_run: bool) -> CreateTreeResponse {
             repo: plan.repo.to_string(),
             name: plan.name.clone(),
             path: plan.path.display().to_string(),
-            role: plan.role.as_str().to_owned(),
             owner: plan.owner.clone(),
             task: plan.task.clone(),
             lifetime: plan.lifetime.to_string(),

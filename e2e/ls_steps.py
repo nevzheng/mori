@@ -59,7 +59,7 @@ def shows_base_tree(mori: Mori, name: str, repo: str, lifetime: str) -> None:
     found = row(mori, name)
     assert_that(found["status"], equal_to("STATUS_TREE"))
     assert_that(found["tree"]["repo"], equal_to(repo))
-    assert_that(found["tree"]["role"], equal_to("base"))
+    assert_that(found["tree"]["name"], equal_to("default"))
     assert_that(found["tree"]["lifetime"], equal_to(lifetime))
     assert_that(found["state"].get("changed", False), equal_to(False))
     assert_that(found["state"].get("unpushed", 0), equal_to(0))
@@ -69,8 +69,8 @@ def shows_base_tree(mori: Mori, name: str, repo: str, lifetime: str) -> None:
 def shows_task_tree(mori: Mori, name: str, owner: str, task: str, lifetime: str) -> None:
     tree = row(mori, name)["tree"]
     assert_that(
-        (tree["role"], tree["owner"], tree["task"], tree["lifetime"]),
-        equal_to(("task", owner, task, lifetime)),
+        (tree["owner"], tree["task"], tree["lifetime"]),
+        equal_to((owner, task, lifetime)),
     )
 
 

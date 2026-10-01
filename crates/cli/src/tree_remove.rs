@@ -48,11 +48,7 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
         .find(|tree| tree.name == request.name);
     let recorded = record.as_ref().map(|record| Recorded {
         name: record.name.clone(),
-        role: if record.role == Role::Base.as_str() {
-            Role::Base
-        } else {
-            Role::Task
-        },
+        role: Role::of(&record.name),
         // An unreadable lifetime counts as pinned: the choice that refuses.
         lifetime: record.lifetime.parse().unwrap_or(Lifetime::Pinned),
         path: if record.name == BASE_TREE_NAME {
@@ -151,7 +147,6 @@ fn tree_message(repo: &str, plan: &RemovePlan, record: TreeRecord) -> Tree {
         repo: repo.to_owned(),
         name: record.name,
         path: plan.path.display().to_string(),
-        role: record.role,
         owner: record.owner,
         task: record.task.unwrap_or_default(),
         lifetime: record.lifetime,
