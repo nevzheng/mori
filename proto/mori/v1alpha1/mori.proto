@@ -34,16 +34,13 @@ service MoriService {
   // never touches anyone else's skills.
   rpc SyncSkills(SyncSkillsRequest) returns (SyncSkillsResponse);
 
-  // Reports which trees may be removed and whether each is safe to remove, and saves the report
-  // for `GcApply`. Changes no tree; fetches remote bookmarks unless offline.
+  // Reports which trees may be removed and whether each is safe to remove; fetches remote
+  // bookmarks unless offline. With `apply` and `confirmed`, also removes a batch of the removable
+  // ones: each is snapshotted and judged again first and kept if anything changed; each removal
+  // pins the tree's commit and goes into the journal, so `Restore` can bring it back.
   rpc Gc(GcRequest) returns (GcResponse);
 
-  // Removes a confirmed batch of the trees a saved report lists to remove. Each is snapshotted and
-  // judged again first, and skipped if anything changed; each removal pins the tree's commit and
-  // goes into the journal, so `Restore` can bring it back.
-  rpc GcApply(GcApplyRequest) returns (GcApplyResponse);
-
-  // Brings back a tree `GcApply` removed, from its journal entry: its workspace on the pinned
+  // Brings back a tree `Gc` removed, from its journal entry: its workspace on the pinned
   // commit, at its old path, recorded under its old ID. Says so if the commit is gone.
   rpc Restore(RestoreRequest) returns (RestoreResponse);
 }
@@ -337,15 +334,33 @@ message GcRequest {
 
   // Don't fetch or ask GitHub: work only from what the clone already knows.
   bool offline = 2;
+
+  // Also remove a batch of the trees the report finds removable.
+  bool apply = 3;
+
+  // The person confirmed the removal. With `apply` and without it, nothing is removed.
+  bool confirmed = 4;
+
+  // With `apply`: only these trees, by name. Empty for every removable tree.
+  repeated string names = 5;
+
+  // With `apply`: the most trees to remove. 0 means the default, 10.
+  uint32 max = 6;
+
+  // With `apply`: check everything and remove nothing (AIP-163; the CLI's --dry-run).
+  bool validate_only = 7;
 }
 
 // Response for `Gc`.
 message GcResponse {
-  // The saved report's ID, for `GcApply`.
-  string report_id = 1;
+  reserved 1;
+  reserved "report_id";
 
   // Every tree, sorted by repo and name.
   repeated GcItem items = 2;
+
+  // Echoes the request: true if nothing was removed although `apply` was asked.
+  bool validate_only = 3;
 }
 
 // One tree in a cleanup report.
@@ -381,50 +396,14 @@ message GcItem {
 
   // The facts it was judged on, for people to read.
   string facts = 6;
-}
 
-// Request for `GcApply`.
-message GcApplyRequest {
-  // The report to act on.
-  string report_id = 1;
-
-  // Only these trees, by name. Empty for every tree the report lists to remove.
-  repeated string names = 2;
-
-  // The most trees to remove in this batch. 0 means the default, 10.
-  uint32 max = 3;
-
-  // The person confirmed the batch. Without it, nothing is removed.
-  bool confirmed = 4;
-
-  // Check everything and remove nothing (AIP-163; the CLI's --dry-run).
-  bool validate_only = 5;
-
-  // Don't fetch or ask GitHub while checking again.
-  bool offline = 6;
-}
-
-// Response for `GcApply`.
-message GcApplyResponse {
-  // The report acted on.
-  string report_id = 1;
-
-  // Each tree in the batch, in order, and what happened.
-  repeated GcApplyItem items = 2;
-
-  // Echoes the request: true if nothing was actually removed.
-  bool validate_only = 3;
-}
-
-// One tree in a `GcApply` batch.
-message GcApplyItem {
-  // What happened to the tree.
+  // What `apply` did with the tree. Unset when nothing was applied to it.
   enum Outcome {
-    // Not set.
+    // Not applied.
     OUTCOME_UNSPECIFIED = 0;
-    // It was removed and journalled.
+    // Removed and journalled.
     OUTCOME_REMOVED = 1;
-    // It would be removed (a dry run, or not confirmed).
+    // Would be removed (a dry run).
     OUTCOME_WOULD_REMOVE = 2;
     // Checked again, it may no longer go (its facts changed); kept.
     OUTCOME_SKIPPED_CHANGED = 3;
@@ -432,25 +411,16 @@ message GcApplyItem {
     OUTCOME_SKIPPED_UNSAVED = 4;
   }
 
-  // The repo.
-  string repo = 1;
-
-  // The tree's name.
-  string name = 2;
-
-  // What happened.
-  Outcome outcome = 3;
-
-  // The reason the tree was judged by, now.
-  string reason = 4;
+  // What `apply` did with it.
+  Outcome outcome = 7;
 
   // The journal entry for a removal, for `Restore`.
-  string entry_id = 5;
+  string entry_id = 8;
 }
 
 // Request for `Restore`.
 message RestoreRequest {
-  // The journal entry, from `GcApply`.
+  // The journal entry, from `Gc` with `apply`.
   string entry_id = 1;
 }
 

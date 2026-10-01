@@ -395,16 +395,31 @@ pub struct GcRequest {
     /// Don't fetch or ask GitHub: work only from what the clone already knows.
     #[prost(bool, tag = "2")]
     pub offline: bool,
+    /// Also remove a batch of the trees the report finds removable.
+    #[prost(bool, tag = "3")]
+    pub apply: bool,
+    /// The person confirmed the removal. With `apply` and without it, nothing is removed.
+    #[prost(bool, tag = "4")]
+    pub confirmed: bool,
+    /// With `apply`: only these trees, by name. Empty for every removable tree.
+    #[prost(string, repeated, tag = "5")]
+    pub names: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// With `apply`: the most trees to remove. 0 means the default, 10.
+    #[prost(uint32, tag = "6")]
+    pub max: u32,
+    /// With `apply`: check everything and remove nothing (AIP-163; the CLI's --dry-run).
+    #[prost(bool, tag = "7")]
+    pub validate_only: bool,
 }
 /// Response for `Gc`.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GcResponse {
-    /// The saved report's ID, for `GcApply`.
-    #[prost(string, tag = "1")]
-    pub report_id: ::prost::alloc::string::String,
     /// Every tree, sorted by repo and name.
     #[prost(message, repeated, tag = "2")]
     pub items: ::prost::alloc::vec::Vec<GcItem>,
+    /// Echoes the request: true if nothing was removed although `apply` was asked.
+    #[prost(bool, tag = "3")]
+    pub validate_only: bool,
 }
 /// One tree in a cleanup report.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -427,6 +442,12 @@ pub struct GcItem {
     /// The facts it was judged on, for people to read.
     #[prost(string, tag = "6")]
     pub facts: ::prost::alloc::string::String,
+    /// What `apply` did with it.
+    #[prost(enumeration = "gc_item::Outcome", tag = "7")]
+    pub outcome: i32,
+    /// The journal entry for a removal, for `Restore`.
+    #[prost(string, tag = "8")]
+    pub entry_id: ::prost::alloc::string::String,
 }
 /// Nested message and enum types in `GcItem`.
 pub mod gc_item {
@@ -471,72 +492,15 @@ pub mod gc_item {
             }
         }
     }
-}
-/// Request for `GcApply`.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct GcApplyRequest {
-    /// The report to act on.
-    #[prost(string, tag = "1")]
-    pub report_id: ::prost::alloc::string::String,
-    /// Only these trees, by name. Empty for every tree the report lists to remove.
-    #[prost(string, repeated, tag = "2")]
-    pub names: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    /// The most trees to remove in this batch. 0 means the default, 10.
-    #[prost(uint32, tag = "3")]
-    pub max: u32,
-    /// The person confirmed the batch. Without it, nothing is removed.
-    #[prost(bool, tag = "4")]
-    pub confirmed: bool,
-    /// Check everything and remove nothing (AIP-163; the CLI's --dry-run).
-    #[prost(bool, tag = "5")]
-    pub validate_only: bool,
-    /// Don't fetch or ask GitHub while checking again.
-    #[prost(bool, tag = "6")]
-    pub offline: bool,
-}
-/// Response for `GcApply`.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GcApplyResponse {
-    /// The report acted on.
-    #[prost(string, tag = "1")]
-    pub report_id: ::prost::alloc::string::String,
-    /// Each tree in the batch, in order, and what happened.
-    #[prost(message, repeated, tag = "2")]
-    pub items: ::prost::alloc::vec::Vec<GcApplyItem>,
-    /// Echoes the request: true if nothing was actually removed.
-    #[prost(bool, tag = "3")]
-    pub validate_only: bool,
-}
-/// One tree in a `GcApply` batch.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct GcApplyItem {
-    /// The repo.
-    #[prost(string, tag = "1")]
-    pub repo: ::prost::alloc::string::String,
-    /// The tree's name.
-    #[prost(string, tag = "2")]
-    pub name: ::prost::alloc::string::String,
-    /// What happened.
-    #[prost(enumeration = "gc_apply_item::Outcome", tag = "3")]
-    pub outcome: i32,
-    /// The reason the tree was judged by, now.
-    #[prost(string, tag = "4")]
-    pub reason: ::prost::alloc::string::String,
-    /// The journal entry for a removal, for `Restore`.
-    #[prost(string, tag = "5")]
-    pub entry_id: ::prost::alloc::string::String,
-}
-/// Nested message and enum types in `GcApplyItem`.
-pub mod gc_apply_item {
-    /// What happened to the tree.
+    /// What `apply` did with the tree. Unset when nothing was applied to it.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Outcome {
-        /// Not set.
+        /// Not applied.
         Unspecified = 0,
-        /// It was removed and journalled.
+        /// Removed and journalled.
         Removed = 1,
-        /// It would be removed (a dry run, or not confirmed).
+        /// Would be removed (a dry run).
         WouldRemove = 2,
         /// Checked again, it may no longer go (its facts changed); kept.
         SkippedChanged = 3,
@@ -573,7 +537,7 @@ pub mod gc_apply_item {
 /// Request for `Restore`.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct RestoreRequest {
-    /// The journal entry, from `GcApply`.
+    /// The journal entry, from `Gc` with `apply`.
     #[prost(string, tag = "1")]
     pub entry_id: ::prost::alloc::string::String,
 }

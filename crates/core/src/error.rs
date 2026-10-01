@@ -470,13 +470,6 @@ impl ErrorDetails for RepoError {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CleanupError {
-    /// There is no saved report with that ID.
-    #[error("there is no cleanup report {id:?}; run `mori gc` for a new one")]
-    ReportNotFound {
-        /// The report ID.
-        id: String,
-    },
-
     /// There is no journal entry with that ID.
     #[error("there is no journal entry {id:?}")]
     EntryNotFound {
@@ -505,7 +498,7 @@ pub enum CleanupError {
     },
 
     /// Removing needs the person's confirmation, and it wasn't given.
-    #[error("this would remove {count} tree(s); confirm with --yes, or look first with --dry-run")]
+    #[error("this would remove {count} tree(s); confirm with --yes, or look first without --apply")]
     NotConfirmed {
         /// How many trees the batch would remove.
         count: usize,
@@ -520,7 +513,7 @@ impl CleanupError {
 impl ErrorDetails for CleanupError {
     fn code(&self) -> Code {
         match self {
-            Self::ReportNotFound { .. } | Self::EntryNotFound { .. } => Code::NotFound,
+            Self::EntryNotFound { .. } => Code::NotFound,
             Self::NotConfirmed { .. } | Self::NothingToRestore { .. } | Self::CommitGone { .. } => {
                 Code::FailedPrecondition
             }
@@ -529,7 +522,6 @@ impl ErrorDetails for CleanupError {
 
     fn reason(&self) -> &'static str {
         match self {
-            Self::ReportNotFound { .. } => "REPORT_NOT_FOUND",
             Self::NotConfirmed { .. } => "CONFIRMATION_NEEDED",
             Self::EntryNotFound { .. } => "ENTRY_NOT_FOUND",
             Self::NothingToRestore { .. } => "RESTORE_NOTHING",
@@ -543,7 +535,6 @@ impl ErrorDetails for CleanupError {
 
     fn metadata(&self) -> Vec<(&'static str, String)> {
         match self {
-            Self::ReportNotFound { id } => vec![("reportId", id.clone())],
             Self::NotConfirmed { count } => vec![("count", count.to_string())],
             Self::EntryNotFound { id } | Self::NothingToRestore { id } => {
                 vec![("entryId", id.clone())]

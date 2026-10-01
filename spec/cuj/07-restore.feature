@@ -1,5 +1,5 @@
 Feature: CUJ 7 - undo a removal
-  `mori restore` brings back a tree `mori gc apply` removed: its workspace on the pinned commit, at
+  `mori restore` brings back a tree `mori gc --apply` removed: its workspace on the pinned commit, at
   its old path, under its old record. If the commit is gone, it says so and changes nothing.
 
   Background:
@@ -13,8 +13,7 @@ Feature: CUJ 7 - undo a removal
     And pushes it to the remote as "claude/fix-login"
     And I have run "mori ls"
     And the remote deletes "claude/fix-login" after a squash merge
-    And I have made a cleanup report
-    And I have applied the report
+    And I have removed it with "mori gc --apply --yes"
 
   Scenario: A removed tree comes back, after its bookmark is gone
     When I restore the removed tree

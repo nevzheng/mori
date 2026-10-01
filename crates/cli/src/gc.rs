@@ -7,9 +7,10 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use mori_api::v1alpha1::{GcItem, GcResponse, gc_item::Class as ItemClass};
+use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
+use mori_api::v1alpha1::{GcItem, GcResponse};
 use mori_core::clone::{BASE_TREE_NAME, CloneUrl, RepoId, clone_path};
-use mori_core::error::{ErrorDetails, RepoError};
+use mori_core::error::{CleanupError, ErrorDetails, RepoError};
 use mori_core::forest::{Entry, Workspaces, reconcile};
 use mori_core::gc::{Class, Facts, Reason, classify};
 use mori_core::paths::Paths;
@@ -17,9 +18,10 @@ use mori_core::tree::{Lifetime, Role};
 use mori_github::GhCli;
 use mori_jj::JjCli;
 use mori_store::database::Database;
-use mori_store::gc::{Report, ReportItem, new_id, now, save_report};
+use mori_store::gc::now;
 use mori_store::records::{RepoRecord, TreeRecord};
 
+use crate::gc_apply;
 use crate::landing::{self, TreeRef};
 use crate::state::{self, boxed};
 
@@ -28,49 +30,85 @@ pub fn gh() -> GhCli {
     std::env::var_os("MORI_GH").map_or_else(GhCli::from_path, GhCli::new)
 }
 
-/// Runs `mori gc`.
-pub fn run(repo: Option<&str>, offline: bool) -> Result<GcResponse, Box<dyn ErrorDetails>> {
+/// What `mori gc` was asked for.
+pub struct GcArgs {
+    pub repo: Option<String>,
+    pub offline: bool,
+    /// Set with `--apply`.
+    pub apply: Option<Apply>,
+}
+
+/// What `--apply` was asked for.
+pub struct Apply {
+    pub yes: bool,
+    pub names: Vec<String>,
+    pub max: Option<u32>,
+    pub dry_run: bool,
+}
+
+/// The default batch size for `--apply`.
+const DEFAULT_MAX: u32 = 10;
+
+/// Runs `mori gc`: the report, and with `--apply` a confirmed batch of removals.
+pub fn run(args: &GcArgs) -> Result<GcResponse, Box<dyn ErrorDetails>> {
     let paths = state::paths()?;
     let mut db = state::open_database(&paths)?;
     let jj = JjCli::from_path();
-    let gh = (!offline).then(gh);
+    let gh = (!args.offline).then(gh);
     let mut repos = db.repos().map_err(boxed)?;
-    if let Some(repo) = repo {
+    if let Some(repo) = &args.repo {
         let wanted = CloneUrl::parse(repo).map_err(boxed)?.repo.to_string();
         repos.retain(|record| record.remote == wanted);
         if repos.is_empty() {
             return Err(boxed(RepoError::NotManaged { repo: wanted }));
         }
     }
-    let now = now();
+    let context = Context {
+        paths: &paths,
+        jj: &jj,
+        gh: gh.as_ref(),
+        now: now(),
+    };
     let mut items = Vec::new();
     for repo in &repos {
-        let context = Context {
-            paths: &paths,
-            jj: &jj,
-            gh: gh.as_ref(),
-            now,
-        };
-        items.extend(report_repo(&context, &mut db, repo, offline)?);
+        items.extend(report_repo(&context, &mut db, repo, args.offline)?);
     }
-    let report = Report {
-        id: new_id("gc"),
-        created_at: now,
-        items: items
+    if let Some(apply) = &args.apply {
+        let max = usize::try_from(apply.max.filter(|max| *max > 0).unwrap_or(DEFAULT_MAX))
+            .unwrap_or(usize::MAX);
+        let batch: Vec<usize> = items
             .iter()
-            .map(|item: &GcItem| ReportItem {
-                repo: item.repo.clone(),
-                name: item.name.clone(),
-                class: class_name(item.class()).to_owned(),
-                reason: item.reason.clone(),
-                facts: item.facts.clone(),
-            })
-            .collect(),
-    };
-    save_report(&paths, &report).map_err(boxed)?;
+            .enumerate()
+            .filter(|(_, item)| item.class() == ItemClass::Remove)
+            .filter(|(_, item)| apply.names.is_empty() || apply.names.contains(&item.name))
+            .map(|(index, _)| index)
+            .take(max)
+            .collect();
+        if !apply.yes && !apply.dry_run && !batch.is_empty() {
+            return Err(boxed(CleanupError::NotConfirmed { count: batch.len() }));
+        }
+        for index in batch {
+            let item = &items[index];
+            // This run already fetched; checking again works from what it saw.
+            let (outcome, reason, entry_id) = gc_apply::apply_one(
+                &context,
+                &mut db,
+                &item.repo.clone(),
+                &item.name.clone(),
+                apply.dry_run,
+            )?;
+            let item = &mut items[index];
+            if outcome == Outcome::SkippedUnsaved {
+                item.set_class(ItemClass::Blocked);
+            }
+            item.set_outcome(outcome);
+            item.reason = reason;
+            item.entry_id = entry_id;
+        }
+    }
     Ok(GcResponse {
-        report_id: report.id,
         items,
+        validate_only: args.apply.as_ref().is_some_and(|apply| apply.dry_run),
     })
 }
 
@@ -134,6 +172,7 @@ pub fn report_repo(
                 path: row.path.display().to_string(),
                 class: item_class(class).into(),
                 reason: reason.code().to_owned(),
+                ..GcItem::default()
             }
         })
         .collect())
