@@ -112,6 +112,46 @@ pub fn low_space_warning(space: Space, floor: Floor) -> Option<String> {
     })
 }
 
+/// Something `gc --free` could remove, as far as picking goes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Candidate {
+    /// What removing it frees.
+    pub bytes: u64,
+    /// Seconds since its latest change; none when unknown.
+    pub idle_seconds: Option<u64>,
+    /// True if it holds only cache (Bazel output left by a deleted tree), so it goes first.
+    pub cache_only: bool,
+}
+
+/// Which candidates `gc --free` removes to free `target` bytes, as indexes into `candidates`:
+/// cache first, then the least recently changed (unknown change times last), until the total
+/// reaches the target. The last pick may overshoot. Candidates that free nothing are never picked.
+/// If everything together frees less than the target, everything is picked.
+#[must_use]
+pub fn pick_to_free(candidates: &[Candidate], target: u64) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..candidates.len())
+        .filter(|&index| candidates[index].bytes > 0)
+        .collect();
+    order.sort_by_key(|&index| {
+        let candidate = candidates[index];
+        (
+            !candidate.cache_only,
+            candidate.idle_seconds.is_none(),
+            std::cmp::Reverse(candidate.idle_seconds.unwrap_or(0)),
+        )
+    });
+    let mut freed = 0_u64;
+    let mut picked = Vec::new();
+    for index in order {
+        if freed >= target {
+            break;
+        }
+        freed = freed.saturating_add(candidates[index].bytes);
+        picked.push(index);
+    }
+    picked
+}
+
 /// How long a measured size is reused before `ls --size` or `gc` measures again.
 pub const SIZE_REUSE_SECONDS: u64 = 15 * 60;
 
@@ -283,6 +323,47 @@ mod tests {
         assert!(warning.contains("300G free of 3.9T (7%)"), "{warning}");
         assert!(warning.contains("`mori gc`"), "{warning}");
         assert_eq!(low_space_warning(space, Floor::Percent(5)), None);
+    }
+
+    fn candidate(bytes: u64, idle_seconds: Option<u64>) -> Candidate {
+        Candidate {
+            bytes,
+            idle_seconds,
+            cache_only: false,
+        }
+    }
+
+    #[test]
+    fn free_picks_the_least_recently_changed_first() {
+        let candidates = [
+            candidate(10 * G, Some(100)),
+            candidate(10 * G, Some(900)),
+            candidate(10 * G, None),
+            candidate(10 * G, Some(500)),
+        ];
+
+        assert_eq!(pick_to_free(&candidates, 15 * G), [1, 3]);
+        assert_eq!(pick_to_free(&candidates, 20 * G), [1, 3]);
+        assert_eq!(pick_to_free(&candidates, 21 * G), [1, 3, 0]);
+        assert_eq!(pick_to_free(&candidates, 100 * G), [1, 3, 0, 2]);
+        assert_eq!(pick_to_free(&candidates, 0), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn free_takes_cache_first_and_skips_what_frees_nothing() {
+        let candidates = [
+            candidate(10 * G, Some(900)),
+            candidate(0, Some(9999)),
+            Candidate {
+                bytes: 5 * G,
+                idle_seconds: None,
+                cache_only: true,
+            },
+        ];
+
+        assert_eq!(pick_to_free(&candidates, 5 * G), [2]);
+        assert_eq!(pick_to_free(&candidates, 6 * G), [2, 0]);
+        assert_eq!(pick_to_free(&candidates, 100 * G), [2, 0]);
     }
 
     #[test]

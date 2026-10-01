@@ -274,15 +274,17 @@ fn space_text(free: u64, total: u64) -> String {
     )
 }
 
-/// Appends an indented table with aligned columns.
+/// Appends an indented table with aligned columns, under `header` unless it is empty.
 fn table(text: &mut String, header: &[String], rows: &[Vec<String>]) {
     let mut widths: Vec<usize> = header.iter().map(String::len).collect();
     for row in rows {
+        widths.resize(widths.len().max(row.len()), 0);
         for (width, cell) in widths.iter_mut().zip(row) {
             *width = (*width).max(cell.len());
         }
     }
-    for row in std::iter::once(header).chain(rows.iter().map(Vec::as_slice)) {
+    let header = (!header.is_empty()).then_some(header);
+    for row in header.into_iter().chain(rows.iter().map(Vec::as_slice)) {
         let cells: Vec<String> = row
             .iter()
             .zip(&widths)
@@ -425,14 +427,15 @@ pub fn skills_text(response: &SyncSkillsResponse) -> String {
 /// The text `gc` prints: every tree with its class and reason (and, with --apply, what happened
 /// to it), then what to do next.
 pub fn gc_text(response: &GcResponse) -> String {
-    use mori_api::v1alpha1::gc_item::Outcome;
+    use mori_api::v1alpha1::gc_item::{Class, Outcome};
     let mut text = String::new();
-    let applied = response
-        .items
-        .iter()
-        .any(|item| item.outcome() != Outcome::Unspecified);
+    let applied = response.validate_only
+        || response
+            .items
+            .iter()
+            .any(|item| !matches!(item.outcome(), Outcome::Unspecified | Outcome::WouldRemove));
     let _ = writeln!(text, "Cleanup:");
-    let rows: Vec<[String; 4]> = response
+    let rows: Vec<Vec<String>> = response
         .items
         .iter()
         .map(|item| {
@@ -443,42 +446,55 @@ pub fn gc_text(response: &GcResponse) -> String {
                 Outcome::SkippedChanged => "kept: changed since it was judged".to_owned(),
                 Outcome::Unspecified => item.facts.clone(),
             };
-            [
+            let size = if item.size_bytes > 0 {
+                format_size(item.size_bytes)
+            } else {
+                "-".to_owned()
+            };
+            vec![
                 mori_app::gc::class_name(item.class()).to_owned(),
                 format!("{} {}", item.repo, item.name),
+                size,
                 item.reason.clone(),
                 what,
             ]
         })
         .collect();
-    let mut widths = [0; 4];
-    for row in &rows {
-        for (width, cell) in widths.iter_mut().zip(row) {
-            *width = (*width).max(cell.len());
-        }
-    }
-    for row in &rows {
-        let cells: Vec<String> = row
+    table(&mut text, &[], &rows);
+    let sum = |keep: &dyn Fn(&mori_api::v1alpha1::GcItem) -> bool| -> (usize, u64) {
+        response
+            .items
             .iter()
-            .zip(widths)
-            .map(|(cell, width)| format!("{cell:width$}"))
-            .collect();
-        let _ = writeln!(text, "  {}", cells.join("  ").trim_end());
-    }
-    let removable = mori_app::gc::counts(&response.items)
-        .get("remove")
-        .copied()
-        .unwrap_or(0);
+            .filter(|item| keep(item))
+            .fold((0, 0), |(count, bytes), item| {
+                (count + 1, bytes + item.size_bytes)
+            })
+    };
+    let (removable, removable_bytes) = sum(&|item| item.class() == Class::Remove);
+    let (picked, picked_bytes) = sum(&|item| item.outcome() == Outcome::WouldRemove);
     let _ = if applied {
         Ok(())
     } else if removable == 0 {
         writeln!(text, "Nothing to remove.")
+    } else if picked > 0 {
+        writeln!(
+            text,
+            "Picked {picked} of {removable} removable tree(s), freeing {}: add `--apply --yes` \
+             to remove them, checking each again first.",
+            format_size(picked_bytes)
+        )
     } else {
         writeln!(
             text,
-            "{removable} tree(s) can go: `mori gc --apply --yes` removes them, checking each again first."
+            "{removable} tree(s) can go, freeing {}: `mori gc --apply --yes` removes them, \
+             checking each again first; `--free <size>` picks only enough to free that much.",
+            format_size(removable_bytes)
         )
     };
+    if let Some(disk) = &response.disk {
+        let _ = writeln!(text, "{}.", space_text(disk.free_bytes, disk.total_bytes));
+    }
+    warnings_text(&mut text, &response.warnings);
     text
 }
 

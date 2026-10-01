@@ -174,6 +174,12 @@ tree's commit and goes into the journal, and the output gives the `mori restore 
 that undoes it. Without `--yes` nothing is removed (`CONFIRMATION_NEEDED`); `--apply --dry-run`
 shows what would go. Removing is the person's decision: don't run `--apply` unless they asked.
 
+Each tree that may go shows how much removing it frees (`sizeBytes`). **`--free <size>`** (e.g.
+`--free 200G`) picks removable trees, least recently changed first, until they free that much, and
+marks them `OUTCOME_WOULD_REMOVE`; with `--apply --yes` it removes exactly those (no 10-tree cap
+unless `--max`). Picking measures the removable trees again, so it can take a while. When the disk
+is nearly full, show the person the `--free` plan and let them decide.
+
 ### `mori restore <entry>`
 
 Brings back a tree `mori gc --apply` removed, from the journal entry it printed: its

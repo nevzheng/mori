@@ -494,6 +494,11 @@ pub struct GcRequest {
     /// With `apply`: check everything and remove nothing (AIP-163; the CLI's --dry-run).
     #[prost(bool, tag = "7")]
     pub validate_only: bool,
+    /// Free at least this many bytes: pick removable trees, least recently changed first, until
+    /// their sizes add up to it. Without `apply` the picked trees are marked `OUTCOME_WOULD_REMOVE`;
+    /// with `apply` they are the batch, and `max` limits it only if set. 0 means no target.
+    #[prost(uint64, tag = "8")]
+    pub free_target_bytes: u64,
 }
 /// Response for `Gc`.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -504,6 +509,12 @@ pub struct GcResponse {
     /// Echoes the request: true if nothing was removed although `apply` was asked.
     #[prost(bool, tag = "3")]
     pub validate_only: bool,
+    /// Free and total space on the disk under the root.
+    #[prost(message, optional, tag = "4")]
+    pub disk: ::core::option::Option<Disk>,
+    /// Things worth knowing, such as free disk space below the `\[disk\] warn_below` floor.
+    #[prost(string, repeated, tag = "5")]
+    pub warnings: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// One tree in a cleanup report.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -532,6 +543,10 @@ pub struct GcItem {
     /// The journal entry for a removal, for `Restore`.
     #[prost(string, tag = "8")]
     pub entry_id: ::prost::alloc::string::String,
+    /// Bytes the tree's directory holds on disk: what removing it frees. Measured for trees that
+    /// may go (classes remove, blocked and keep); 0 for the others and for missing trees.
+    #[prost(uint64, tag = "9")]
+    pub size_bytes: u64,
 }
 /// Nested message and enum types in `GcItem`.
 pub mod gc_item {

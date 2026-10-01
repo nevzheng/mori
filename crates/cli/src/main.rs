@@ -88,6 +88,11 @@ enum Command {
         /// With --apply: check everything and remove nothing.
         #[arg(long, requires = "apply")]
         dry_run: bool,
+
+        /// Free at least this much, e.g. 200G: pick trees that are safe to remove, least
+        /// recently changed first. Shows the plan; with --apply --yes, removes them.
+        #[arg(long, value_name = "SIZE", value_parser = parse_size, conflicts_with = "names")]
+        free: Option<u64>,
     },
 
     /// List the repos mori manages and their trees: owner, task, lifetime, and work that exists
@@ -234,6 +239,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
             names,
             max,
             dry_run,
+            free,
         } => respond(
             json,
             gc::run(
@@ -247,6 +253,7 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
                         max,
                         dry_run,
                     }),
+                    free,
                 },
             ),
             output::gc_text,
@@ -319,6 +326,11 @@ fn dispatch_tree(
             output::tree_remove_text,
         ),
     }
+}
+
+/// Parses a size such as 200G for `--free`.
+fn parse_size(text: &str) -> Result<u64, String> {
+    mori_core::disk::parse_size(text)
 }
 
 /// The app for this process: its environment and clock, jj and git on `PATH`, and `gh` (or `$MORI_GH`,
