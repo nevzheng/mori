@@ -1,24 +1,40 @@
 # mori
 
 > mori tends a forest of git and jj worktrees for you and your coding agents: one clone per repo in
-> a fixed layout, an owner and a lifetime for every tree, and cleanup that never loses a change.
-> Pre-alpha: anything may change in any release.
+> a fixed layout, a tree per task with an owner, a purpose and a lifetime, agents told where they are
+> and how to work together, and cleanup that never loses a change. Pre-alpha: anything may change in
+> any release, but no work is lost across versions.
 
-## Using mori
+## Start here
 
-- [Release policy](https://nevzheng.github.io/mori/releases/): versioning, when a release is cut, and what mori promises before 1.0
-- [Install and release channels](https://nevzheng.github.io/mori/install/): head (every commit on main, what we dogfood) and the planned tagged releases
+- [README](https://github.com/nevzheng/mori/blob/main/README.md): what mori is, a day with mori, and how to install and build it
+- [Install and release channels](https://nevzheng.github.io/mori/install/): head (every commit on main, what we dogfood), tagged releases, and completions
+- [Using mori (agent skill)](https://github.com/nevzheng/mori/blob/main/skills/using-mori/SKILL.md): every command, JSON output, errors and the rules agents follow; start with `mori where`
+
+## Agent skills
+
+- [Skills index](https://github.com/nevzheng/mori/blob/main/skills/llms.txt): every skill mori ships, one `skills/<name>/SKILL.md` each, installed into `~/mori/context/skills/` by `mori init`
+- [jj and git in mori](https://github.com/nevzheng/mori/blob/main/skills/vcs-in-mori/SKILL.md): which works where, and the commands for the same jobs
+- [Lead trees](https://github.com/nevzheng/mori/blob/main/skills/lead-tree/SKILL.md): combining several agents' work, and handing it to the person as one `ready/<topic>`
+- [Agent workflows](https://github.com/nevzheng/mori/blob/main/skills/agent-workflows/SKILL.md): coordinator and workers, exchanging work, restacking
+- [Disk usage](https://github.com/nevzheng/mori/blob/main/skills/disk-usage/SKILL.md): measuring, freeing space safely and passing on cache warnings
+
+## Guides
+
 - [Disk usage tips](https://nevzheng.github.io/mori/disk-usage/): what mori shows and does about disk, the caches to set up for each language so trees share their builds, and Docker and OrbStack cleanup
 - [Shared caches](https://nevzheng.github.io/mori/shared-caches/): set build caches at the user level so every tree shares them, and clean up Bazel output left by deleted trees
-- [Skills index](https://github.com/nevzheng/mori/blob/main/skills/llms.txt): every agent skill mori ships, one `skills/<name>/SKILL.md` each
-- [Disk usage (agent skill)](https://github.com/nevzheng/mori/blob/main/skills/disk-usage/SKILL.md): measuring, freeing space safely and passing on cache warnings
-- [Using mori (agent skill)](https://github.com/nevzheng/mori/blob/main/skills/using-mori/SKILL.md): commands, JSON output, errors and the rules agents follow
-- [README](https://github.com/nevzheng/mori/blob/main/README.md): what mori is and how to build it
+- [CLI style guide](https://nevzheng.github.io/mori/cli-style/): how mori's commands, output, errors and colour behave, for people and agents
+- [Release policy](https://nevzheng.github.io/mori/releases/): versioning, when a release is cut, and what mori promises before 1.0
 
 ## Design
 
+- [How design docs work](https://nevzheng.github.io/mori/design/): the format and statuses
 - [The forest layout and tree model](https://nevzheng.github.io/mori/design/core/forest-layout-and-tree-model/): where mori keeps repos and trees, and what it records
-- [How design docs work](https://nevzheng.github.io/mori/design/): the SPIP format and statuses
+- [Cleanup that never loses work](https://nevzheng.github.io/mori/design/core/cleanup-never-loses-work/): gc, the journal and restore
+- [Git worktree backend](https://nevzheng.github.io/mori/design/core/git-worktree-backend/): trees as detached git worktrees, with jj the default
+- [Tree purpose, where, and finding trees](https://nevzheng.github.io/mori/design/core/tree-purpose-where-and-finding-trees/): what each tree is for, and where am I
+- [Disk usage](https://nevzheng.github.io/mori/design/core/disk-usage/): seeing what the forest costs and freeing it in one step
+- [Skills in the root](https://nevzheng.github.io/mori/design/skills/install-skills-and-llms-txt-into-the-root/): how skills and these indexes are installed
 
 ## Contributing
 
