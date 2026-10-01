@@ -50,6 +50,13 @@ Feature: CUJ 4 - an agent finishes and removes its tree
     Then it succeeds
     And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
 
+  Scenario: A pushed working copy is safe, so the tree may go
+    Given someone describes work in "claude-fix-login" without committing it
+    And pushes the working copy to the remote as "claude/fix-login"
+    When I run "mori tree remove github.com/acme/widget claude-fix-login"
+    Then it succeeds
+    And nothing exists at "<home>/mori/trees/widget/claude-fix-login"
+
   Scenario: A squash-merged tree is safe to remove
     Given someone commits work in "claude-fix-login"
     And pushes it to the remote as "claude/fix-login"

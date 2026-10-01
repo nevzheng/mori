@@ -16,6 +16,7 @@ Feature: CUJ 3 - an agent starts a task in its own tree
     And the clone has a workspace "claude-fix-login"
     And mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
     And the output says it created "claude-fix-login"
+    And the output says the tree is a jj workspace and points to the "vcs-in-mori" skill
 
   Scenario: The owner defaults to the login name
     Given USER is "Tester"

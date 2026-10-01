@@ -33,10 +33,12 @@ over is just saying which changes are ready.
 
 **An agent that finishes work for the lead:**
 
-1. Gives every change a description (`jj describe`): that is the note the lead reads.
+1. Finishes with `jj commit -m "…"`, so every change has a description (the note the lead reads)
+   and the working copy is a fresh empty change. Not `jj describe`: that leaves the work as the
+   working copy, and mori keeps reading the tree as edited.
 2. Stops editing its tree.
-3. Tells the lead its change IDs (`jj log -r '::<its tree>@ ~ ::trunk()'`) in its final message,
-   with one line on what they do.
+3. Tells the lead its change IDs (`jj log -r '::<its tree>@- ~ ::trunk()'`) in its final
+   message, with one line on what they do.
 
 **The lead:**
 
@@ -59,7 +61,8 @@ work between trees; you point at it.
 2. **Stack or combine it:** rebase the changes you're landing onto each other or onto trunk,
    e.g. `jj rebase -s <change> -d <onto>`, or make a merge with `jj new <a> <b>`. You change
    other trees' commits this way, so tell the person before you rewrite work you didn't make.
-3. **Resolve conflicts here,** in the lead tree, not in the other agents' trees.
+3. **Resolve conflicts here,** in the lead tree, not in the other agents' trees. Fix each one at
+   the first conflicted change (see `agent-workflows`); jj won't push a stack that still has one.
 4. **Test the combined result** in the lead tree before anything goes up.
 5. **Publish only with the person's yes:** bookmarks, pushes and pull requests leave the machine.
 

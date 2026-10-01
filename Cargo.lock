@@ -553,6 +553,11 @@ dependencies = [
 [[package]]
 name = "mori-git"
 version = "0.0.0"
+dependencies = [
+ "mori-core",
+ "tempfile",
+ "thiserror",
+]
 
 [[package]]
 name = "mori-github"
