@@ -265,6 +265,18 @@ impl Vcs for GitCli {
         parse_remote_branches(&self.run(&root, &args)?)
     }
 
+    /// Every remote-tracking branch, wherever it points; `origin/HEAD` is skipped.
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, GitError> {
+        parse_remote_branches(&self.run(
+            clone,
+            &[
+                "for-each-ref",
+                "--format=%(refname:lstrip=2)%09%(objectname)%09%(symref)",
+                "refs/remotes",
+            ],
+        )?)
+    }
+
     /// The newer of `HEAD`'s commit time and the newest edited file's modification time.
     fn last_change(&self, clone: &Path, name: &str) -> Result<u64, GitError> {
         let root = self.root(clone, name)?;

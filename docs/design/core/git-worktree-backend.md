@@ -130,6 +130,7 @@ Nothing existing breaks: an unset `vcs` means jj, as today.
 | `state.changed`                 | working-copy change non-empty                   | `git status --porcelain` non-empty                                    |
 | `state.unpushed`                | changes on no remote bookmark                   | `git rev-list --count HEAD --not --remotes <landed>`                  |
 | `pushed_bookmarks`              | remote bookmarks in the tree's history          | `git for-each-ref refs/remotes --merged HEAD --no-merged origin/HEAD` |
+| `remote_bookmarks`              | `jj bookmark list --all-remotes`                | `git for-each-ref refs/remotes`, skipping `origin/HEAD`               |
 | `last_change`                   | working-copy commit time                        | newest of HEAD's commit time and the dirty files' mtimes              |
 | `snapshot`                      | `jj util snapshot`                              | nothing: git reads the working tree live                              |
 | `working_copy_commit`           | the working-copy commit                         | `HEAD`; only asked for trees with no edits                            |

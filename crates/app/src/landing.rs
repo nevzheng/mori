@@ -6,7 +6,7 @@ use std::path::Path;
 use mori_core::clone::RepoId;
 use mori_core::error::ErrorDetails;
 use mori_core::gc::{Landing, SeenBookmark, landing};
-use mori_core::vcs::{Forge, Merged};
+use mori_core::vcs::{Forge, Merged, RemoteBookmark};
 use mori_store::database::Database;
 
 use crate::Backend;
@@ -38,8 +38,10 @@ pub struct Seen {
     pub landed: bool,
 }
 
-/// Records the bookmarks now pointing into the tree, then decides from everything recorded
-/// which of them landed. With `gh`, it also asks whether their pull requests merged.
+/// Records the bookmarks whose history now holds the tree's work, then decides from everything
+/// recorded which of them landed. A recorded bookmark gone from the remote landed; one the remote
+/// still has but that moved off the tree's work is forgotten. With `gh`, it also asks whether
+/// their pull requests merged.
 pub fn observe(
     db: &mut Database,
     vcs: &impl Backend,
@@ -57,6 +59,7 @@ pub fn observe_each(
     tree: &TreeRef,
 ) -> Result<(Landing, Vec<Seen>), Box<dyn ErrorDetails>> {
     let current = vcs.pushed_bookmarks(tree.clone, tree.name).map_err(boxed)?;
+    let on_any_remote = vcs.remote_bookmarks(tree.clone).map_err(boxed)?;
     for bookmark in &current {
         db.record_tree_bookmark(
             tree.id,
@@ -69,9 +72,17 @@ pub fn observe_each(
     let mut each = Vec::new();
     let mut facts = Vec::new();
     for recorded in db.tree_bookmarks(tree.id).map_err(boxed)? {
-        let on_remote = current
-            .iter()
-            .any(|now| now.remote == recorded.remote && now.name == recorded.bookmark);
+        let same =
+            |now: &RemoteBookmark| now.remote == recorded.remote && now.name == recorded.bookmark;
+        let holds_the_work = current.iter().any(same);
+        let on_remote = holds_the_work || on_any_remote.iter().any(same);
+        if on_remote && !holds_the_work {
+            // Moved off the tree's work (say, rebased onto trunk): it no longer says anything
+            // about this tree, and must not land it if the remote deletes it later.
+            db.forget_tree_bookmark(tree.id, &recorded.remote, &recorded.bookmark)
+                .map_err(boxed)?;
+            continue;
+        }
         let pr_merged =
             forge.and_then(
                 |forge| match forge.pr_merged(tree.repo, &recorded.bookmark) {

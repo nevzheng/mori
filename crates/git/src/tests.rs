@@ -113,6 +113,31 @@ fn edits_and_local_commits_are_unsaved() -> Result<()> {
 }
 
 #[test]
+fn remote_bookmarks_are_every_remote_branch_but_head() -> Result<()> {
+    let repo = Repo::new()?;
+    let path = repo.add("t")?;
+    let commit = repo.commit(&path, "fix.txt")?;
+    repo.git.run(
+        &path,
+        &["push", "--quiet", "origin", "HEAD:refs/heads/claude/fix"],
+    )?;
+    repo.git.fetch(&repo.clone())?;
+
+    let mut names: Vec<(String, String)> = repo
+        .git
+        .remote_bookmarks(&repo.clone())?
+        .into_iter()
+        .map(|bookmark| (bookmark.name, bookmark.commit_id))
+        .collect();
+    names.sort();
+
+    assert_eq!(names.len(), 2, "{names:?}");
+    assert_eq!(names[0], ("claude/fix".to_owned(), commit));
+    assert_eq!(names[1].0, "main");
+    Ok(())
+}
+
+#[test]
 fn a_pushed_branch_is_seen_and_a_landed_one_covers_its_work() -> Result<()> {
     let repo = Repo::new()?;
     let path = repo.add("t")?;

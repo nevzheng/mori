@@ -138,7 +138,8 @@ pub trait Vcs: Workspaces {
     /// If the VCS fails or has no such tree.
     fn working_copy_commit(&self, clone: &Path, name: &str) -> Result<String, Self::Error>;
 
-    /// The remote bookmarks that point at the tree's own work (its history not yet in trunk).
+    /// The remote bookmarks whose history holds the tree's own work (its history not yet in
+    /// trunk): those pointing at it and those stacked on top of it, but never trunk itself.
     ///
     /// # Errors
     ///
@@ -148,6 +149,13 @@ pub trait Vcs: Workspaces {
         clone: &Path,
         name: &str,
     ) -> Result<Vec<RemoteBookmark>, Self::Error>;
+
+    /// Every bookmark the clone knows the remotes have, wherever it points.
+    ///
+    /// # Errors
+    ///
+    /// If the VCS fails or its answer can't be read.
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, Self::Error>;
 
     /// When the tree's working copy last changed, in seconds since the Unix epoch.
     ///

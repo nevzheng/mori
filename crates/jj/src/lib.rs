@@ -306,8 +306,10 @@ impl JjCli {
             .to_owned())
     }
 
-    /// The remote bookmarks pointing into the tree's own history (its changes not in trunk).
-    /// The colocated `git` pseudo-remote is left out.
+    /// The remote bookmarks whose history holds the tree's own work (its changes not in trunk):
+    /// those pointing into it, and those on changes stacked on top of it, so a stack pushed as
+    /// one bookmark lands every tree in it. Trunk is left out, as is the colocated `git`
+    /// pseudo-remote.
     ///
     /// # Errors
     ///
@@ -318,6 +320,7 @@ impl JjCli {
         name: &str,
     ) -> Result<Vec<RemoteBookmark>, JjError> {
         let own = format!("::{}@ ~ ::trunk()", revset_string(name));
+        let holding = format!("({own}):: ~ ::trunk()");
         let stdout = self.read(
             clone,
             &[
@@ -325,7 +328,27 @@ impl JjCli {
                 "list",
                 "--all-remotes",
                 "-r",
-                &own,
+                &holding,
+                "-T",
+                REMOTE_BOOKMARK_TEMPLATE,
+            ],
+        )?;
+        parse_remote_bookmarks(&stdout)
+    }
+
+    /// Every remote bookmark the clone knows, wherever it points. The colocated `git`
+    /// pseudo-remote is left out.
+    ///
+    /// # Errors
+    ///
+    /// When jj can't be run or its answer can't be read.
+    pub fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, JjError> {
+        let stdout = self.read(
+            clone,
+            &[
+                "bookmark",
+                "list",
+                "--all-remotes",
                 "-T",
                 REMOTE_BOOKMARK_TEMPLATE,
             ],
@@ -506,6 +529,10 @@ impl Vcs for JjCli {
 
     fn pushed_bookmarks(&self, clone: &Path, name: &str) -> Result<Vec<RemoteBookmark>, JjError> {
         Self::pushed_bookmarks(self, clone, name)
+    }
+
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, JjError> {
+        Self::remote_bookmarks(self, clone)
     }
 
     fn last_change(&self, clone: &Path, name: &str) -> Result<u64, JjError> {
@@ -1246,6 +1273,14 @@ mod tests {
         assert_eq!(pushed[0].name, "claude/fix-login");
         assert_eq!(pushed[0].remote, "origin");
         assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 0);
+        let names = |jj: &JjCli| -> Result<Vec<String>, JjError> {
+            Ok(jj
+                .remote_bookmarks(&clone)?
+                .into_iter()
+                .map(|b| format!("{}@{}", b.name, b.remote))
+                .collect())
+        };
+        assert_eq!(names(&jj)?, ["claude/fix-login@origin", "main@origin"]);
 
         // The remote deletes the bookmark (as after a squash merge): the work is only local again,
         // unless the commit the bookmark last pointed to counts as landed.
@@ -1265,8 +1300,95 @@ mod tests {
         )?;
         jj.fetch(&clone)?;
         assert_eq!(jj.pushed_bookmarks(&clone, "claude-fix-login")?, []);
+        assert_eq!(names(&jj)?, ["main@origin"]);
         assert_eq!(jj.state(&clone, "claude-fix-login")?.unpushed, 1);
         let landed = [pushed[0].commit_id.clone()];
+        assert_eq!(
+            jj.state_covering(&clone, "claude-fix-login", &landed)?
+                .unpushed,
+            0
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_bookmark_stacked_on_the_tree_counts_as_pushed_from_it()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let Some(jj) = pinned_jj(dir.path())? else {
+            return Ok(());
+        };
+        // Given a tree with a change, and a second tree whose change sits on top of it.
+        let (clone, _) = tree_with_a_commit(&jj, dir.path())?;
+        let upper = dir.path().join("claude-fix-logout");
+        jj.add_workspace(&clone, "claude-fix-logout", &upper, "claude-fix-login@-")?;
+        std::fs::write(upper.join("logout.rs"), "fn logout() {}\n")?;
+        let upper_arg = upper.display().to_string();
+        run(
+            &jj,
+            &["--repository", &upper_arg, "commit", "--message", "logout"],
+        )?;
+        // And an unrelated tree whose bookmark doesn't hold the first tree's work.
+        let aside = dir.path().join("claude-docs");
+        jj.add_workspace(&clone, "claude-docs", &aside, "trunk()")?;
+        std::fs::write(aside.join("docs.md"), "docs\n")?;
+        let aside_arg = aside.display().to_string();
+        run(
+            &jj,
+            &["--repository", &aside_arg, "commit", "--message", "docs"],
+        )?;
+        for (tree, bookmark) in [
+            (&upper_arg, "claude/fix-logout"),
+            (&aside_arg, "claude/docs"),
+        ] {
+            run(
+                &jj,
+                &[
+                    "--repository",
+                    tree,
+                    "bookmark",
+                    "create",
+                    bookmark,
+                    "-r",
+                    "@-",
+                ],
+            )?;
+            run(
+                &jj,
+                &["--repository", tree, "git", "push", "--bookmark", bookmark],
+            )?;
+        }
+
+        // When mori asks which bookmarks were pushed from each tree,
+        // then the bookmark at the top of the stack counts for both stacked trees, and no other.
+        let lower = jj.pushed_bookmarks(&clone, "claude-fix-login")?;
+        let names: Vec<_> = lower.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(names, ["claude/fix-logout"]);
+        let names: Vec<_> = jj
+            .pushed_bookmarks(&clone, "claude-fix-logout")?
+            .into_iter()
+            .map(|b| b.name)
+            .collect();
+        assert_eq!(names, ["claude/fix-logout"]);
+
+        // And when the remote deletes it after a squash merge, the lower tree's work is saved.
+        run(
+            &jj,
+            &[
+                "--repository",
+                &upper_arg,
+                "bookmark",
+                "delete",
+                "claude/fix-logout",
+            ],
+        )?;
+        run(
+            &jj,
+            &["--repository", &upper_arg, "git", "push", "--deleted"],
+        )?;
+        jj.fetch(&clone)?;
+        assert_eq!(jj.pushed_bookmarks(&clone, "claude-fix-login")?, []);
+        let landed = [lower[0].commit_id.clone()];
         assert_eq!(
             jj.state_covering(&clone, "claude-fix-login", &landed)?
                 .unpushed,

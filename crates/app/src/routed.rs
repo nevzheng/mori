@@ -135,6 +135,10 @@ impl<J: Adapter, G: Adapter> Vcs for Routed<J, G> {
     fn fetch(&self, clone: &Path) -> Result<(), Self::Error> {
         route!(self, clone, |vcs| vcs.fetch(clone))
     }
+
+    fn remote_bookmarks(&self, clone: &Path) -> Result<Vec<RemoteBookmark>, Self::Error> {
+        route!(self, clone, |vcs| vcs.remote_bookmarks(clone))
+    }
 }
 
 impl<J: Adapter, G: Adapter> Backend for Routed<J, G> {
@@ -332,6 +336,10 @@ mod tests {
         fn fetch(&self, _: &Path) -> Result<(), Never> {
             self.call("fetch");
             Ok(())
+        }
+        fn remote_bookmarks(&self, _: &Path) -> Result<Vec<RemoteBookmark>, Never> {
+            self.call("remote_bookmarks");
+            Ok(Vec::new())
         }
     }
 
