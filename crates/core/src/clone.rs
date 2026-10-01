@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use crate::error::RepoError;
 use crate::paths::Paths;
+use crate::vcs::VcsKind;
 
 /// The base tree's name: jj's name for a clone's own workspace, so the record matches it.
 pub const BASE_TREE_NAME: &str = "default";
@@ -150,7 +151,9 @@ pub struct ClonePlan {
     /// The repo's directory under `trees/`: its name, or `<owner>-<name>` if another repo
     /// already uses the name.
     pub tree_dir: String,
-    /// Whether the clone is a git repo too (colocated), or jj only.
+    /// Which VCS the clone uses.
+    pub vcs: VcsKind,
+    /// Whether the clone is a git repo too (colocated), or jj only. Always true for git.
     pub colocate: bool,
 }
 
@@ -168,15 +171,19 @@ pub fn clone_path(paths: &Paths, repo: &RepoId) -> PathBuf {
 ///
 /// # Errors
 ///
-/// [`RepoError::RepoExists`] if mori already recorded the repo, [`RepoError::PathExists`] if
-/// something is at its path, and [`RepoError::TreeDirTaken`] if neither directory name under
-/// `trees/` is free. Nothing should be created on any of them.
+/// [`RepoError::ColocateNeedsJj`] for a jj-only git clone, [`RepoError::RepoExists`] if mori
+/// already recorded the repo, [`RepoError::PathExists`] if something is at its path, and
+/// [`RepoError::TreeDirTaken`] if neither directory name under `trees/` is free. Nothing should be created on any of them.
 pub fn plan(
     paths: &Paths,
     url: CloneUrl,
+    vcs: VcsKind,
     colocate: bool,
     observed: &Observed,
 ) -> Result<ClonePlan, RepoError> {
+    if vcs == VcsKind::Git && !colocate {
+        return Err(RepoError::ColocateNeedsJj);
+    }
     let path = clone_path(paths, &url.repo);
     if observed.recorded.contains(&url.repo) {
         return Err(RepoError::RepoExists {
@@ -202,6 +209,7 @@ pub fn plan(
         url,
         path,
         tree_dir,
+        vcs,
         colocate,
     })
 }
@@ -285,7 +293,7 @@ mod tests {
     fn the_clone_goes_under_repos() {
         let url = CloneUrl::parse("github.com/acme/widget").unwrap();
 
-        let plan = plan(&paths(), url, true, &Observed::default()).unwrap();
+        let plan = plan(&paths(), url, VcsKind::Jj, true, &Observed::default()).unwrap();
 
         assert_eq!(
             plan.path,
@@ -303,7 +311,7 @@ mod tests {
             ..Observed::default()
         };
 
-        let plan = plan(&paths(), url, true, &observed).unwrap();
+        let plan = plan(&paths(), url, VcsKind::Jj, true, &observed).unwrap();
 
         assert_eq!(plan.tree_dir, "other-widget");
     }
@@ -317,7 +325,7 @@ mod tests {
             ..Observed::default()
         };
 
-        let error = plan(&paths(), url, true, &observed).unwrap_err();
+        let error = plan(&paths(), url, VcsKind::Jj, true, &observed).unwrap_err();
 
         assert_eq!(error.code(), Code::AlreadyExists);
         assert_eq!(error.reason(), "REPO_EXISTS");
@@ -331,7 +339,7 @@ mod tests {
             ..Observed::default()
         };
 
-        let error = plan(&paths(), url, true, &observed).unwrap_err();
+        let error = plan(&paths(), url, VcsKind::Jj, true, &observed).unwrap_err();
 
         assert_eq!(error.code(), Code::AlreadyExists);
         assert_eq!(error.reason(), "PATH_EXISTS");
@@ -345,8 +353,18 @@ mod tests {
             ..Observed::default()
         };
 
-        let error = plan(&paths(), url, true, &observed).unwrap_err();
+        let error = plan(&paths(), url, VcsKind::Jj, true, &observed).unwrap_err();
 
         assert_eq!(error.reason(), "TREE_DIR_TAKEN");
+    }
+
+    #[test]
+    fn a_git_clone_cannot_be_jj_only() {
+        let url = CloneUrl::parse("github.com/acme/widget").unwrap();
+
+        let error = plan(&paths(), url, VcsKind::Git, false, &Observed::default()).unwrap_err();
+
+        assert_eq!(error, RepoError::ColocateNeedsJj);
+        assert_eq!(error.reason(), "COLOCATE_NEEDS_JJ");
     }
 }

@@ -19,6 +19,7 @@ pytest_plugins = [
     "init_steps",
     "clone_steps",
     "gc_steps",
+    "git_steps",
     "ls_steps",
     "remove_steps",
     "skills_steps",

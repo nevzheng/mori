@@ -27,7 +27,8 @@ pub struct Routed<J, G> {
 }
 
 /// Which backend owns `dir`, a clone or one of its trees.
-fn kind_of(dir: &Path) -> VcsKind {
+#[must_use]
+pub fn kind_of(dir: &Path) -> VcsKind {
     if dir.join(".jj").is_dir() {
         VcsKind::Jj
     } else {

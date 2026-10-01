@@ -117,6 +117,11 @@ fn list_repo(
         repo: repo.remote.clone(),
         path: clone.display().to_string(),
         trees,
+        vcs: if clone.exists() {
+            crate::api_vcs(crate::routed::kind_of(&clone)).into()
+        } else {
+            mori_api::v1alpha1::Vcs::Unspecified.into()
+        },
     })
 }
 

@@ -30,12 +30,14 @@ pub fn run<V: Backend, F: Forge>(
     url: &str,
     dry_run: bool,
     jj_only: bool,
+    vcs: Option<VcsKind>,
 ) -> Result<CloneResponse, Box<dyn ErrorDetails>> {
     let url = CloneUrl::parse(url).map_err(boxed)?;
     let paths = state::paths(&app.host)?;
     let mut db = state::open_database(&paths)?;
     let observed = observe(&paths, &db, &url)?;
-    let plan = plan(&paths, url, !jj_only, &observed).map_err(boxed)?;
+    let vcs = state::clone_vcs(&paths, vcs)?;
+    let plan = plan(&paths, url, vcs, !jj_only, &observed).map_err(boxed)?;
     if !dry_run {
         clone(&app.vcs, &plan)?;
         record(&mut db, &plan, app.host.user.as_deref())?;
@@ -79,8 +81,7 @@ fn clone(vcs: &impl Backend, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetail
             })
         })?;
     }
-    // A git backend choice arrives with `mori clone --vcs`; until then every clone is jj.
-    vcs.clone_as(VcsKind::Jj, &plan.url.fetch, &plan.path, plan.colocate)
+    vcs.clone_as(plan.vcs, &plan.url.fetch, &plan.path, plan.colocate)
         .map_err(boxed)
 }
 
@@ -124,6 +125,7 @@ fn response(paths: &Paths, plan: &ClonePlan, dry_run: bool) -> CloneResponse {
         colocated: plan.colocate,
         tree_dir: plan.tree_dir.clone(),
         validate_only: dry_run,
+        vcs: crate::api_vcs(plan.vcs).into(),
         context_dir: paths
             .root
             .join("context/projects")

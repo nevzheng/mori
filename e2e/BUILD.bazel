@@ -12,6 +12,7 @@ py_test(
         "clone_steps.py",
         "conftest.py",
         "gc_steps.py",
+        "git_steps.py",
         "harness.py",
         "init_steps.py",
         "ls_steps.py",

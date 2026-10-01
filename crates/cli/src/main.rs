@@ -12,6 +12,7 @@ use mori_app::routed::Routed;
 use mori_app::{App, Host, clone, gc, init, ls, restore, skills, tree, tree_remove};
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
+use mori_core::vcs::VcsKind;
 use mori_git::GitCli;
 use mori_github::GhCli;
 use mori_jj::JjCli;
@@ -47,9 +48,14 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
 
-        /// Make a jj-only clone. By default the clone is a git repo too (colocated).
+        /// Make a jj-only clone. By default a jj clone is a git repo too (colocated).
         #[arg(long)]
         no_colocate: bool,
+
+        /// The VCS for the clone and its trees: jj (workspaces) or git (detached worktrees).
+        /// Defaults to `[vcs] default` in config.toml, else jj.
+        #[arg(long)]
+        vcs: Option<VcsKind>,
     },
 
     /// Report which trees may be removed and whether each is safe to remove. With --apply --yes,
@@ -195,9 +201,10 @@ fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
             url,
             dry_run,
             no_colocate,
+            vcs,
         } => respond(
             json,
-            clone::run(app, &url, dry_run, no_colocate),
+            clone::run(app, &url, dry_run, no_colocate, vcs),
             output::clone_text,
         ),
         Command::Skills {
