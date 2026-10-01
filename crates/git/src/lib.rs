@@ -333,6 +333,14 @@ impl Vcs for GitCli {
         self.run(clone, &["fetch", "--prune", "--quiet"])
             .map(|_| ())
     }
+
+    fn available(&self) -> bool {
+        Command::new(&self.program)
+            .envs(self.envs.iter().map(|(key, value)| (key, value)))
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
 }
 
 /// Parses `git worktree list --porcelain -z`: records of NUL-terminated `key value` lines, each

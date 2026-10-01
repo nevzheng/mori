@@ -12,7 +12,8 @@ use std::path::{Path, PathBuf};
 pub struct Workspace {
     /// Its name in the VCS. For a tree mori created, this is the tree's name.
     pub name: String,
-    /// Its working directory.
+    /// Its working directory. Empty when the VCS no longer knows it (jj forgets the root of a
+    /// workspace whose directory was deleted).
     pub root: PathBuf,
 }
 

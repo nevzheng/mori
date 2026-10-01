@@ -484,6 +484,42 @@ impl JjCli {
     pub fn fetch(&self, clone: &Path) -> Result<(), JjError> {
         self.write(clone, &["git", "fetch"])
     }
+
+    /// The clone's local bookmarks with several targets (`main??`).
+    ///
+    /// # Errors
+    ///
+    /// [`JjError::Failed`] if jj fails, [`JjError::OutputInvalid`] if its answer can't be read.
+    pub fn conflicted_bookmarks(&self, clone: &Path) -> Result<Vec<String>, JjError> {
+        let stdout = self.read(
+            clone,
+            &[
+                "bookmark",
+                "list",
+                "--conflicted",
+                "-T",
+                r#"if(!remote, json(name) ++ "\n")"#,
+            ],
+        )?;
+        stdout
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| {
+                serde_json::from_str(line).map_err(|_| JjError::OutputInvalid {
+                    output: line.to_owned(),
+                })
+            })
+            .collect()
+    }
+
+    /// Whether `jj --version` runs.
+    #[must_use]
+    pub fn available(&self) -> bool {
+        self.command()
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
 }
 
 /// Every method is the inherent one of the same name; the trait lets flows take any backend.
@@ -549,6 +585,14 @@ impl Vcs for JjCli {
 
     fn fetch(&self, clone: &Path) -> Result<(), JjError> {
         Self::fetch(self, clone)
+    }
+
+    fn conflicted_bookmarks(&self, clone: &Path) -> Result<Vec<String>, JjError> {
+        Self::conflicted_bookmarks(self, clone)
+    }
+
+    fn available(&self) -> bool {
+        Self::available(self)
     }
 }
 
@@ -633,15 +677,16 @@ fn parse_workspace_list(stdout: &str) -> Result<Vec<Workspace>, JjError> {
             let invalid = || JjError::OutputInvalid {
                 output: line.to_owned(),
             };
-            let mut values = serde_json::Deserializer::from_str(line).into_iter::<String>();
-            let (Some(Ok(name)), Some(Ok(root)), None) =
+            // The root is `null` once the workspace's directory was deleted.
+            let mut values = serde_json::Deserializer::from_str(line).into_iter::<Option<String>>();
+            let (Some(Ok(Some(name))), Some(Ok(root)), None) =
                 (values.next(), values.next(), values.next())
             else {
                 return Err(invalid());
             };
             Ok(Workspace {
                 name,
-                root: PathBuf::from(root),
+                root: root.map(PathBuf::from).unwrap_or_default(),
             })
         })
         .collect()
@@ -761,6 +806,19 @@ mod tests {
                     root: PathBuf::from("/tmp/a \"quoted\" p\u{e4}th"),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn a_workspace_whose_directory_was_deleted_has_no_root() {
+        let workspaces = parse_workspace_list("\"claude-fix-login\" null\n").unwrap();
+
+        assert_eq!(
+            workspaces,
+            [Workspace {
+                name: "claude-fix-login".to_owned(),
+                root: PathBuf::new(),
+            }]
         );
     }
 

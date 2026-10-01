@@ -12,7 +12,7 @@ use crate::clone::RepoId;
 use crate::forest::{TreeState, Workspaces};
 
 /// Which VCS a clone and its trees use.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VcsKind {
     /// jj: trees are jj workspaces.
@@ -185,6 +185,21 @@ pub trait Vcs: Workspaces {
     ///
     /// If the fetch fails (offline, for example).
     fn fetch(&self, clone: &Path) -> Result<(), Self::Error>;
+
+    /// The clone's local bookmarks that have several targets. Backends whose branches can't
+    /// conflict have none.
+    ///
+    /// # Errors
+    ///
+    /// If the VCS fails or its answer can't be read.
+    fn conflicted_bookmarks(&self, _clone: &Path) -> Result<Vec<String>, Self::Error> {
+        Ok(Vec::new())
+    }
+
+    /// Whether the VCS program can be run at all.
+    fn available(&self) -> bool {
+        true
+    }
 }
 
 /// Whether a bookmark's pull request merged.

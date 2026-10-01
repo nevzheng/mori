@@ -8,9 +8,9 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use mori_api::v1alpha1::{
-    CloneResponse, CreateTreeResponse, GcResponse, InitResponse, ListTreesResponse,
-    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs, skill_file::Action,
-    tree_row::Status,
+    CloneResponse, CreateTreeResponse, DoctorResponse, GcResponse, InitResponse, ListTreesResponse,
+    RemoveTreeResponse, RestoreResponse, SyncSkillsResponse, TreeRow, Vcs, finding::Severity,
+    skill_file::Action, tree_row::Status,
 };
 use mori_core::error::{Code, ErrorDetails};
 use serde_json::{Map, Value, json};
@@ -379,6 +379,36 @@ pub fn restore_text(response: &RestoreResponse) -> String {
         let _ = writeln!(text, "  task: {} (owner {})", tree.task, tree.owner);
     }
     text
+}
+
+/// The text `doctor` prints: each finding, worst first, with its fix, then the summary.
+pub fn doctor_text(response: &DoctorResponse) -> String {
+    let mut text = String::new();
+    for finding in &response.findings {
+        let severity = match finding.severity() {
+            Severity::Problem => "problem",
+            Severity::Warn => "warn",
+            Severity::Info | Severity::Unspecified => "info",
+        };
+        let _ = writeln!(text, "{severity:<8} {}  {}", finding.code, finding.subject);
+        let _ = writeln!(text, "         {}", finding.message);
+        let _ = writeln!(text, "         fix: {}", finding.fix);
+    }
+    let _ = writeln!(text, "{}", response.summary);
+    text
+}
+
+/// Whether `doctor` found any problem, which makes it exit non-zero.
+pub fn doctor_has_problems(response: &DoctorResponse) -> bool {
+    response
+        .findings
+        .iter()
+        .any(|finding| finding.severity() == Severity::Problem)
+}
+
+/// The exit code when `doctor` found problems: `FAILED_PRECONDITION`, as for a refusal.
+pub fn doctor_problems_exit() -> ExitCode {
+    exit(Code::FailedPrecondition)
 }
 
 fn report(

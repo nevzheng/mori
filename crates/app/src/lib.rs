@@ -6,6 +6,7 @@
 //! builds one with fakes.
 
 pub mod clone;
+pub mod doctor;
 pub mod gc;
 mod gc_apply;
 pub mod init;
@@ -74,6 +75,11 @@ pub trait Backend: Vcs<Error: ErrorDetails + 'static> {
         path: &Path,
         colocate: bool,
     ) -> Result<(), Self::Error>;
+
+    /// Which of `needed` can't be run on this machine. By default, none.
+    fn missing_tools(&self, _needed: &[VcsKind]) -> Vec<VcsKind> {
+        Vec::new()
+    }
 }
 
 /// The API's name for `kind`.

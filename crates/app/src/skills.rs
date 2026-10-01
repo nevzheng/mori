@@ -54,6 +54,14 @@ pub(crate) fn run(
     })
 }
 
+/// Whether a generated `llms.txt` index is missing or differs from what mori would write now.
+/// One a person edited counts as current: mori never overwrites it.
+pub(crate) fn index_stale(paths: &Paths) -> Result<bool, Box<dyn ErrorDetails>> {
+    let observed = mori_store::skills::observe(paths).map_err(boxed)?;
+    let steps = mori_store::skills::index_plan(&observed, &repo_contexts(paths)?);
+    Ok(steps.iter().any(|step| step.action.writes()))
+}
+
 /// Every recorded repo's context folder, for the index. None before mori is set up.
 fn repo_contexts(paths: &Paths) -> Result<Vec<RepoContext>, Box<dyn ErrorDetails>> {
     if paths.database.symlink_metadata().is_err() {
