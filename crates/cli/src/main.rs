@@ -8,9 +8,11 @@ mod output;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use mori_app::routed::Routed;
 use mori_app::{App, Host, clone, gc, init, ls, restore, skills, tree, tree_remove};
 use mori_core::error::ErrorDetails;
 use mori_core::tree::Lifetime;
+use mori_git::GitCli;
 use mori_github::GhCli;
 use mori_jj::JjCli;
 
@@ -183,7 +185,7 @@ fn main() -> ExitCode {
 }
 
 /// Runs the parsed command and prints its result.
-fn dispatch(app: &App<JjCli, GhCli>, cli: Cli) -> ExitCode {
+fn dispatch(app: &App<Routed<JjCli, GitCli>, GhCli>, cli: Cli) -> ExitCode {
     let json = cli.json;
     match cli.command {
         Command::Init { dry_run } => {
@@ -279,12 +281,15 @@ fn dispatch(app: &App<JjCli, GhCli>, cli: Cli) -> ExitCode {
     }
 }
 
-/// The app for this process: its environment and clock, jj on `PATH`, and `gh` (or `$MORI_GH`,
+/// The app for this process: its environment and clock, jj and git on `PATH`, and `gh` (or `$MORI_GH`,
 /// which lets tests stand in for it).
-fn real_app() -> App<JjCli, GhCli> {
+fn real_app() -> App<Routed<JjCli, GitCli>, GhCli> {
     App::new(
         Host::from_process(),
-        JjCli::from_path(),
+        Routed {
+            jj: JjCli::from_path(),
+            git: GitCli::from_path(),
+        },
         std::env::var_os("MORI_GH").map_or_else(GhCli::from_path, GhCli::new),
     )
 }

@@ -7,13 +7,13 @@
 use mori_api::v1alpha1::gc_item::{Class as ItemClass, Outcome};
 use mori_core::clone::{CloneUrl, clone_path};
 use mori_core::error::ErrorDetails;
-use mori_store::StoreError;
 use mori_store::database::Database;
 use mori_store::gc::{JournalBookmark, JournalEntry, new_id};
 use mori_store::records::{RepoRecord, TreeRecord};
 
 use crate::Backend;
 use crate::gc::{self, Context};
+use crate::state;
 use crate::state::boxed;
 
 /// Checks one tree again and, if it still may go and is safe, removes it.
@@ -117,12 +117,7 @@ fn remove<V: Backend>(
             .vcs
             .forget_tree(&clone, &record.name)
             .map_err(boxed)?;
-        std::fs::remove_dir_all(&path).map_err(|source| {
-            boxed(StoreError::Io {
-                path: path.clone(),
-                source,
-            })
-        })?;
+        state::remove_tree_dir(&path)?;
         (commit, pin)
     } else {
         (String::new(), String::new())

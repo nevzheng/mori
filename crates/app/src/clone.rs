@@ -17,7 +17,7 @@ use mori_store::records::{NewRepo, NewTree};
 
 use crate::state::{self, boxed};
 use crate::{App, Backend};
-use mori_core::vcs::Forge;
+use mori_core::vcs::{Forge, VcsKind};
 
 /// Runs `clone`: the VCS clone, then a best-effort record of it.
 ///
@@ -79,7 +79,8 @@ fn clone(vcs: &impl Backend, plan: &ClonePlan) -> Result<(), Box<dyn ErrorDetail
             })
         })?;
     }
-    vcs.clone_repo(&plan.url.fetch, &plan.path, plan.colocate)
+    // A git backend choice arrives with `mori clone --vcs`; until then every clone is jj.
+    vcs.clone_as(VcsKind::Jj, &plan.url.fetch, &plan.path, plan.colocate)
         .map_err(boxed)
 }
 
