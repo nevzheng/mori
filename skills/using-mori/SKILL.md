@@ -84,7 +84,9 @@ safe to run, even while others work.
   tree first if you need it current.
 - Clones under `repos/` that mori didn't make are listed apart, and left alone.
 - With `--json`, rows are in `repos[].trees[]`, with `status` (`STATUS_TREE`, `STATUS_MISSING`,
-  `STATUS_FOREIGN`), `tree` and `state`. Fields at their default (`false`, `0`) are left out.
+  `STATUS_FOREIGN`), `tree`, `state`, and `bookmarks`: each bookmark mori has seen the tree push,
+  with `onRemote` and `landed` (gone from the remote after a push, as after a squash merge). Fields
+  at their default (`false`, `0`) are left out.
 
 ### `mori tree create <repo> --task <slug>`
 

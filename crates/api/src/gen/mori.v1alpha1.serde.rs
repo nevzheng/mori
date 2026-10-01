@@ -2282,6 +2282,170 @@ impl<'de> serde::Deserialize<'de> for ListTreesResponse {
         deserializer.deserialize_struct("mori.v1alpha1.ListTreesResponse", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for PushedBookmark {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.remote.is_empty() {
+            len += 1;
+        }
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.commit_id.is_empty() {
+            len += 1;
+        }
+        if self.on_remote {
+            len += 1;
+        }
+        if self.landed {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.PushedBookmark", len)?;
+        if !self.remote.is_empty() {
+            struct_ser.serialize_field("remote", &self.remote)?;
+        }
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.commit_id.is_empty() {
+            struct_ser.serialize_field("commitId", &self.commit_id)?;
+        }
+        if self.on_remote {
+            struct_ser.serialize_field("onRemote", &self.on_remote)?;
+        }
+        if self.landed {
+            struct_ser.serialize_field("landed", &self.landed)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for PushedBookmark {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "remote",
+            "name",
+            "commit_id",
+            "commitId",
+            "on_remote",
+            "onRemote",
+            "landed",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Remote,
+            Name,
+            CommitId,
+            OnRemote,
+            Landed,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl serde::de::Visitor<'_> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "remote" => Ok(GeneratedField::Remote),
+                            "name" => Ok(GeneratedField::Name),
+                            "commitId" | "commit_id" => Ok(GeneratedField::CommitId),
+                            "onRemote" | "on_remote" => Ok(GeneratedField::OnRemote),
+                            "landed" => Ok(GeneratedField::Landed),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = PushedBookmark;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct mori.v1alpha1.PushedBookmark")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<PushedBookmark, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut remote__ = None;
+                let mut name__ = None;
+                let mut commit_id__ = None;
+                let mut on_remote__ = None;
+                let mut landed__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Remote => {
+                            if remote__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("remote"));
+                            }
+                            remote__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::CommitId => {
+                            if commit_id__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("commitId"));
+                            }
+                            commit_id__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::OnRemote => {
+                            if on_remote__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("onRemote"));
+                            }
+                            on_remote__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Landed => {
+                            if landed__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("landed"));
+                            }
+                            landed__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(PushedBookmark {
+                    remote: remote__.unwrap_or_default(),
+                    name: name__.unwrap_or_default(),
+                    commit_id: commit_id__.unwrap_or_default(),
+                    on_remote: on_remote__.unwrap_or_default(),
+                    landed: landed__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("mori.v1alpha1.PushedBookmark", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for RemoveTreeRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -3550,6 +3714,9 @@ impl serde::Serialize for TreeRow {
         if self.state.is_some() {
             len += 1;
         }
+        if !self.bookmarks.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("mori.v1alpha1.TreeRow", len)?;
         if let Some(v) = self.tree.as_ref() {
             struct_ser.serialize_field("tree", v)?;
@@ -3563,6 +3730,9 @@ impl serde::Serialize for TreeRow {
         if let Some(v) = self.state.as_ref() {
             struct_ser.serialize_field("state", v)?;
         }
+        if !self.bookmarks.is_empty() {
+            struct_ser.serialize_field("bookmarks", &self.bookmarks)?;
+        }
         struct_ser.end()
     }
 }
@@ -3572,13 +3742,14 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["tree", "status", "state"];
+        const FIELDS: &[&str] = &["tree", "status", "state", "bookmarks"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Tree,
             Status,
             State,
+            Bookmarks,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3606,6 +3777,7 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                             "tree" => Ok(GeneratedField::Tree),
                             "status" => Ok(GeneratedField::Status),
                             "state" => Ok(GeneratedField::State),
+                            "bookmarks" => Ok(GeneratedField::Bookmarks),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3628,6 +3800,7 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                 let mut tree__ = None;
                 let mut status__ = None;
                 let mut state__ = None;
+                let mut bookmarks__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Tree => {
@@ -3648,12 +3821,19 @@ impl<'de> serde::Deserialize<'de> for TreeRow {
                             }
                             state__ = map_.next_value()?;
                         }
+                        GeneratedField::Bookmarks => {
+                            if bookmarks__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("bookmarks"));
+                            }
+                            bookmarks__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(TreeRow {
                     tree: tree__,
                     status: status__.unwrap_or_default(),
                     state: state__,
+                    bookmarks: bookmarks__.unwrap_or_default(),
                 })
             }
         }

@@ -115,3 +115,23 @@ def text_row(mori: Mori, name: str, owner: str, task: str, lifetime: str) -> Non
     matching = [cells for cells in lines if cells and cells[0] == name]
     assert matching, f"no row for {name!r} in:\n{mori.last.stdout}"
     assert_that(matching[0][1:5], equal_to(["tree", owner, task, lifetime]))
+
+
+@then(parsers.parse('the forest shows "{name}" pushed "{bookmark}", on the remote, not landed'))
+def pushed_not_landed(mori: Mori, name: str, bookmark: str) -> None:
+    seen = {entry["name"]: entry for entry in row(mori, name).get("bookmarks", [])}
+    assert bookmark in seen, seen
+    assert_that(
+        (seen[bookmark].get("onRemote", False), seen[bookmark].get("landed", False)),
+        equal_to((True, False)),
+    )
+
+
+@then(parsers.parse('the forest shows "{name}" pushed "{bookmark}", gone, landed'))
+def pushed_landed(mori: Mori, name: str, bookmark: str) -> None:
+    seen = {entry["name"]: entry for entry in row(mori, name).get("bookmarks", [])}
+    assert bookmark in seen, seen
+    assert_that(
+        (seen[bookmark].get("onRemote", False), seen[bookmark].get("landed", False)),
+        equal_to((False, True)),
+    )

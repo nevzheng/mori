@@ -210,7 +210,7 @@ pub struct RepoTrees {
     pub trees: ::prost::alloc::vec::Vec<TreeRow>,
 }
 /// One tree, as mori recorded it and as the VCS reports it.
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TreeRow {
     /// The tree. A foreign tree has only its name and path.
     #[prost(message, optional, tag = "1")]
@@ -221,6 +221,9 @@ pub struct TreeRow {
     /// The VCS state; unset for a missing tree.
     #[prost(message, optional, tag = "3")]
     pub state: ::core::option::Option<TreeState>,
+    /// The bookmarks mori has seen pushed from the tree (task trees only), and whether each landed.
+    #[prost(message, repeated, tag = "4")]
+    pub bookmarks: ::prost::alloc::vec::Vec<PushedBookmark>,
 }
 /// Nested message and enum types in `TreeRow`.
 pub mod tree_row {
@@ -261,6 +264,27 @@ pub mod tree_row {
             }
         }
     }
+}
+/// A bookmark mori saw pushed from a tree.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct PushedBookmark {
+    /// The remote, e.g. "origin".
+    #[prost(string, tag = "1")]
+    pub remote: ::prost::alloc::string::String,
+    /// The bookmark, e.g. "claude/fix-login".
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    /// Where it pointed when mori last saw it.
+    #[prost(string, tag = "3")]
+    pub commit_id: ::prost::alloc::string::String,
+    /// Whether the remote still has it, as far as the clone knows.
+    #[prost(bool, tag = "4")]
+    pub on_remote: bool,
+    /// Whether its work landed: it is gone from the remote after being pushed (as after a squash
+    /// merge). `ls` doesn't ask GitHub, so a merged pull request whose bookmark still exists shows as
+    /// not landed here.
+    #[prost(bool, tag = "5")]
+    pub landed: bool,
 }
 /// A tree's state as of the VCS's last snapshot of it.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

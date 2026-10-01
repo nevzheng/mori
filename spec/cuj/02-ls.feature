@@ -27,6 +27,16 @@ Feature: CUJ 2 - see the forest
     When I run "mori ls --json"
     Then the forest shows "claude-fix-login" as edited with 1 unpushed change
 
+  Scenario: ls shows whether pushed work landed
+    Given I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
+    And someone commits work in "claude-fix-login"
+    And pushes it to the remote as "claude/fix-login"
+    When I run "mori ls --json"
+    Then the forest shows "claude-fix-login" pushed "claude/fix-login", on the remote, not landed
+    Given the remote deletes "claude/fix-login" after a squash merge
+    When I run "mori ls --json"
+    Then the forest shows "claude-fix-login" pushed "claude/fix-login", gone, landed
+
   Scenario: A workspace mori didn't make is foreign
     Given someone added a workspace "scratch" to the clone outside mori
     When I run "mori ls --json"
