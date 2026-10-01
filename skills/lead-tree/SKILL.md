@@ -13,7 +13,8 @@ pinned lifetime, so cleanup never picks it, and a name that says what it is for.
 in their own task trees; the lead tree is where their work comes together before it goes up for
 review. mori records no "lead" role: how you run the tree is up to this skill and the person.
 
-Read the `using-mori` skill first; its rules apply here too.
+Read the `using-mori` skill first; its rules apply here too. `agent-workflows` has the fuller
+recipes (workers, exchanging work, restacking).
 
 ## Make one
 
