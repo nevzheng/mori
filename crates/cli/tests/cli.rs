@@ -114,3 +114,27 @@ fn errors_as_text_go_to_stderr() {
         "{stderr}"
     );
 }
+
+#[test]
+fn completions_are_printed_for_a_shell() {
+    let home = tempfile::tempdir().unwrap();
+    let out = mori(home.path(), &[], &["completions", "bash"]).unwrap();
+
+    assert!(out.status.success());
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("_mori()"), "{stdout}");
+}
+
+#[test]
+fn help_has_examples_and_the_environment() {
+    let home = tempfile::tempdir().unwrap();
+    let top = mori(home.path(), &[], &["--help"]).unwrap();
+    let create = mori(home.path(), &[], &["tree", "create", "--help"]).unwrap();
+
+    assert!(String::from_utf8(top.stdout).unwrap().contains("MORI_ROOT"));
+    assert!(
+        String::from_utf8(create.stdout)
+            .unwrap()
+            .contains("Examples:\n  mori tree create widget")
+    );
+}

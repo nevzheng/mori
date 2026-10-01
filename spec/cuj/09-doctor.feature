@@ -86,11 +86,11 @@ Feature: CUJ 9 - check the root
     Then it fails with status FAILED_PRECONDITION and reason "CONFIRMATION_NEEDED"
     And mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
 
-  Scenario: --fix --dry-run repairs nothing
+  Scenario: --dry-run shows what --fix would repair, and repairs nothing
     Given I have run "mori clone github.com/acme/widget"
     And I have run "mori tree create github.com/acme/widget --agent claude --task fix-login"
     And the directory of "claude-fix-login" was deleted by hand
-    When I run "mori doctor --fix --dry-run"
+    When I run "mori doctor --dry-run"
     Then stdout matches "(?s)Would fix TREE_DIR_GONE  github.com/acme/widget claude-fix-login.*"
     And mori records the tree "claude-fix-login" for claude's task "fix-login", lifetime "task-done"
 

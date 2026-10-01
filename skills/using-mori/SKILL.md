@@ -174,11 +174,12 @@ and a reason:
 - **keep**: not yet (`NOT_YET`), or it can't be told (`UNKNOWN`: offline, or no `gh` login).
 - **never**: the clone itself, a pinned tree, or a workspace mori didn't make.
 
-`mori gc --apply --yes` also removes the removable trees, at most 10 per run (`--max`, `--only
-<name>`). Each is snapshotted and judged again first, and kept if it changed; each removal pins the
-tree's commit and goes into the journal, and the output gives the `mori restore <entry>` command
-that undoes it. Without `--yes` nothing is removed (`CONFIRMATION_NEEDED`); `--apply --dry-run`
-shows what would go. Removing is the person's decision: don't run `--apply` unless they asked.
+`mori gc --apply --yes` also removes the removable trees, at most 10 per run (`--max`,
+`--only <name>`). Each is snapshotted and judged again first, and kept if it changed; each removal
+pins the tree's commit and goes into the journal, and the output gives the `mori restore <entry>`
+command that undoes it. Without `--yes` nothing is removed (`CONFIRMATION_NEEDED`); `--dry-run`
+shows what `--apply` would remove, checking each tree again. Removing is the person's decision:
+don't run `--apply` unless they asked.
 
 Each tree that may go shows how much removing it frees (`sizeBytes`). **`--free <size>`** (e.g.
 `--free 200G`) picks removable trees, least recently changed first, until they free that much, and

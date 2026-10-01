@@ -29,7 +29,7 @@ Feature: CUJ 6 - clean up safely: removing what the report finds
     And "<home>/mori/trees/widget/claude-fix-login" exists
 
   Scenario: A dry run removes nothing
-    When I run "mori gc --apply --dry-run"
+    When I run "mori gc --dry-run"
     Then it succeeds
     And the output says "claude-fix-login" would be removed
     And "<home>/mori/trees/widget/claude-fix-login" exists

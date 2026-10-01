@@ -61,5 +61,12 @@ mori --version
 mori init      # sets up ~/mori, its config and database, and the agent skills
 ```
 
+Shell completions and the man page come from the binary:
+
+```sh
+mori completions zsh > ~/.zfunc/_mori    # or bash, fish, elvish, powershell
+mori man | man -l -
+```
+
 Then point your agent at the root once, for example by adding "Before working under ~/mori, read
 ~/mori/llms.txt" to the instructions file it reads (`AGENTS.md`, `CLAUDE.md`, or your tool's rules).
