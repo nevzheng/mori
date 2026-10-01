@@ -74,7 +74,6 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
     // after the remote deletes them.
     let landed = match (&record, has_workspace) {
         (Some(record), true) => {
-            let policy = state::tree_policy(&paths)?.landed.when;
             landing::observe(
                 &mut db,
                 &jj,
@@ -85,7 +84,6 @@ pub fn run(args: RemoveArgs) -> Result<RemoveTreeResponse, Box<dyn ErrorDetails>
                     id: &record.id,
                     name: &request.name,
                 },
-                &policy,
             )?
             .commits
         }

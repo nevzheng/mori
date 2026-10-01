@@ -6,7 +6,6 @@ use std::path::Path;
 use mori_core::clone::RepoId;
 use mori_core::error::ErrorDetails;
 use mori_core::gc::{Landing, SeenBookmark, landing};
-use mori_core::tree::Landed;
 use mori_github::{GhCli, Merged};
 use mori_jj::JjCli;
 use mori_store::database::Database;
@@ -32,7 +31,6 @@ pub fn observe(
     jj: &JjCli,
     gh: Option<&GhCli>,
     tree: &TreeRef,
-    policy: &[Landed],
 ) -> Result<Landing, Box<dyn ErrorDetails>> {
     let current = jj.pushed_bookmarks(tree.clone, tree.name).map_err(boxed)?;
     for bookmark in &current {
@@ -60,5 +58,5 @@ pub fn observe(
             commit_id: recorded.commit_id,
         })
         .collect();
-    Ok(landing(&seen, policy))
+    Ok(landing(&seen))
 }

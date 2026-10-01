@@ -5,10 +5,8 @@
 //! safe?** Nothing in it exists only on this machine. The adapter gathers the facts from the VCS
 //! and the remote; [`classify`] decides. Unknown facts never make a tree a candidate.
 
-use std::collections::BTreeSet;
-
 use crate::forest::TreeState;
-use crate::tree::{Landed, Lifetime, Role};
+use crate::tree::{Lifetime, Role};
 
 /// What happens to a tree in a cleanup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -38,8 +36,6 @@ pub enum Reason {
     Landed,
     /// `ttl`, and nothing changed in it for that long.
     Idle,
-    /// `lru`, and its repo is over the cap.
-    OverCap,
     /// Its lifetime doesn't make it a candidate yet.
     NotYet,
     /// Whether it may go can't be known now (offline, no GitHub access, no change time).
@@ -59,7 +55,6 @@ impl Reason {
             Self::Missing => "MISSING",
             Self::Landed => "LANDED",
             Self::Idle => "IDLE",
-            Self::OverCap => "OVER_CAP",
             Self::NotYet => "NOT_YET",
             Self::Unknown => "UNKNOWN",
             Self::Unsaved => "UNSAVED",
@@ -78,8 +73,6 @@ pub struct Facts {
     pub landed: Option<bool>,
     /// Seconds since its latest change (for `ttl`); none when unknown.
     pub idle_seconds: Option<u64>,
-    /// Whether it is beyond its repo's `lru` cap (see [`over_cap`]).
-    pub over_cap: bool,
 }
 
 /// Sorts one tree into its class, with the reason. First match wins.
@@ -109,8 +102,6 @@ pub fn classify(facts: &Facts) -> (Class, Reason) {
             Some(_) => return (Class::Keep, Reason::NotYet),
             None => return (Class::Keep, Reason::Unknown),
         },
-        Lifetime::Lru if facts.over_cap => Reason::OverCap,
-        Lifetime::Lru => return (Class::Keep, Reason::NotYet),
     };
     if state.changed || state.unpushed > 0 {
         (Class::Blocked, Reason::Unsaved)
@@ -141,22 +132,17 @@ pub struct Landing {
     pub commits: Vec<String>,
 }
 
-/// Decides which of a tree's recorded bookmarks landed, under the `[trees.landed]` policy.
+/// Decides which of a tree's recorded bookmarks landed: a bookmark landed when its pull request
+/// merged, or when it is gone from the remote after mori saw it pushed.
 #[must_use]
-pub fn landing(seen: &[SeenBookmark], policy: &[Landed]) -> Landing {
-    let deleted_counts = policy.contains(&Landed::PushedBookmarkDeleted);
-    let merged_counts = policy.contains(&Landed::PrMerged);
+pub fn landing(seen: &[SeenBookmark]) -> Landing {
     let landed: Vec<&SeenBookmark> = seen
         .iter()
-        .filter(|bookmark| {
-            (deleted_counts && !bookmark.on_remote)
-                || (merged_counts && bookmark.pr_merged == Some(true))
-        })
+        .filter(|bookmark| !bookmark.on_remote || bookmark.pr_merged == Some(true))
         .collect();
-    let unknown = merged_counts
-        && seen
-            .iter()
-            .any(|bookmark| bookmark.on_remote && bookmark.pr_merged.is_none());
+    let unknown = seen
+        .iter()
+        .any(|bookmark| bookmark.on_remote && bookmark.pr_merged.is_none());
     Landing {
         landed: if !landed.is_empty() {
             Some(true)
@@ -170,23 +156,6 @@ pub fn landing(seen: &[SeenBookmark], policy: &[Landed]) -> Landing {
             .map(|bookmark| bookmark.commit_id.clone())
             .collect(),
     }
-}
-
-/// The trees beyond a repo's `lru` cap: of its task trees (name and seconds since their latest
-/// change), all but the `max` most recently changed. Trees with no known change time count as the
-/// most recent, so they are never pushed over the cap by a guess.
-#[must_use]
-pub fn over_cap(task_trees: &[(String, Option<u64>)], max: Option<u32>) -> BTreeSet<String> {
-    let Some(max) = max else {
-        return BTreeSet::new();
-    };
-    let mut ranked: Vec<&(String, Option<u64>)> = task_trees.iter().collect();
-    ranked.sort_by_key(|(_, idle)| idle.unwrap_or(0));
-    ranked
-        .into_iter()
-        .skip(usize::try_from(max).unwrap_or(usize::MAX))
-        .map(|(name, _)| name.clone())
-        .collect()
 }
 
 #[cfg(test)]
@@ -211,7 +180,6 @@ mod tests {
             state: Some(clean()),
             landed: None,
             idle_seconds: None,
-            over_cap: false,
         }
     }
 
@@ -291,13 +259,13 @@ mod tests {
             }),
             ..task(Lifetime::TaskDone)
         };
-        let over_cap_but_unpushed = Facts {
-            over_cap: true,
+        let idle_but_unpushed = Facts {
+            idle_seconds: Some(30 * DAY),
             state: Some(TreeState {
                 unpushed: 2,
                 ..clean()
             }),
-            ..task(Lifetime::Lru)
+            ..task(Lifetime::Ttl(Duration::from_secs(14 * DAY)))
         };
 
         assert_eq!(
@@ -305,31 +273,14 @@ mod tests {
             (Class::Blocked, Reason::Unsaved)
         );
         assert_eq!(
-            classify(&over_cap_but_unpushed),
+            classify(&idle_but_unpushed),
             (Class::Blocked, Reason::Unsaved)
         );
     }
 
     #[test]
-    fn over_cap_is_the_least_recently_changed_beyond_max() {
-        let trees = [
-            ("fresh".to_owned(), Some(DAY)),
-            ("old".to_owned(), Some(30 * DAY)),
-            ("oldest".to_owned(), Some(90 * DAY)),
-            ("unknown".to_owned(), None),
-        ];
-
-        assert_eq!(
-            over_cap(&trees, Some(2)),
-            BTreeSet::from(["old".to_owned(), "oldest".to_owned()])
-        );
-        assert!(over_cap(&trees, None).is_empty());
-        assert!(over_cap(&trees, Some(10)).is_empty());
-    }
-
-    #[test]
     fn reason_codes_are_stable() {
-        assert_eq!(Reason::OverCap.code(), "OVER_CAP");
+        assert_eq!(Reason::Landed.code(), "LANDED");
         assert_eq!(Reason::Unsaved.code(), "UNSAVED");
     }
 
@@ -341,11 +292,9 @@ mod tests {
         }
     }
 
-    const BOTH: [Landed; 2] = [Landed::PrMerged, Landed::PushedBookmarkDeleted];
-
     #[test]
     fn a_bookmark_gone_from_the_remote_landed() {
-        let landing = landing(&[seen("aaaa", false, None)], &BOTH);
+        let landing = landing(&[seen("aaaa", false, None)]);
 
         assert_eq!(landing.landed, Some(true));
         assert_eq!(landing.commits, ["aaaa"]);
@@ -353,32 +302,22 @@ mod tests {
 
     #[test]
     fn a_merged_pull_request_landed() {
-        let landing = landing(&[seen("aaaa", true, Some(true))], &BOTH);
+        let landing = landing(&[seen("aaaa", true, Some(true))]);
 
         assert_eq!(landing.landed, Some(true));
     }
 
     #[test]
     fn nothing_pushed_is_not_landed() {
-        assert_eq!(landing(&[], &BOTH).landed, Some(false));
+        assert_eq!(landing(&[]).landed, Some(false));
         assert_eq!(
-            landing(&[seen("aaaa", true, Some(false))], &BOTH).landed,
+            landing(&[seen("aaaa", true, Some(false))]).landed,
             Some(false)
         );
     }
 
     #[test]
     fn an_open_bookmark_with_no_answer_is_unknown() {
-        assert_eq!(landing(&[seen("aaaa", true, None)], &BOTH).landed, None);
-    }
-
-    #[test]
-    fn the_policy_decides_which_facts_count() {
-        let only_merged = [Landed::PrMerged];
-
-        let deleted = landing(&[seen("aaaa", false, Some(false))], &only_merged);
-
-        assert_eq!(deleted.landed, Some(false));
-        assert!(deleted.commits.is_empty());
+        assert_eq!(landing(&[seen("aaaa", true, None)]).landed, None);
     }
 }

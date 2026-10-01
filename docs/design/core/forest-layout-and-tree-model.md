@@ -8,7 +8,12 @@
 | **Issue**   | none                          |
 | **PR**      | #16                           |
 | **Created** | 2026-09-30                    |
-| **Updated** | 2026-09-30                    |
+| **Updated** | 2026-10-01                    |
+
+> **Changed after acceptance (2026-10-01):** a review of the whole command surface found no need
+> for the `lru` lifetime or the `[trees.lru]` and `[trees.landed]` settings, so they were dropped:
+> lifetimes are `pinned`, `task-done` and `ttl`, and both landing rules (pull request merged, pushed
+> bookmark deleted) always apply. The text below is the design as accepted.
 
 ## Q1. What are you trying to do?
 
