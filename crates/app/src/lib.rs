@@ -12,6 +12,7 @@ pub mod init;
 mod landing;
 pub mod ls;
 pub mod restore;
+pub mod routed;
 pub mod skills;
 mod state;
 pub mod tree;
@@ -24,7 +25,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use mori_core::error::ErrorDetails;
 use mori_core::paths::Env;
-use mori_core::vcs::{Forge, Vcs};
+use std::path::Path;
+
+use mori_core::vcs::{Forge, Vcs, VcsKind};
 
 /// What a command reads from the process: environment variables and the clock.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -56,10 +59,22 @@ impl Host {
     }
 }
 
-/// A VCS whose errors the flows can report.
-pub trait Backend: Vcs<Error: ErrorDetails + 'static> {}
-
-impl<T: Vcs<Error: ErrorDetails + 'static>> Backend for T {}
+/// A VCS the flows can use: its errors carry codes and reasons, and it can make a clone of
+/// either kind ([`routed::Routed`] in the binary).
+pub trait Backend: Vcs<Error: ErrorDetails + 'static> {
+    /// Clones `url` into `path` as a `kind` clone; `colocate` applies to jj.
+    ///
+    /// # Errors
+    ///
+    /// As [`Vcs::clone_repo`].
+    fn clone_as(
+        &self,
+        kind: VcsKind,
+        url: &str,
+        path: &Path,
+        colocate: bool,
+    ) -> Result<(), Self::Error>;
+}
 
 /// Everything a command gets from outside.
 pub struct App<V, F> {

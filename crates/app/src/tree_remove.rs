@@ -7,7 +7,6 @@ use mori_core::error::{ErrorDetails, RepoError};
 use mori_core::tree::{Lifetime, Role};
 use mori_core::tree_remove::{Observed, Recorded, RemovePlan, Request, plan};
 use mori_core::vcs::Forge;
-use mori_store::StoreError;
 use mori_store::records::TreeRecord;
 
 use crate::landing;
@@ -139,12 +138,7 @@ fn remove(
     }
     vcs.forget_tree(clone, &plan.name).map_err(boxed)?;
     response.workspace_forgotten = true;
-    std::fs::remove_dir_all(&plan.path).map_err(|source| {
-        boxed(StoreError::Io {
-            path: plan.path.clone(),
-            source,
-        })
-    })?;
+    state::remove_tree_dir(&plan.path)?;
     response.directory_removed = true;
     Ok(())
 }

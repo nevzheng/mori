@@ -13,6 +13,7 @@ clap.workspace = true
 mori-api = { path = "../api" }
 mori-app = { path = "../app" }
 mori-core = { path = "../core" }
+mori-git = { path = "../git" }
 mori-github = { path = "../github" }
 mori-jj = { path = "../jj" }
 serde.workspace = true
